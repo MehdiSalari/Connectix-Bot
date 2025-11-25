@@ -1,0 +1,5 @@
+config.php
+debug/*.*
+broadcast/uploads/*
+broadcast/*.json
+broadcast/*.txt
