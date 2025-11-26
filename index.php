@@ -35,6 +35,128 @@ $stmt->close();
 $totalUsers = $conn->query("SELECT COUNT(*) as cnt FROM users")->fetch_assoc()['cnt'];
 $adminChatId = $admin['chat_id'] ?? null; // chat_id ادمین
 $conn->close();
+
+
+// Handle Configuration Form Submission
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // get data from request
+    $appName = $_POST['app_name'] ?? '';
+    $adminId = $_POST['admin_id'] ?? '';
+    $telegramSupport = $_POST['telegram_support'] ?? '';
+    $telegramChannel = $_POST['telegram_channel'] ?? '';
+    $cardNumber = $_POST['card_number'] ?? '';
+    $cardName = $_POST['card_name'] ?? '';
+    $welcomeMessage = $_POST['welcome_message'] ?? '';
+    $supportMessage = $_POST['support_message'] ?? '';
+    $faqMessage = $_POST['faq_message'] ?? '';
+    $freeTrialMessage = $_POST['free_trial_message'] ?? '';
+
+    // update config file
+    $botConfig = [
+        'app_name' => $appName,
+        'admin_id' => $adminId,
+        'support_telegram' => $telegramSupport,
+        'channel_telegram' => $telegramChannel,
+        'card_number' => $cardNumber,
+        'card_name' => $cardName,
+        'messages' => [
+            'welcome_text' => $welcomeMessage,
+            'contact_support' => $supportMessage,
+            'questions_and_answers' => $faqMessage,
+            'free_test_account_created' => $freeTrialMessage
+        ]
+    ];
+
+    $config = json_encode($botConfig, JSON_PRETTY_PRINT);
+    file_put_contents('setup/bot_config.json', $config);
+
+    //update config in main panel
+    //get data from api
+    $endpoint = "https://api.connectix.vip/v1/seller/telegram-bot";
+
+    $ch = curl_init();
+    curl_setopt_array($ch, [
+        CURLOPT_URL            => $endpoint,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT        => 30,
+        CURLOPT_CONNECTTIMEOUT => 10,
+        CURLOPT_SSL_VERIFYPEER => false, // Connectix sometimes has SSL issues
+        CURLOPT_SSL_VERIFYHOST => false,
+        CURLOPT_HTTPHEADER     => [
+            "Authorization: Bearer {$panelToken}",
+            "Accept: application/json",
+            "Content-Type: application/json",
+            "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36",
+            "Origin: https://connectix.vip",
+            "Referer: https://connectix.vip/"
+        ],
+    ]);
+
+    $response = curl_exec($ch);
+    $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+
+    if ($http_code != 200) {
+        $errorMsg = "خطا در ارتباط با پنل مدیریت. کد خطا: $http_code";
+        echo "<script>alert('$errorMsg')</script>";
+        exit();
+    }
+
+    $data = json_decode($response, true);
+
+    if (isset($data['bot']) && !empty($data['bot'])) {
+        // Update local config file
+        $updateData = [
+            'app_name' => $appName,
+            'support_telegram' => $telegramSupport,
+            'channel_id' => $data['bot']['channel_id'],
+            'channel_telegram' => $telegramChannel,
+            'token' => $data['bot']['token'],
+            'card_number' => $cardNumber,
+            'card_name' => $cardName,
+            'is_enabled' => $data['bot']['is_enabled'],
+            'admin_id' => $adminId,
+            'is_90_percent_plan_notifications_enabled' => $data['bot']['is_90_percent_plan_notifications_enabled'],
+            'is_expired_plan_notifications_enabled' => $data['bot']['is_expired_plan_notifications_enabled'],
+        ];
+
+        $newConfig = json_encode($updateData, JSON_PRETTY_PRINT);
+        $endpoint = "https://api.connectix.vip/v1/seller/telegram-bot/update-bot";
+        $ch = curl_init();
+        curl_setopt_array($ch, [
+            CURLOPT_URL            => $endpoint,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT        => 30,
+            CURLOPT_CONNECTTIMEOUT => 10,
+            CURLOPT_SSL_VERIFYPEER => false, // Connectix sometimes has SSL issues
+            CURLOPT_SSL_VERIFYHOST => false,
+            CURLOPT_HTTPHEADER     => [
+                "Authorization: Bearer {$panelToken}",
+                "Accept: application/json",
+                "Content-Type: application/json",
+                "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36",
+                "Origin: https://connectix.vip",
+                "Referer: https://connectix.vip/"
+            ],
+            CURLOPT_POST           => true,
+            CURLOPT_POSTFIELDS     => $newConfig
+        ]);
+
+        $response = curl_exec($ch);
+        $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        if ($http_code != 200) {
+            $errorMsg = "خطا در ارتباط با پنل مدیریت. کد خطا: $http_code";
+            echo "<script>alert('$errorMsg')</script>";
+            exit();
+        }
+
+        echo "<script>alert('تنظیمات با موفقیت ذخیره شد!')</script>";
+    }
+}
+
+
 ?>
 
 <!DOCTYPE html>
@@ -52,6 +174,10 @@ $conn->close();
     <style>
         body {
             font-family: 'Vazirmatn', sans-serif;
+        }
+
+        #messageForm label {
+            font-weight: bolder;
         }
 
         .log-item.success {
@@ -96,25 +222,151 @@ $conn->close();
 <body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen">
     <div class="container mx-auto px-4 py-8 max-w-4xl">
         <!-- هدر -->
-        <div class="bg-white rounded-xl shadow-lg p-6 mb-8 flex justify-between items-center">
-            <div>
-                <h1 class="text-3xl font-bold text-gray-800">پنل مدیریت Connectix Bot</h1>
-                <p class="text-gray-600 mt-1">خوش آمدید، <?= htmlspecialchars($admin['email']) ?></p>
-            </div>
-            <div class="flex items-center gap-4">
-                <a href="setup"
-                    class="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold transition flex items-center gap-2">
-                    <i class="fas fa-cog"></i> تنظیمات اولیه
-                </a>
-                <a href="logout.php"
-                    class="bg-red-500 hover:bg-red-600 text-white px-6 py-3 rounded-lg font-semibold transition flex items-center gap-2">
-                    <i class="fas fa-sign-out-alt"></i> خروج
-                </a>
+        <div class="bg-white rounded-xl shadow-lg p-6 mb-8">
+            <div class="grid md:grid-cols-2 gap-6 items-start">
+
+                <div class="text-right">
+                    <h1 class="text-3xl font-bold text-gray-800">پنل مدیریت Connectix Bot</h1>
+                    <p class="text-gray-600 mt-1">خوش آمدید، <?= htmlspecialchars($admin['email']) ?></p>
+                </div>
+
+                <div class="flex flex-col gap-5 items-end">
+
+                    <a href="logout.php" class="bg-red-500 hover:bg-red-600 text-white px-6 py-3 rounded-lg font-semibold transition flex items-center gap-2 w-fit">
+                        <i class="fas fa-sign-out-alt"></i> خروج
+                    </a>
+
+
+                    <div class="flex flex-wrap gap-3 justify-end w-full">
+                        <a href="setup" class="bg-blue-500 hover:bg-blue-600 text-white px-5 py-3 rounded-lg font-semibold transition flex items-center gap-2 whitespace-nowrap">
+                            <i class="fas fa-cog"></i> تنظیمات اولیه
+                        </a>
+                        <a id="messagesBtn" href="#" class="bg-blue-500 hover:bg-blue-600 text-white px-5 py-3 rounded-lg font-semibold transition flex items-center gap-2 whitespace-nowrap">
+                            <i class="fas fa-comments"></i> پیام های بات
+                        </a>
+                        <a id="broadcastBtn" href="#" class="bg-blue-500 hover:bg-blue-600 text-white px-5 py-3 rounded-lg font-semibold transition flex items-center gap-2 whitespace-nowrap">
+                            <i class="fas fa-users"></i> ارسال پیام همگانی
+                        </a>
+
+                    </div>
+                </div>
             </div>
         </div>
 
+        <!-- فرم تنظیمات پیام -->
+        <div id="messageFormContainer" class="bg-white rounded-xl shadow-xl p-8 mb-8" style="display: block;">
+            <h2 class="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-3">
+                <i class="fas fa-comments text-blue-600"></i>
+                مدیریت پیام های بات
+            </h2>
+
+            <form id="messageForm" method="post" class="space-y-6">
+                <?php
+                //get data from bot_config.json
+                $data = file_get_contents('setup/bot_config.json');
+                $config = json_decode($data, true);
+                $appName = $config['app_name'] ?? '';
+                $adminId = $config['admin_id'] ?? '';
+                $telegramSupport = $config['support_telegram'] ?? '';
+                $telegramChannel = $config['channel_telegram'] ?? '';
+                $cardNumber = $config['card_number'] ?? '';
+                $cardName = $config['card_name'] ?? '';
+                
+                $welcomeMessage = $config['messages']['welcome_text'] ?? '';
+                $supportMessage = $config['messages']['contact_support'] ?? '';
+                $faqMessage = $config['messages']['questions_and_answers'] ?? '';
+                $freeTrialMessage = $config['messages']['free_test_account_created'] ?? '';
+                ?>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="input-group">
+                        <label class="block text-gray-700 font-semibold mb-2">نام برنامه</label>
+                        <input type="text" id="app_name" name="app_name" value="<?= $appName ?>"
+                            class="w-full px-4 py-3 border border-gray-300 rounded-lg file:mr-4 file:py-3 file:px-6 file:rounded-lg file:border-0 file:bg-blue-600 file:text-white hover:file:bg-blue-700">
+                    </div>
+                    <div class="input-group">
+                    <label class="block text-gray-700 font-semibold mb-2"> آیدی عددی ادمین</label>
+                    <input type="text" id="admin_id" name="admin_id" value="<?= $adminId ?>"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg file:mr-4 file:py-3 file:px-6 file:rounded-lg file:border-0 file:bg-blue-600 file:text-white hover:file:bg-blue-700">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="input-group">
+                        <label class="block text-gray-700 font-semibold mb-2">نام کاربری پشتیبانی تلگرام</label>
+                        <input type="text" id="telegram_support" name="telegram_support" value="<?= $telegramSupport ?>"
+                            class="w-full px-4 py-3 border border-gray-300 rounded-lg file:mr-4 file:py-3 file:px-6 file:rounded-lg file:border-0 file:bg-blue-600 file:text-white hover:file:bg-blue-700">
+                    </div>
+                    <div class="input-group">
+                    <label class="block text-gray-700 font-semibold mb-2">نام کاربری کانال تلگرام</label>
+                    <input type="text" id="telegram_channel" name="telegram_channel" value="<?= $telegramChannel ?>"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg file:mr-4 file:py-3 file:px-6 file:rounded-lg file:border-0 file:bg-blue-600 file:text-white hover:file:bg-blue-700">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="input-group">
+                        <label class="block text-gray-700 font-semibold mb-2">نام دارنده کارت</label>
+                        <input type="text" id="card_name" name="card_name" value="<?= $cardName ?>"
+                            class="w-full px-4 py-3 border border-gray-300 rounded-lg file:mr-4 file:py-3 file:px-6 file:rounded-lg file:border-0 file:bg-blue-600 file:text-white hover:file:bg-blue-700">
+                    </div>
+                    <div class="input-group">
+                    <label class="block text-gray-700 font-semibold mb-2">شماره کارت</label>
+                    <input type="text" id="card_number" name="card_number" value="<?= $cardNumber ?>"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg file:mr-4 file:py-3 file:px-6 file:rounded-lg file:border-0 file:bg-blue-600 file:text-white hover:file:bg-blue-700">
+                    </div>
+                </div>
+
+                <!-- Messages -->
+                <div>
+                    <label class="block text-gray-700 font-semibold mb-2">پیام خوش آمد گویی</label>
+                    <textarea id="welcome_message" name="welcome_message" rows="5"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-4 focus:ring-blue-200 focus:border-blue-500 outline-none transition"
+                        placeholder="متن پیام خوش آمد گویی را اینجا بنویسید..."><?= htmlspecialchars($welcomeMessage) ?>
+                    </textarea>
+                </div>
+
+                <div>
+                    <label class="block text-gray-700 font-semibold mb-2">پیام پشتیبانی</label>
+                    <textarea id="support_message" name="support_message" rows="5"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-4 focus:ring-blue-200 focus:border-blue-500 outline-none transition"
+                        placeholder="متن پیام خوش آمد گویی را اینجا بنویسید..."><?= htmlspecialchars($supportMessage) ?>
+                    </textarea>
+                </div>
+
+                <div>
+                    <label class="block text-gray-700 font-semibold mb-2">سوالات متداول</label>
+                    <textarea id="faq_message" name="faq_message" rows="5"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-4 focus:ring-blue-200 focus:border-blue-500 outline-none transition"
+                        placeholder="متن پیام خوش آمد گویی را اینجا بنویسید..."><?= htmlspecialchars($faqMessage) ?>
+                    </textarea>
+                </div>
+
+                <div>
+                    <label class="block text-gray-700 font-semibold mb-2">متن پیام دریافت اکانت تست</label>
+                    <textarea id="free_trial_message" name="free_trial_message" rows="5"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-4 focus:ring-blue-200 focus:border-blue-500 outline-none transition"
+                        placeholder="متن پیام خوش آمد گویی را اینجا بنویسید..."><?= htmlspecialchars($freeTrialMessage) ?>
+                    </textarea>
+                </div>
+
+                <!-- دکمه‌ها -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <button type="button" id="closeBtn"
+                        class="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold py-4 rounded-lg text-lg transition transform hover:scale-105 flex items-center justify-center gap-3">
+                        <i class="fas fa-circle-xmark"></i>بستن
+                    </button>
+
+                    <button type="submit" id="submitBtn"
+                        class="bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white font-bold py-4 rounded-lg text-lg transition transform hover:scale-105 flex items-center justify-center gap-3">
+                        <i class="fas fa-circle-check"></i>
+                        <span id="btnText">ثبت اطلاعات</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+
         <!-- فرم ارسال پیام -->
-        <div class="bg-white rounded-xl shadow-xl p-8 mb-8">
+        <div id="broadcastFormContainer" class="bg-white rounded-xl shadow-xl p-8 mb-8" style="display: none;">
             <h2 class="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-3">
                 <i class="fas fa-paper-plane text-blue-600"></i>
                 ارسال پیام همگانی به <?= number_format($totalUsers) ?> کاربر
@@ -194,6 +446,26 @@ $conn->close();
     </div>
 
     <script>
+        const messageFormContainer = document.getElementById('messageFormContainer');
+        const broadcastFormContainer = document.getElementById('broadcastFormContainer');
+
+
+        const messagesBtn = document.getElementById('messagesBtn');
+        messagesBtn.addEventListener('click', function () {
+            messageFormContainer.style.display = messageFormContainer.style.display === 'none' ? 'block' : 'none';
+        });
+
+        closeBtn.addEventListener('click', function () {
+            messageFormContainer.style.display = 'none';
+        });
+
+        const broadcastBtn = document.getElementById('broadcastBtn');
+        broadcastBtn.addEventListener('click', function () {
+            broadcastFormContainer.style.display = broadcastFormContainer.style.display === 'none' ? 'block' : 'none';
+        });
+
+
+
         const mediaInput = document.getElementById('media');
         const previewContainer = document.getElementById('previewContainer');
         const filePreview = document.getElementById('filePreview');

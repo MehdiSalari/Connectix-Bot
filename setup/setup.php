@@ -41,13 +41,52 @@ function config($db_host, $db_name, $db_user, $db_pass, $panelToken, $botToken) 
 
 function setAdmin($email, $password, $panelToken, $admin_chat_id, $db_host, $db_name, $db_user, $db_pass) {
     try {
-        // Try to get admin name from Connectix Panel API
-        $admin_name = 'Admin';
+        // Hash the password inside the function
+        $hashed_password = password_hash($password, PASSWORD_BCRYPT);
+        
+        $pdo = new PDO("mysql:host=$db_host;dbname=$db_name;charset=utf8", $db_user, $db_pass);
+        $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
+        // چک کردن وجود جدول مدیران
+        $stmt = $pdo->prepare("SHOW TABLES LIKE 'admins'");
+        $stmt->execute();
+        $result = $stmt->fetchAll(PDO::FETCH_COLUMN);
+        if (!in_array('admins', $result)) {
+            // اگر جدول مدیران وجود نداشت، آن را ایجاد می‌کنیم
+            $pdo->exec("
+                CREATE TABLE admins (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    email VARCHAR(190) UNIQUE NOT NULL,
+                    password VARCHAR(255) NOT NULL,
+                    token VARCHAR(255) NOT NULL,
+                    chat_id VARCHAR(255) NOT NULL,
+                    role ENUM('admin','editor') NOT NULL DEFAULT 'editor'
+                )
+            ");
+            logFlush("admins table created");
+        }
+
+        // افزودن یا بروزرسانی مدیر اصلی
+        $stmt = $pdo->prepare("INSERT INTO admins (email, password, token, chat_id, role) VALUES (:email, :password, :token, :chat_id, :role) ON DUPLICATE KEY UPDATE password = :password, token = :token, chat_id = :chat_id, role = :role");
+        $stmt->execute([
+            ':email' => $email,
+            ':password' => $hashed_password,
+            ':token' => $panelToken,
+            ':chat_id' => $admin_chat_id,
+            ':role' => 'admin'
+        ]);
+        logFlush("Main admin added/updated: {$email}");
+    } catch (Exception $e) {
+        logFlush("Set Admin Error: " . $e->getMessage());
+        exit(1);
+    }
+}
+
+function fetchBotConfig($panelToken) {
+    try {
         try {
-            $endpoint = "https://api.connectix.vip/v1/seller/seller-data";
-            $panelToken = '4UIp0S5thmkYRPE8I32Ntp7L5c59CtR5ZcmQ8yPX'; // or get from config
-
+            $endpoint = "https://api.connectix.vip/v1/seller/telegram-bot";
+            
             $ch = curl_init();
             curl_setopt_array($ch, [
                 CURLOPT_URL            => $endpoint,
@@ -67,71 +106,67 @@ function setAdmin($email, $password, $panelToken, $admin_chat_id, $db_host, $db_
             ]);
 
             $response = curl_exec($ch);
-
-            if (curl_errno($ch)) {
-                throw new Exception('cURL Error: ' . curl_error($ch));
-            }
-
             $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
             curl_close($ch);
 
-            // if redirect happened (302) or login page returned
-            if ($http_code !== 200 || strpos($response, 'login') !== false || strpos($response, 'html') !== false) {
-                throw new Exception("Failed to get admin data - probably redirected to login (HTTP $http_code)");
+            if ($http_code !== 200) {
+                throw new Exception("Failed to fetch messages - HTTP $http_code");
             }
 
             $data = json_decode($response, true);
 
-            if ($data && isset($data['seller']['name']) && !empty($data['seller']['name'])) {
-                $admin_name = $data['seller']['name'];
-                logFlush("Admin Name retrieved from panel API: {$admin_name}");
+            if ($data && isset($data['bot']['app_name']) && !empty($data['bot']['app_name'])) {
+                $appName = $data['bot']['app_name'] ?? null;
+                $adminId = $data['bot']['admin_id'] ?? null;
+                $telegramSupport = $data['bot']['support_telegram'] ?? null;
+                $telegramChannel = $data['bot']['channel_telegram'] ?? null;
+                $cardNumber = $data['bot']['card_number'] ?? null;
+                $cardName = $data['bot']['card_name'] ?? null;
+
+                $welcomeMessage = $data['telegramMessages']['welcome_text'] ?? null;
+                $supportMessage = $data['telegramMessages']['contact_support'] ?? null;
+                $faqMessage = $data['telegramMessages']['questions_and_answers'] ?? null;
+                $freeTrialMessage = $data['telegramMessages']['free_test_account_created'] ?? null;
+                logFlush("Bot messages retrieved from panel API - App Name: {$appName}");
             } else {
-                logFlush("Panel API response was invalid, couldn't find admin name: " . json_encode($data));
+                logFlush("Panel API response was invalid, couldn't find messages: " . json_encode($data));
             }
 
+            //check if telegramSupport and telegramChannel start with @, remove it
+            if (strpos($telegramSupport, '@') === 0) {
+                $telegramSupport = substr($telegramSupport, 1);
+            }
+            if (strpos($telegramChannel, '@') === 0) {
+                $telegramChannel = substr($telegramChannel, 1);
+            }
+
+            //save bot configs to json file
+            $botConfig = [
+                'app_name' => $appName,
+                'admin_id' => $adminId,
+                'support_telegram' => $telegramSupport,
+                'channel_telegram' => $telegramChannel,
+                'card_number' => $cardNumber,
+                'card_name' => $cardName,
+                'messages' => [
+                    'welcome_text' => $welcomeMessage,
+                    'contact_support' => $supportMessage,
+                    'questions_and_answers' => $faqMessage,
+                    'free_test_account_created' => $freeTrialMessage
+                ]
+            ];
+
+            $botConfigJson = json_encode($botConfig, JSON_PRETTY_PRINT);
+            file_put_contents(__DIR__ . '/bot_config.json', $botConfigJson);
+
+
         } catch (Exception $e) {
-            logFlush("Error: couldn't get admin name from panel API → " . $e->getMessage());
-            // $admin_name will be 'Admin' by default
+            logFlush("Error: couldn't get messages from panel API → " . $e->getMessage());
+            return;
         }
-
-        // Hash the password inside the function
-        $hashed_password = password_hash($password, PASSWORD_BCRYPT);
-        
-        $pdo = new PDO("mysql:host=$db_host;dbname=$db_name;charset=utf8", $db_user, $db_pass);
-        $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-
-        // چک کردن وجود جدول مدیران
-        $stmt = $pdo->prepare("SHOW TABLES LIKE 'admins'");
-        $stmt->execute();
-        $result = $stmt->fetchAll(PDO::FETCH_COLUMN);
-        if (!in_array('admins', $result)) {
-            // اگر جدول مدیران وجود نداشت، آن را ایجاد می‌کنیم
-            $pdo->exec("
-                CREATE TABLE admins (
-                    id INT AUTO_INCREMENT PRIMARY KEY,
-                    email VARCHAR(190) UNIQUE NOT NULL,
-                    name VARCHAR(255) NOT NULL,
-                    password VARCHAR(255) NOT NULL,
-                    chat_id VARCHAR(255) NOT NULL,
-                    role ENUM('admin','editor') NOT NULL DEFAULT 'editor'
-                )
-            ");
-            logFlush("admins table created");
-        }
-
-        // افزودن یا بروزرسانی مدیر اصلی
-        $stmt = $pdo->prepare("INSERT INTO admins (email, name, password, chat_id, role) VALUES (:email, :name, :password, :chat_id, :role) ON DUPLICATE KEY UPDATE name = :name, password = :password, chat_id = :chat_id, role = :role");
-        $stmt->execute([
-            ':email' => $email,
-            ':name' => $admin_name,
-            ':password' => $hashed_password,
-            ':chat_id' => $admin_chat_id,
-            ':role' => 'admin'
-        ]);
-        logFlush("Main admin added/updated: {$email}");
+        logFlush("Fetching messages from panel... (not implemented yet)");
     } catch (Exception $e) {
-        logFlush("Set Admin Error: " . $e->getMessage());
-        exit(1);
+        logFlush("Fetch Messages Error: " . $e->getMessage());
     }
 }
 
@@ -245,6 +280,7 @@ function dbSetup()
     name VARCHAR(255),
     email VARCHAR(255),
     phone VARCHAR(50),
+    test TINYINT(1) DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     ");
@@ -284,8 +320,8 @@ function dbSetup()
 
     // prepared statements for speed
     $selectUserByChat = $pdo->prepare("SELECT id FROM users WHERE chat_id = ? LIMIT 1");
-    $insertUser = $pdo->prepare("INSERT INTO users (chat_id, telegram_id, name, email, phone) VALUES (?, ?, ?, ?, ?)");
-    $updateUser = $pdo->prepare("UPDATE users SET telegram_id = ?, name = ?, email = ?, phone = ? WHERE chat_id = ?");
+    $insertUser = $pdo->prepare("INSERT INTO users (chat_id, telegram_id, name, email, phone, test) VALUES (?, ?, ?, ?, ?, ?)");
+    $updateUser = $pdo->prepare("UPDATE users SET telegram_id = ?, name = ?, email = ?, phone = ?, test = ? WHERE chat_id = ?");
 
     $selectClient = $pdo->prepare("SELECT id FROM clients WHERE id = ? LIMIT 1");
     $insertClient = $pdo->prepare("INSERT INTO clients (id, count_of_devices, username, password, chat_id, user_id) VALUES (?, ?, ?, ?, ?, ?)");
@@ -303,6 +339,7 @@ function dbSetup()
         // pagination loop
         $pageUrl = rtrim($endpoint, '/') . '/clients?page=1';
         $pageNum = 0;
+        $totalClientsCount = 0;
         while ($pageUrl !== null) {
             $pageNum++;
             // echo "<strong>Fetching page: {$pageUrl}</strong><br>";
@@ -312,6 +349,18 @@ function dbSetup()
                 throw new Exception("Unexpected response structure from {$pageUrl}");
             }
             $clientsArray = $resp['clients']['data'];
+
+            // On first page attempt to capture total clients count (API fields may vary)
+            if ($pageNum === 1) {
+                if (!empty($resp['clients']['total'])) {
+                    $totalClientsCount = (int)$resp['clients']['total'];
+                } elseif (!empty($resp['clients']['total_clients'])) {
+                    $totalClientsCount = (int)$resp['clients']['total_clients'];
+                } elseif (!empty($resp['clients']['meta']['total'])) {
+                    $totalClientsCount = (int)$resp['clients']['meta']['total'];
+                }
+            }
+
             foreach ($clientsArray as $c) {
                 $clientId = $c['id'] ?? null;
                 if (!$clientId)
@@ -353,6 +402,7 @@ function dbSetup()
                                 $clientDetail['name'] ?? null,
                                 $clientDetail['email'] ?? null,
                                 $clientDetail['phone'] ?? null,
+                                1, // test field default True
                                 $chat_id
                             ]);
                             // we don't increment insertedUsers since it's existing
@@ -362,7 +412,8 @@ function dbSetup()
                                 $clientDetail['telegram_id'] ?? null,
                                 $clientDetail['name'] ?? null,
                                 $clientDetail['email'] ?? null,
-                                $clientDetail['phone'] ?? null
+                                $clientDetail['phone'] ?? null,
+                                1 // test field default True
                             ]);
                             $userId = $pdo->lastInsertId();
                             $insertedUsers++;
@@ -456,7 +507,8 @@ function dbSetup()
                 'insertedUsers' => $insertedUsers,
                 'insertedClients' => $insertedClients,
                 'insertedPlans' => $insertedPlans,
-                'skipped' => $skippedClientsNoDetail
+                'skipped' => $skippedClientsNoDetail,
+                'total_clients' => $totalClientsCount
             ]));
 
             // prepare next page
@@ -538,7 +590,13 @@ try {
         logFlush("Warning: Webhook setup failed, but setup will continue: " . $webhookErr->getMessage());
     }
 
-    // Step 4: Sync database with panel
+    // Step 4: Fetch clients from panel
+    fetchBotConfig(
+        $panelToken,
+    );
+
+
+    // Step 5: Sync database with panel
     dbSetup();
     
     logFlush("\n✅ Setup completed successfully!");

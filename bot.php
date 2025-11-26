@@ -1,5 +1,4 @@
 <?php
-require 'config.php';
 require 'functions.php';
 
 $content = file_get_contents('php://input');
@@ -26,16 +25,46 @@ $video_note = $update['message']['video_note'] ?? null;  // Video message (circu
 $document = $update['message']['document'] ?? null;  // Document/file in the message
 $caption = $update['message']['caption'] ?? null;  // Caption for media (if any)
 
+define('UID', $chat_id);
+
 
 try {
     //debug
     // file_put_contents('debug/user_info.txt', "Chat ID: $chat_id\nUser: $user_name\nMessage: $text\n");
     switch ($text) {
         case '/start':
+            $conn = new mysqli($db_host, $db_user, $db_pass, $db_name);
+            if ($conn->connect_error) {
+                errorLog("Connection failed: " . $conn->connect_error);
+            }
+            $stmt = $conn->prepare("SELECT * FROM users WHERE chat_id = ?");
+            $stmt->bind_param("i", $chat_id);
+            $stmt->execute();
+            $result = $stmt->get_result();
+            $user = $result->fetch_assoc();
+            if ($user) {
+                $stmt = $conn->prepare("UPDATE users SET telegram_id = ?, name = ? WHERE chat_id = ?");
+                $stmt->bind_param("ssi", $user_id, $user_name, $chat_id);
+                $result = $stmt->execute();
+            } else {
+                $stmt = $conn->prepare("INSERT INTO users (chat_id, telegram_id, name, created_at) VALUES (?, ?, ?, NOW())");
+                $stmt->bind_param("ssi", $chat_id, $user_id, $user_name);
+                $result = $stmt->execute();
+            }
+            $stmt->close();
+            $conn->close();
+            
+            //send welcome message
             $result = tg('sendMessage',[
                 'chat_id' => $chat_id,
-                'text' => 'به ربات شما خوش آمدید!'
+                'text' => message("welcome_message"),
+                'reply_markup' => keyboard('main_menu')
+                // 'reply_markup' => json_encode(['remove_keyboard' => true])
             ]);
+            if (!($result = json_decode($result))->ok) {
+                errorLog("Failed to send /start message to chat_id: $chat_id | Message: {$result->description}");
+                exit;
+            }
             break;
         default:
             $message = "متن پیشفرض پاسخ به کاربر";
@@ -49,6 +78,6 @@ try {
     }
 } catch (Exception $e) {
     // Log any exceptions for debugging
-    file_put_contents('debug/error.log', $e->getMessage());
+    errorLog($e->getMessage() . $e->getTraceAsString());
 }
 

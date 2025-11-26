@@ -3,3 +3,5 @@ debug/*.*
 broadcast/uploads/*
 broadcast/*.json
 broadcast/*.txt
+setup/*.json
+setup/*.txt

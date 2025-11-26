@@ -286,41 +286,43 @@ if (file_exists('../config.php')) {
         let totalClients = 0;
         let processedClients = 0;
         let hasError = false;
+        let lastProgressMsg = '';
         
-        //get total clients for test
-        fetch("https://api.connectix.vip/v1/seller/clients?page=1", {
-            headers: {
-                "Authorization": "Bearer " + formData.get("panelToken")
-            }
-        }).then(response => response.json()).then(data => {
-            totalClients = data.total_clients;
-            console.log(totalClients);
-        }).catch(err => {
-            console.error(err);
-            alert("Error: " + err);
-        });
-
-        // function updateProgress(msg, percent) {
-        //     barEl.style.width = percent + "%";
-        //     percentEl.innerText = percent + "%";
-        //     logEl.innerHTML += msg + "<br>";
-        //     logEl.scrollTop = logEl.scrollHeight;
-        // }
-
-        let progressPollInterval;
-
-        function updateProgress(msg) {
-            processedClients++;
+        // Render percent bar based on authoritative values
+        function renderPercent() {
             let percent = totalClients > 0 ? Math.round((processedClients / totalClients) * 100) : 0;
-            percent = Math.min(percent, 100);
+            percent = Math.min(Math.max(percent, 0), 100);
             barEl.style.width = percent + "%";
             percentEl.innerText = percent + "%";
+        }
+
+        // append a log line (does NOT change processedClients)
+        function updateProgress(msg) {
             logEl.innerHTML += msg + "<br>";
             logEl.scrollTop = logEl.scrollHeight;
 
-            // چک کردن وجود خطا
+            // check for error keywords
             if (/fatal|error/i.test(msg)) {
                 hasError = true;
+            }
+        }
+
+        // Apply polled JSON progress to UI (authoritative)
+        function applyProgressFromPoll(data) {
+            if (!data) return;
+            if (typeof data.total_clients !== 'undefined') {
+                totalClients = parseInt(data.total_clients) || 0;
+            }
+            processedClients = parseInt(data.processedClients) || 0;
+            renderPercent();
+
+            if (data && data.page > 0) {
+                const progressMsg = `📊 Page ${data.page}: ${data.processedClients} clients, ${data.insertedClients} inserted, ${data.insertedPlans} plans`;
+                if (progressMsg !== lastProgressMsg) {
+                    logEl.innerHTML += progressMsg + "<br>";
+                    logEl.scrollTop = logEl.scrollHeight;
+                    lastProgressMsg = progressMsg;
+                }
             }
         }
 
@@ -329,15 +331,7 @@ if (file_exists('../config.php')) {
             fetch("setup_progress.php")
                 .then(r => r.json())
                 .then(data => {
-                    if (data && data.page > 0) {
-                        const progressMsg = `📊 Page ${data.page}: ${data.processedClients} clients, ${data.insertedClients} inserted, ${data.insertedPlans} plans`;
-                        const lastLog = logEl.innerHTML.split('<br>').pop();
-                        // Only update if message changed (avoid spam)
-                        if (lastLog !== progressMsg) {
-                            logEl.innerHTML += progressMsg + "<br>";
-                            logEl.scrollTop = logEl.scrollHeight;
-                        }
-                    }
+                    applyProgressFromPoll(data);
                 })
                 .catch(() => {
                     // ignore poll errors
@@ -346,18 +340,29 @@ if (file_exists('../config.php')) {
 
         function onFinish() {
             clearInterval(progressPollInterval);
-            if (hasError) {
-                updateProgress("❌ Error occurred!");
-            } else {
-                updateProgress("✅ Done!");
-            }
-            document.querySelector(".finish").style.display = "block";
+            // fetch final progress to ensure UI shows final numbers
+            fetch("setup_progress.php").then(r => r.json()).then(data => {
+                applyProgressFromPoll(data);
+                if (hasError) {
+                    updateProgress("❌ Error occurred!");
+                } else {
+                    updateProgress("✅ Done!");
+                }
+                document.querySelector(".finish").style.display = "block";
+            }).catch(() => {
+                if (hasError) {
+                    updateProgress("❌ Error occurred!");
+                } else {
+                    updateProgress("✅ Done!");
+                }
+                document.querySelector(".finish").style.display = "block";
+            });
         }
 
         updateProgress("Starting...");
         progressPollInterval = setInterval(pollSetupProgress, 2000); // Poll every 2 seconds
 
-        // از fetch با response.body و reader برای دریافت استریم خط به خط استفاده می‌کنیم
+        // Use fetch stream reader for real-time server logs
         fetch("setup.php", {
             method: "POST",
             body: formData
@@ -365,25 +370,20 @@ if (file_exists('../config.php')) {
             const reader = response.body.getReader();
             const decoder = new TextDecoder("utf-8");
             let buffer = "";
-            let lines = [];
-            let progress = 10;
 
             function read() {
                 reader.read().then(({ done, value }) => {
                     if (done) {
-                        // وقتی استریم تمام شد، آخرین درصد و پیام موفقیت را نمایش بده
-                        if (done) {
-                            onFinish();
-                            return;
-                        }
-                        document.querySelector(".finish").style.display = "block";
+                        // When stream finished show final data
+                        onFinish();
                         return;
                     }
                     buffer += decoder.decode(value, { stream: true });
                     let parts = buffer.split("\n");
-                    buffer = parts.pop(); // خط ناقص آخر را نگه می‌داریم
+                    buffer = parts.pop(); // keep last partial line
                     parts.forEach(line => {
                         if (line.trim() !== "") {
+                            // append server log line (do not treat as authoritative counter)
                             updateProgress(line.trim());
                         }
                     });
