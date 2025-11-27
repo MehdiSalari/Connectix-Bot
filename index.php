@@ -171,10 +171,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@100..900&display=swap" rel="stylesheet">
+    <link rel="icon" href="favicon.ico" type="image/x-icon">
     <style>
-        body {
-            font-family: 'Vazirmatn', sans-serif;
-        }
+        html, body { height: 100%; }
+        html {background-color: #e7edff;}
+        body { font-family: 'Vazirmatn', sans-serif; display: flex; flex-direction: column; min-height: 100vh; }
+        body > .container { flex: 1 0 auto; }
 
         #messageForm label {
             font-weight: bolder;
@@ -202,20 +204,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             object-fit: cover;
         }
         .copyright {
-            position: fixed;
-            left: 0;
-            bottom: 0;
-            width: 100%;
-            text-align: center;
-            color: #777;
-            font-size: 15px;
-            direction: ltr;
-            margin-bottom: 10px;
-        }
-        .copyright a {
-            color: #b500bbff;
-            text-decoration: none;
-        }
+                width: 100%;
+                text-align: center;
+                color: #777;
+                font-size: 15px;
+                direction: ltr;
+                margin: auto;
+                padding-bottom: 10px;
+                flex-shrink: 0;
+            }
+        .copyright a { color: #b500bbff; text-decoration: none; }
     </style>
 </head>
 
@@ -247,7 +245,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <a id="broadcastBtn" href="#" class="bg-blue-500 hover:bg-blue-600 text-white px-5 py-3 rounded-lg font-semibold transition flex items-center gap-2 whitespace-nowrap">
                             <i class="fas fa-users"></i> ارسال پیام همگانی
                         </a>
-
+                        <a href="users" class="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-5 py-3 rounded-lg font-semibold transition flex items-center gap-2 whitespace-nowrap shadow-md">
+                            <i class="fas fa-users"></i> لیست کاربران
+                        </a>
                     </div>
                 </div>
             </div>
@@ -442,7 +442,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </div>
     </div>
     <div class="copyright">
-        <p style="text-align: center; color: #777; font-size: 12px;">&copy; 2024 - <?= date('Y'); ?> Connectix Bot designed by <a href="https://github.com/MehdiSalari" target="_blank">Mehdi Salari</a>. All rights reserved.</p>
+        <p>&copy; 2024 - <?= date('Y') ?> Connectix Bot designed by <a href="https://github.com/MehdiSalari" target="_blank">Mehdi Salari</a>. All rights reserved.</p>
     </div>
 
     <script>

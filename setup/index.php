@@ -1,411 +1,339 @@
 <?php
 if (file_exists('../config.php')) {
     require_once '../config.php';
+    require_once '../functions.php';
     session_start();
     if (isset($_SESSION['admin_id'])) {
-        // get admin info
-        $conn = new mysqli($db_host, $db_user, $db_pass, $db_name);
-        if ($conn->connect_error) die("DB Error");
-        $stmt = $conn->prepare("SELECT * FROM admins WHERE id = ?");
-        $stmt->bind_param("i", $_SESSION['admin_id']);
-        $stmt->execute();
-        $result = $stmt->get_result();
-        $admin = $result->fetch_assoc();
-        $conn->close();
+        $admin = getAdminById($_SESSION['admin_id']);
     } else {
-        // Redirect to login page
         header('Location: ../login.php');
         exit();
     }
 }
 ?>
 <!DOCTYPE html>
-<html lang="en">
+<html lang="fa" dir="rtl">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Connectix Bot Setup</title>
+    <title>نصب و راه‌اندازی | Connectix Bot</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;900&display=swap"
+        rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Vazirmatn', sans-serif;
+        }
+
+        input:focus,
+        select:focus {
+            outline: none;
+            ring: 4px solid #a78bfa;
+            border-color: #a78bfa;
+        }
+
+        .input-focus:focus {
+            @apply ring-4 ring-indigo-200 border-indigo-500;
+        }
+
+        .progress-bar {
+            height: 12px;
+            background: #e5e7eb;
+            border-radius: 999px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #a78bfa, #6366f1);
+            border-radius: 999px;
+            width: 0%;
+            transition: width 0.6s ease;
+        }
+
+        .log-box {
+            background: #1a1a1a;
+            color: #33ff33;
+            font-family: 'Courier New', monospace;
+            padding: 16px;
+            border-radius: 12px;
+            height: 280px;
+            overflow-y: auto;
+            direction: ltr;
+            text-align: left;
+        }
+
+        .copyright {
+            width: 100%;
+            text-align: center;
+            color: #777;
+            font-size: 15px;
+            direction: ltr;
+            margin: 30px 0 15px;
+        }
+
+        .copyright a {
+            color: #b500bbff;
+            text-decoration: none;
+        }
+
+        .fade-in {
+            animation: fadeIn 0.8s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+    </style>
 </head>
-<style>
-    body {
-        font-family: Arial, sans-serif;
-        background-color: #f4f4f4;
-        margin: 0;
-        padding: 0;
-    }
-    .main {
-        max-width: 600px;
-        width: 80%;
-        margin: 50px auto;
-        padding: 20px;
-        background-color: #fff;
-        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-        border-radius: 8px;
-    }
-    h2 {
-        text-align: center;
-        color: #333;
-    }
-    form {
-        display: flex;
-        flex-direction: column;
-        width: 100%;
-    }
-    .form-group {
-        /* margin-bottom: 5px; */
-        display: flex;
-        flex-direction: column;
-    }
-    .row {
-        display: flex;
-        flex-direction: row;
-        flex: 1;
-        justify-content: space-around;
-        gap: 10px;
-    }
-    .col {
-        display: flex;
-        flex-direction: column;
-        flex: 1;
-        justify-content: space-between;
-        margin-bottom: -10px;
-    }
-    .input-group {
-        margin-bottom: 8px;
-        display: flex;
-        flex-direction: column;
-    }
-    label {
-        margin-bottom: 5px;
-        font-weight: bold;
-    }
-    input[type="text"], input[type="password"], input[type="email"] {
-        padding: 10px;
-        margin-bottom: 15px;
-        border: 1px solid #ccc;
-        border-radius: 4px;
-    }
-    input[type="submit"] {
-        padding: 10px;
-        background-color: #95009fff;
-        color: white;
-        border: none;
-        border-radius: 10px;
-        cursor: pointer;
-        font-size: 16px;
-        transition: background-color 0.5s ease;
-        font-weight: bold;
-    }
-    input[type="submit"]:hover {
-        background-color: #480056ff;
-    }
-    input[type="button"] {
-        padding: 10px;
-        background-color: #ccc;
-        color: #333;
-        border: none;
-        border-radius: 10px;
-        cursor: pointer;
-        font-size: 16px;
-        transition: background-color 0.5s ease;
-        margin-top: 10px;
-        font-weight: bold;
-    }
-    input[type="button"]:hover {
-        background-color: #bbb;
-    }
-    a {
-        color: #95009fff;
-        text-decoration: none;
-    }
-    hr {
-        border: none;
-        border-top: 2px solid #ccc;
-        margin: 0 0 15px 0;
-    }
-    .copyright {
-        position: fixed;
-        left: 0;
-        bottom: 0;
-        width: 100%;
-        text-align: center;
-        color: #777;
-        /* background-color: white; */
-    }
-    @media only screen and (max-width: 600px) {
-        .main {
-            width: 100%;
-            padding: 20px;
-        }
-        .form-group {
-            flex-direction: column;
-            width: 100%;
-        }
-        .row {
-            flex-direction: column;
-            width: 100%;
-        }
-        .col {
-            width: 100%;
-        }
-    }
-</style>
 
-<body>
-    <div class="main">
-        <div class="form">
-            <h2>Connectix Bot Setup</h2>
-            <p>Please enter the required configuration details below</p>
-            <form action="#" method="post">
-                <!-- Database Configuration -->
-                <div class="form-group">
-                    <div class="row">
-                        <div class="col">
-                            <div class="input-group">
-                                <label for="db_host">Database Host:</label>
-                                <input type="text" id="db_host" name="db_host" value="<?= $db_host ?? '' ?>" required>
-                            </div>
-                        </div>
-                        <div class="col">
-                            <div class="input-group">
-                                <label for="db_name">Database Name:</label>
-                                <input type="text" id="db_name" name="db_name" value="<?= $db_name ?? '' ?>" autocomplete="off" required>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="row">
-                        <div class="col">
-                            <div class="input-group">
-                                <label for="db_user">Database User:</label>
-                                <input type="text" id="db_user" name="db_user" value="<?= $db_user ?? '' ?>" required>
-                            </div>
-                        </div>
-                        <div class="col">
-                            <div class="input-group">
-                                <label for="db_pass">Database Password:</label>
-                                <input type="password" id="db_pass" name="db_pass" value="<?= $db_pass ?? '' ?>">
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <hr>
-                <!-- Tokens and Admin Configuration -->
-                <div class="form-group">
-                    <div class="input-group">
-                        <label for="panelToken">Connectix Panel Email:</label>
-                        <input type="email" id="panelEmail" name="panelEmail" required>
-                    </div>
-                    <div class="input-group">
-                        <label for="panelToken">Connectix Panel Password:</label>
-                        <input type="password" id="panelPassword" name="panelPassword" required>
-                    </div>
-                </div>
-                <div class="form-group">
-                    <div class="input-group">
-                        <label for="botToken">Bot Token:</label>
-                        <input type="text" id="botToken" name="botToken" value="<?= $botToken ?? '' ?>" required>
-                    </div>
-                    <hr>
-                </div>
-                <div class="form-group">
-                    <div class="row">
-                        <div class="col">
-                            <div class="input-group">
-                                <label for="email">Admin Email:</label>
-                                <input type="email" id="email" name="email" value="<?= $admin['email'] ?? '' ?>" required>
-                            </div>
-                        </div>
-                        <div class="col">
-                            <div class="input-group">
-                                <label for="chatId">Admin Chat ID: <a href="https://t.me/username_to_id_bot?start=GetChatID" target="_blank">(Get Chat ID)</a></label>
-                                <input type="text" id="chatId" name="chatId" value="<?= $admin['chat_id'] ?? '' ?>" required>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="form-group">
-                    <div class="row">
-                        <div class="col">
-                            <div class="input-group">
-                                <label for="botPassword">Set Admin Password:</label>
-                                <input type="password" id="adminPassword" name="adminPassword" required>
-                            </div>
-                        </div>
-                        <div class="col">
-                            <div class="input-group">
-                                <label for="reBotPassword">Re-Enter Admin Password:</label>
-                                <input type="password" id="reAdminPassword" name="reAdminPassword" required>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <input type="submit" value="Submit">
-                <input type="button" name="cancel" id="cancel" value="Cancel" onclick="window.location.href='../login.php'">
-            </form>
-        </div>
-        <div class="progress-container" style="display:none; margin-top:30px;">
-            <div class="progress" style="width:100%; background:#eee; border-radius:8px;">
-                <div class="bar" style="height:18px; width:0%; background:#95009fff; border-radius:8px;"></div>
-            </div>
-            <div class="percent" style="font-weight:bold; margin-top:5px;">0%</div>
-
-            <div class="log"
-                style="background:#111; color:#0f0; padding:10px; height:200px; margin-top:15px;
-                    overflow-y:auto; font-family:monospace; border-radius:6px;">
-            </div>
-
-            <button onclick="window.location.href='../'" class="finish"
-                    style="margin-top:20px; display:none; padding:10px 20px; background:#95009fff; color:white;
-                        border:none; border-radius:8px; cursor:pointer;">
-                Finish Setup
-            </button>
+<body class="bg-gradient-to-br from-blue-50 via-purple-50 to-indigo-100 min-h-screen">
+    <div class="container mx-auto px-4 py-12 max-w-4xl">
+        <!-- Header -->
+        <div class="text-center mb-10 fade-in">
+            <h1 class="text-4xl font-bold text-gray-800 mb-3">Connectix Bot Setup</h1>
+            <p class="text-lg text-gray-600">تنظیمات اولیه ربات و اتصال به پنل Connectix</p>
         </div>
 
+        <!-- Main Card -->
+        <div class="bg-white rounded-2xl shadow-2xl overflow-hidden fade-in">
+            <!-- Form Section -->
+            <div class="p-8 md:p-12" id="setupForm">
+                <form id="setupFormElement" class="space-y-8">
+                    <!-- Database -->
+                    <div class="border-b border-gray-200 pb-8">
+                        <h3 class="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-3">
+                            <i class="fas fa-database text-indigo-600"></i>
+                            تنظیمات دیتابیس
+                        </h3>
+                        <div class="grid md:grid-cols-2 gap-6">
+                            <div>
+                                <label class="block text-sm font-bold text-gray-700 mb-2">هاست دیتابیس</label>
+                                <input type="text" name="db_host" value="<?= $db_host ?? 'localhost' ?>" required
+                                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-4 focus:ring-indigo-200 focus:border-indigo-500 transition">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-bold text-gray-700 mb-2">نام دیتابیس</label>
+                                <input type="text" name="db_name" value="<?= $db_name ?? '' ?>" required
+                                    autocomplete="off"
+                                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-4 focus:ring-indigo-200 focus:border-indigo-500 transition">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-bold text-gray-700 mb-2">نام کاربری دیتابیس</label>
+                                <input type="text" name="db_user" value="<?= $db_user ?? '' ?>" required
+                                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-4 focus:ring-indigo-200 focus:border-indigo-500 transition">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-bold text-gray-700 mb-2">رمز عبور دیتابیس</label>
+                                <input type="password" name="db_pass" value="<?= $db_pass ?? '' ?>"
+                                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-4 focus:ring-indigo-200 focus:border-indigo-500 transition">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Connectix Panel -->
+                    <div class="border-b border-gray-200 pb-8">
+                        <h3 class="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-3">
+                            <i class="fas fa-shield-alt text-purple-600"></i>
+                            پنل Connectix
+                        </h3>
+                        <div class="grid md:grid-cols-2 gap-6">
+                            <div>
+                                <label class="block text-sm font-bold text-gray-700 mb-2">ایمیل پنل</label>
+                                <input type="email" name="panelEmail" required placeholder="example@connectix.vip"
+                                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-4 focus:ring-indigo-200 focus:border-indigo-500 transition">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-bold text-gray-700 mb-2">پسورد پنل</label>
+                                <input type="password" name="panelPassword" required
+                                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-4 focus:ring-indigo-200 focus:border-indigo-500 transition">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Bot Token -->
+                    <div class="border-b border-gray-200 pb-8">
+                        <h3 class="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-3">
+                            <i class="fas fa-robot text-indigo-600"></i>
+                            توکن ربات تلگرام
+                        </h3>
+                        <input type="text" name="botToken" value="<?= $botToken ?? '' ?>" required
+                            placeholder="123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11"
+                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-4 focus:ring-indigo-200 focus:border-indigo-500 transition">
+                    </div>
+
+                    <!-- Admin Account -->
+                    <div>
+                        <h3 class="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-3">
+                            <i class="fas fa-user-shield text-purple-600"></i>
+                            حساب ادمین
+                        </h3>
+                        <div class="grid md:grid-cols-2 gap-6">
+                            <div>
+                                <label class="block text-sm font-bold text-gray-700 mb-2">ایمیل ادمین</label>
+                                <input type="email" name="email" value="<?= $admin['email'] ?? '' ?>" required
+                                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-4 focus:ring-indigo-200 focus:border-indigo-500 transition">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-bold text-gray-700 mb-2">چت آیدی ادمین <a
+                                        href="https://t.me/username_to_id_bot" target="_blank"
+                                        class="text-blue-600 text-xs">(دریافت)</a></label>
+                                <input type="text" name="chatId" value="<?= $admin['chat_id'] ?? '' ?>" required
+                                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-4 focus:ring-indigo-200 focus:border-indigo-500 transition">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-bold text-gray-700 mb-2">رمز عبور جدید</label>
+                                <input type="password" name="adminPassword" required
+                                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-4 focus:ring-indigo-200 focus:border-indigo-500 transition">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-bold text-gray-700 mb-2">تکرار رمز عبور</label>
+                                <input type="password" name="reAdminPassword" required
+                                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-4 focus:ring-indigo-200 focus:border-indigo-500 transition">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex gap-4 pt-6">
+                        <button type="submit"
+                            class="flex-1 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-bold py-4 rounded-xl shadow-lg transition transform hover:scale-105">
+                            <i class="fas fa-rocket ml-3"></i>
+                            شروع نصب و همگام‌سازی
+                        </button>
+                        <button type="button" onclick="window.location.href='../'"
+                            class="px-8 py-4 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold rounded-xl transition">
+                            لغو
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Progress Section -->
+            <div id="progressSection" class="hidden p-8 md:p-12 bg-gray-50">
+                <div class="text-center mb-8">
+                    <i class="fas fa-sync-alt text-6xl text-indigo-600 animate-spin mb-6"></i>
+                    <h3 class="text-2xl font-bold text-gray-800">در حال نصب و همگام‌سازی اطلاعات...</h3>
+                    <p class="text-gray-600 mt-3">لطفاً منتظر بمانید، این ممکن است چند دقیقه طول بکشد.</p>
+                </div>
+
+                <div class="mb-6">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill"></div>
+                    </div>
+                    <div class="text-center mt-3">
+                        <span class="text-2xl font-bold text-indigo-600" id="progressPercent">0%</span>
+                    </div>
+                </div>
+
+                <div class="log-box text-sm" id="logBox"></div>
+
+                <div class="text-center mt-8">
+                    <button onclick="window.location.href='../'" id="finishBtn"
+                        class="hidden px-10 py-4 bg-gradient-to-r from-green-500 to-emerald-600 text-white font-bold rounded-xl shadow-lg hover:shadow-2xl transition transform hover:scale-105">
+                        <i class="fas fa-check-circle ml-3"></i>
+                        تکمیل شد! برو به پنل
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="copyright">
+            <p>&copy; 2024 - <?= date('Y') ?> Connectix Bot designed by <a href="https://github.com/MehdiSalari"
+                    target="_blank">Mehdi Salari</a>. All rights reserved.</p>
+        </div>
     </div>
-    <div class="copyright">
-        <p style="text-align: center; color: #777; font-size: 12px;">&copy; 2024 - <?= date('Y'); ?> Connectix Bot designed by <a href="https://github.com/MehdiSalari" target="_blank">Mehdi Salari</a>. All rights reserved.</p>
-    </div>
+
     <script>
-    document.querySelector("form").addEventListener("submit", function(e){
-        e.preventDefault();
+        document.getElementById("setupFormElement").addEventListener("submit", function (e) {
+            e.preventDefault();
 
-        const form = this;
-        const formData = new FormData(form);
+            const form = this;
+            const formData = new FormData(form);
 
-        //password match check
-        const adminPassword = formData.get("adminPassword");
-        const reAdminPassword = formData.get("reAdminPassword");
-        if (adminPassword !== reAdminPassword) {
-            alert("Passwords do not match!");
-            return;
-        }
-
-        // مخفی کردن فرم و نمایش بخش پروگرس
-        document.querySelector(".form").style.display = "none";
-        document.querySelector(".progress-container").style.display = "block";
-
-        const percentEl = document.querySelector(".percent");
-        const barEl = document.querySelector(".bar");
-        const logEl = document.querySelector(".log");
-
-        let totalClients = 0;
-        let processedClients = 0;
-        let hasError = false;
-        let lastProgressMsg = '';
-        
-        // Render percent bar based on authoritative values
-        function renderPercent() {
-            let percent = totalClients > 0 ? Math.round((processedClients / totalClients) * 100) : 0;
-            percent = Math.min(Math.max(percent, 0), 100);
-            barEl.style.width = percent + "%";
-            percentEl.innerText = percent + "%";
-        }
-
-        // append a log line (does NOT change processedClients)
-        function updateProgress(msg) {
-            logEl.innerHTML += msg + "<br>";
-            logEl.scrollTop = logEl.scrollHeight;
-
-            // check for error keywords
-            if (/fatal|error/i.test(msg)) {
-                hasError = true;
+            if (formData.get("adminPassword") !== formData.get("reAdminPassword")) {
+                alert("رمز عبور و تکرار آن یکسان نیست!");
+                return;
             }
-        }
 
-        // Apply polled JSON progress to UI (authoritative)
-        function applyProgressFromPoll(data) {
-            if (!data) return;
-            if (typeof data.total_clients !== 'undefined') {
-                totalClients = parseInt(data.total_clients) || 0;
+            document.getElementById("setupForm").classList.add("hidden");
+            document.getElementById("progressSection").classList.remove("hidden");
+
+            const progressFill = document.getElementById("progressFill");
+            const progressPercent = document.getElementById("progressPercent");
+            const logBox = document.getElementById("logBox");
+            const finishBtn = document.getElementById("finishBtn");
+
+            let hasError = false;
+
+            function log(msg) {
+                logBox.innerHTML += msg + "<br>";
+                logBox.scrollTop = logBox.scrollHeight;
+                if (/error|fatal|failed/i.test(msg)) hasError = true;
             }
-            processedClients = parseInt(data.processedClients) || 0;
-            renderPercent();
 
-            if (data && data.page > 0) {
-                const progressMsg = `📊 Page ${data.page}: ${data.processedClients} clients, ${data.insertedClients} inserted, ${data.insertedPlans} plans`;
-                if (progressMsg !== lastProgressMsg) {
-                    logEl.innerHTML += progressMsg + "<br>";
-                    logEl.scrollTop = logEl.scrollHeight;
-                    lastProgressMsg = progressMsg;
-                }
+            function updateProgress(percent) {
+                progressFill.style.width = percent + "%";
+                progressPercent.textContent = percent + "%";
             }
-        }
 
-        // Poll setup progress to show real database import stats
-        function pollSetupProgress() {
-            fetch("setup_progress.php")
-                .then(r => r.json())
-                .then(data => {
-                    applyProgressFromPoll(data);
-                })
-                .catch(() => {
-                    // ignore poll errors
-                });
-        }
-
-        function onFinish() {
-            clearInterval(progressPollInterval);
-            // fetch final progress to ensure UI shows final numbers
-            fetch("setup_progress.php").then(r => r.json()).then(data => {
-                applyProgressFromPoll(data);
-                if (hasError) {
-                    updateProgress("❌ Error occurred!");
-                } else {
-                    updateProgress("✅ Done!");
-                }
-                document.querySelector(".finish").style.display = "block";
-            }).catch(() => {
-                if (hasError) {
-                    updateProgress("❌ Error occurred!");
-                } else {
-                    updateProgress("✅ Done!");
-                }
-                document.querySelector(".finish").style.display = "block";
-            });
-        }
-
-        updateProgress("Starting...");
-        progressPollInterval = setInterval(pollSetupProgress, 2000); // Poll every 2 seconds
-
-        // Use fetch stream reader for real-time server logs
-        fetch("setup.php", {
-            method: "POST",
-            body: formData
-        }).then(response => {
-            const reader = response.body.getReader();
-            const decoder = new TextDecoder("utf-8");
-            let buffer = "";
-
-            function read() {
-                reader.read().then(({ done, value }) => {
-                    if (done) {
-                        // When stream finished show final data
-                        onFinish();
-                        return;
-                    }
-                    buffer += decoder.decode(value, { stream: true });
-                    let parts = buffer.split("\n");
-                    buffer = parts.pop(); // keep last partial line
-                    parts.forEach(line => {
-                        if (line.trim() !== "") {
-                            // append server log line (do not treat as authoritative counter)
-                            updateProgress(line.trim());
+            // Poll progress
+            const poll = setInterval(() => {
+                fetch("setup_progress.php")
+                    .then(r => r.json())
+                    .then(d => {
+                        if (d.processedClients !== undefined) {
+                            const percent = d.total_clients > 0 ? Math.round((d.processedClients / d.total_clients) * 100) : 0;
+                            updateProgress(percent);
                         }
-                    });
+                    })
+                    .catch(() => { });
+            }, 2000);
+
+            fetch("setup.php", {
+                method: "POST",
+                body: formData
+            }).then(r => r.body.getReader())
+                .then(reader => {
+                    const decoder = new TextDecoder("utf-8");
+                    let buffer = "";
+
+                    function read() {
+                        reader.read().then(({ done, value }) => {
+                            if (done) {
+                                clearInterval(poll);
+                                updateProgress(100);
+                                log("نصب با موفقیت تکمیل شد!");
+                                finishBtn.classList.remove("hidden");
+                                return;
+                            }
+                            buffer += decoder.decode(value, { stream: true });
+                            const lines = buffer.split("\n");
+                            buffer = lines.pop();
+                            lines.forEach(line => {
+                                if (line.trim()) log(line.trim());
+                            });
+                            read();
+                        });
+                    }
                     read();
+                })
+                .catch(err => {
+                    clearInterval(poll);
+                    log("خطا در ارتباط: " + err);
+                    finishBtn.classList.remove("hidden");
                 });
-            }
-
-            read();
-        }).catch(err => {
-            clearInterval(progressPollInterval);
-            updateProgress("❌ Error in AJAX: " + err);
         });
-    });
     </script>
-
-
 </body>
 
 </html>

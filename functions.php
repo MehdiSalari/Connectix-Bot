@@ -1,8 +1,9 @@
 <?php
-if (!file_exists('config.php')) {
+if (!file_exists(__DIR__ . '/config.php')) {
     header('Location: index.php');
 }
-require 'config.php';
+require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/gregorian_jalali.php';
 define('BOT_TOKEN', $botToken);  // Bot token for authentication with Telegram API
 define('TELEGRAM_URL', 'https://api.telegram.org/bot' . BOT_TOKEN . '/');  // Base URL for Telegram Bot API
 
@@ -48,6 +49,30 @@ function tg($method, $params = []) {
     }
     curl_close($ch);
     return $result;
+}
+
+function jdate($timestamp, $str) {
+    $date = explode(' ', $timestamp);
+    $time = explode(':', $date[1]);
+    $year = (int)date('Y', strtotime($date[0] . ' ' . $time[0] . ':' . $time[1] . ':' . $time[2]));
+    $month = (int)date('m', strtotime($date[0] . ' ' . $time[0] . ':' . $time[1] . ':' . $time[2]));
+    $day = (int)date('d', strtotime($date[0] . ' ' . $time[0] . ':' . $time[1] . ':' . $time[2]));
+    $date = gregorian_to_jalali($year, $month, $day, $str);
+    return $date;
+    // return $year ;
+}   
+
+function getAdminById($id) {
+    global $db_host, $db_user, $db_pass, $db_name;
+    $conn = new mysqli($db_host, $db_user, $db_pass, $db_name); 
+    $stmt = $conn->prepare("SELECT * FROM admins WHERE id = ?");
+    $stmt->bind_param("s", $id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $admin = $result->fetch_assoc();
+    $stmt->close();
+    $conn->close();
+    return $admin;
 }
 
 function errorLog($message) {
