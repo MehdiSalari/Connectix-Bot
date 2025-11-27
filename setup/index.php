@@ -258,7 +258,7 @@ if (file_exists('../config.php')) {
             <button onclick="window.location.href='../'" class="finish"
                     style="margin-top:20px; display:none; padding:10px 20px; background:#95009fff; color:white;
                         border:none; border-radius:8px; cursor:pointer;">
-                Go to Panel
+                Finish Setup
             </button>
         </div>
 

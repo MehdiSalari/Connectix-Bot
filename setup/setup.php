@@ -48,8 +48,17 @@ function getPanelToken($panelEmail, $panelPassword) {
     return $json->token;
 }
 
-function config($db_host, $db_name, $db_user, $db_pass, $panelToken, $botToken) {
+function setConfig($db_host, $db_name, $db_user, $db_pass, $panelToken, $botToken) {
     try {
+        // Database Test before writing config.php
+        try {
+            $pdo = new PDO("mysql:host=$db_host;dbname=$db_name;charset=utf8", $db_user, $db_pass);
+            $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+            logFlush("Database Connection Success");
+        } catch (PDOException $e) {
+            throw new Exception("Database Connection Failed: " . $e->getMessage());
+        }
+
         $config = "<?php
 \$db_host = '$db_host';
 \$db_name = '$db_name';
@@ -62,6 +71,7 @@ function config($db_host, $db_name, $db_user, $db_pass, $panelToken, $botToken) 
         logFlush("config.php Created");
     } catch (Exception $e) {
         logFlush("config.php Error: " . $e->getMessage());
+        die($e->getMessage());
     }
 }
 
@@ -190,7 +200,7 @@ function fetchBotConfig($panelToken) {
             logFlush("Error: couldn't get messages from panel API → " . $e->getMessage());
             return;
         }
-        logFlush("Fetching messages from panel... (not implemented yet)");
+        logFlush("Messages fetched and saved.");
     } catch (Exception $e) {
         logFlush("Fetch Messages Error: " . $e->getMessage());
     }
@@ -590,7 +600,7 @@ try {
 
 
     // Step 2: Create config.php first
-    config(
+    setConfig(
         $db_host,
         $db_name,
         $db_user,
