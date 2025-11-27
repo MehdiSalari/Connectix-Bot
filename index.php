@@ -254,13 +254,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </div>
 
         <!-- فرم تنظیمات پیام -->
-        <div id="messageFormContainer" class="bg-white rounded-xl shadow-xl p-8 mb-8" style="display: block;">
+        <div id="messageFormContainer" class="bg-white rounded-xl shadow-xl p-8 mb-8" style="display: none;">
             <h2 class="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-3">
                 <i class="fas fa-comments text-blue-600"></i>
                 مدیریت پیام های بات
             </h2>
 
-            <form id="messageForm" method="post" class="space-y-6">
+            <form id="messageForm" method="post" action="index.php" class="space-y-6">
                 <?php
                 //get data from bot_config.json
                 $data = file_get_contents('setup/bot_config.json');

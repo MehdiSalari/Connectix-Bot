@@ -7,10 +7,11 @@ $db_host = $_POST['db_host'] ?? '';
 $db_name = $_POST['db_name'] ?? '';
 $db_user = $_POST['db_user'] ?? '';
 $db_pass = $_POST['db_pass'] ?? '';
-$panelToken = $_POST['panelToken'] ?? '';
+$panelEmail = $_POST['panelEmail'] ?? '';
+$panelPassword = $_POST['panelPassword'] ?? '';
 $botToken = $_POST['botToken'] ?? '';
 $admin_email = $_POST['email'] ?? '';
-$admin_password = $_POST['adminPassword'] ?? ''; // Keep as plain password
+$admin_password = $_POST['adminPassword'] ?? '';
 $admin_chat_id = $_POST['chatId'] ?? '';
 
 logFlush("Starting Connectix Bot Setup...");
@@ -20,6 +21,31 @@ if (empty($admin_password) || empty($admin_email)) {
     logFlush($admin_email);
     logFlush($admin_password);
     exit(1);
+}
+
+function getPanelToken($panelEmail, $panelPassword) {
+    $endpiont = 'https://api.connectix.vip/v1/seller/auth/login';
+    $ch = curl_init();
+    curl_setopt_array($ch, [
+        CURLOPT_URL => $endpiont,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_POST => true,
+        CURLOPT_POSTFIELDS => json_encode([
+            'email' => $panelEmail,
+            'password' => $panelPassword,
+            'rememberMe' => false,
+            'device_browser' => 'Chrome',
+            'device_os' => 'Windows'
+        ]),
+        CURLOPT_HTTPHEADER => [
+            'Content-Type: application/json',
+            'Accept: application/json'
+        ]
+    ]);
+    $response = curl_exec($ch);
+    curl_close($ch);
+    $json = json_decode($response);
+    return $json->token;
 }
 
 function config($db_host, $db_name, $db_user, $db_pass, $panelToken, $botToken) {
@@ -556,7 +582,14 @@ function dbSetup()
 
 
 try {
-    // Step 1: Create config.php first
+    // Step 1: Get Panel Token
+    $panelToken = getPanelToken(
+        $panelEmail,
+        $panelPassword
+    );
+
+
+    // Step 2: Create config.php first
     config(
         $db_host,
         $db_name,
@@ -569,7 +602,7 @@ try {
     // Now require config.php since it was just created
     require_once '../config.php';
 
-    // Step 2: Set up admin user
+    // Step 3: Set up admin user
     setAdmin(
         $admin_email,
         $admin_password,
@@ -581,7 +614,7 @@ try {
         $db_pass
     );
 
-    // Step 3: Set bot webhook
+    // Step 4: Set bot webhook
     try {
         setBotWebhook(
             $botToken
@@ -590,13 +623,13 @@ try {
         logFlush("Warning: Webhook setup failed, but setup will continue: " . $webhookErr->getMessage());
     }
 
-    // Step 4: Fetch clients from panel
+    // Step 5: Fetch clients from panel
     fetchBotConfig(
         $panelToken,
     );
 
 
-    // Step 5: Sync database with panel
+    // Step 6: Sync database with panel
     dbSetup();
     
     logFlush("\n✅ Setup completed successfully!");

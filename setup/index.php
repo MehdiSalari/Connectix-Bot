@@ -193,9 +193,15 @@ if (file_exists('../config.php')) {
                 <!-- Tokens and Admin Configuration -->
                 <div class="form-group">
                     <div class="input-group">
-                        <label for="panelToken">Panel Token:</label>
-                        <input type="text" id="panelToken" name="panelToken" value="<?= $panelToken ?? '' ?>" required>
+                        <label for="panelToken">Connectix Panel Email:</label>
+                        <input type="email" id="panelEmail" name="panelEmail" required>
                     </div>
+                    <div class="input-group">
+                        <label for="panelToken">Connectix Panel Password:</label>
+                        <input type="password" id="panelPassword" name="panelPassword" required>
+                    </div>
+                </div>
+                <div class="form-group">
                     <div class="input-group">
                         <label for="botToken">Bot Token:</label>
                         <input type="text" id="botToken" name="botToken" value="<?= $botToken ?? '' ?>" required>
