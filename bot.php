@@ -17,6 +17,16 @@ $user_id = $update['message']['chat']['username'] ?? null;  // Username of the u
 $user_name = $update['message']['chat']['first_name'] ?? null;  // First name of the user
 $forward_from_id = $update['message']['forward_from_chat']['id'] ?? null;  // Forwarded from chat
 
+// Extract callback query details if available
+$callback_chat_id = $update['callback_query']['message']['chat']['id'] ?? null;  // Chat ID from callback
+$callback_data = $update['callback_query']['data'] ?? null;  // Data from the callback
+$callback_id = $update['callback_query']['id'] ?? null;  // ID of the callback
+$callback_message = $update['callback_query']['message']['text'] ?? null;  // Message text from callback
+$callback_message_id = $update['callback_query']['message']['message_id'] ?? null;  // Message ID from callback
+$callback_user_id = $update['callback_query']['message']['chat']['username'] ?? null;  // Username of the user
+$callback_user_name = $update['callback_query']['message']['chat']['first_name'] ?? null;  // First name of the user
+$bot_id = $update['callback_query']['from']['id'] ?? null;  // Bot ID from callback
+
 // Extract media details
 $photo = $update['message']['photo'] ?? null;  // Photo in the message
 $video = $update['message']['video'] ?? null;  // Video in the message
@@ -25,48 +35,35 @@ $video_note = $update['message']['video_note'] ?? null;  // Video message (circu
 $document = $update['message']['document'] ?? null;  // Document/file in the message
 $caption = $update['message']['caption'] ?? null;  // Caption for media (if any)
 
-define('UID', $chat_id);
+$uid = $chat_id ?? $callback_chat_id;
+define('UID', $uid);
 
 
 try {
     //debug
     // file_put_contents('debug/user_info.txt', "Chat ID: $chat_id\nUser: $user_name\nMessage: $text\n");
+
+    // Handle the user's message
     switch ($text) {
         case '/start':
-            $conn = new mysqli($db_host, $db_user, $db_pass, $db_name);
-            if ($conn->connect_error) {
-                errorLog("Connection failed: " . $conn->connect_error);
-            }
-            $stmt = $conn->prepare("SELECT * FROM users WHERE chat_id = ?");
-            $stmt->bind_param("i", $chat_id);
-            $stmt->execute();
-            $result = $stmt->get_result();
-            $user = $result->fetch_assoc();
-            if ($user) {
-                $stmt = $conn->prepare("UPDATE users SET telegram_id = ?, name = ? WHERE chat_id = ?");
-                $stmt->bind_param("ssi", $user_id, $user_name, $chat_id);
-                $result = $stmt->execute();
-            } else {
-                $stmt = $conn->prepare("INSERT INTO users (chat_id, telegram_id, name, created_at) VALUES (?, ?, ?, NOW())");
-                $stmt->bind_param("ssi", $chat_id, $user_id, $user_name);
-                $result = $stmt->execute();
-            }
-            $stmt->close();
-            $conn->close();
+            userInfo($uid, $user_id, $user_name);
             
             //send welcome message
             $result = tg('sendMessage',[
                 'chat_id' => $chat_id,
-                'text' => message("welcome_message"),
+                'text' => message('welcome_message'),
                 'reply_markup' => keyboard('main_menu')
                 // 'reply_markup' => json_encode(['remove_keyboard' => true])
             ]);
             if (!($result = json_decode($result))->ok) {
-                errorLog("Failed to send /start message to chat_id: $chat_id | Message: {$result->description}");
+                errorLog("Failed to send /start message to chat_id: $uid | Message: {$result->description}");
                 exit;
             }
             break;
         default:
+            if ($text == null) {
+                break;
+            }
             $message = "متن پیشفرض پاسخ به کاربر";
 
             $result = tg('sendMessage',[
@@ -76,8 +73,58 @@ try {
 
             break;
     }
+
+    //Handle Callbacks
+    switch ($callback_data) {
+        case 'main_menu':
+            userInfo($uid, $callback_user_id, $callback_user_name);
+
+            $result = tg('editMessageText',[
+                'chat_id' => $callback_chat_id,
+                'message_id' => $callback_message_id,
+                'text' => message('welcome_message'),
+                'reply_markup' => keyboard('main_menu')
+            ]);
+            break;
+        case 'get_test':
+            $result = tg('editMessageText',[
+                'chat_id' => $callback_chat_id,
+                'message_id' => $callback_message_id,
+                'text' => message('get_test'),
+                'reply_markup' => keyboard('get_test')
+            ]);
+            break;
+        case 'my_accounts':
+            $result = tg('editMessageText',[
+                'chat_id' => $callback_chat_id,
+                'message_id' => $callback_message_id,
+                'text' => message('my_accounts'),
+                'reply_markup' => keyboard('my_accounts')
+            ]);
+            break;
+        default:
+            if ($callback_data == null) {
+                break;
+            }
+            $result = callBackCheck($callback_data);
+            $message = $result['message'];
+            $keyboard = $result['keyboard'];
+
+            $result = tg('editMessageText',[
+                'chat_id' => $callback_chat_id,
+                'message_id' => $callback_message_id,
+                'text' => $message,
+                'parse_mode' => 'html',
+                'reply_markup' => $keyboard
+            ]);
+            break;
+    }
+    if ($result && !($result = json_decode($result))->ok) {
+        errorLog("Error in sending message to chat_id: $uid | Message: {$result->description}");
+        exit;
+    }
 } catch (Exception $e) {
     // Log any exceptions for debugging
-    errorLog($e->getMessage() . $e->getTraceAsString());
+    errorLog($e->getMessage() . " | " . $e->getTraceAsString());
 }
 
