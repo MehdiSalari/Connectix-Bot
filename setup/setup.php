@@ -207,39 +207,47 @@ function fetchBotConfig($panelToken) {
 }
 
 function setBotWebhook($token) {
-
-    // $protocol = isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on' ? "https" : "http";
-    // $protocol = "https";
-
     if ((!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') 
-        || (!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https')) {
+        || (!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https')
+        || (!empty($_SERVER['HTTP_X_FORWARDED_SSL']) && $_SERVER['HTTP_X_FORWARDED_SSL'] === 'on')) {
         $protocol = "https";
     } else {
         $protocol = "http";
     }
-    // 2. ترکیب پروتکل، هاست و URI برای ساخت URL کامل
-    // $full_url = $protocol . "://" . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
-    // مسیر فعلی کامل
-    $current_url = $protocol . "://" . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
 
-    // حذف setup/setup.php و اضافه کردن index.php
+    $current_url = $protocol . "://" . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
     $full_url = str_replace("setup/setup.php", "bot.php", $current_url);
 
+    // اگر http بود → خطا بده و متوقف کن (چون تلگرام فقط https قبول می‌کنه)
+    if ($protocol !== 'https') {
+        logFlush("ERROR: Webhook URL is HTTP! Telegram only accepts HTTPS.");
+        logFlush("ERROR: Current URL detected: " . $full_url);
+        logFlush("ERROR: Please use a valid SSL certificate (Let's Encrypt, Cloudflare, etc.)");
+        throw new Exception("Webhook requires HTTPS. Current URL is HTTP.");
+    }
+
     $url = "https://api.telegram.org/bot{$token}/setWebhook?url={$full_url}";
-    logFlush("Set Bot Webhook for URL: {$full_url}");
+    logFlush("Setting Webhook → {$full_url}");
+
     $ch = curl_init();
-    curl_setopt($ch, CURLOPT_URL, $url);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    // curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+    curl_setopt_array($ch, [
+        CURLOPT_URL => $url,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT => 30,
+    ]);
 
     $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
     $result = json_decode($response, true);
-    if ($result['ok'] !== true) {
-        logFlush("Webhook Error: " . $result['description']);
-        throw new Exception("Webhook Error: " . $result['description']);
-    }
-    logFlush("Webhook set successfully.");
+    curl_close($ch);
 
+    if ($httpCode !== 200 || empty($result['ok'])) {
+        $error = $result['description'] ?? 'Unknown error';
+        logFlush("Webhook Error (HTTP {$httpCode}): " . $error);
+        throw new Exception("Failed to set webhook: " . $error);
+    }
+
+    logFlush("Webhook set successfully!");
 }
 
 function logFlush($msg) {
@@ -624,14 +632,8 @@ try {
         $db_pass
     );
 
-    // Step 4: Set bot webhook
-    try {
-        setBotWebhook(
-            $botToken
-        );
-    } catch (Exception $webhookErr) {
-        logFlush("Warning: Webhook setup failed, but setup will continue: " . $webhookErr->getMessage());
-    }
+    // Step 4: Set bot webhook (CRITICAL - must succeed)
+    setBotWebhook($botToken); 
 
     // Step 5: Fetch clients from panel
     fetchBotConfig(
@@ -644,7 +646,12 @@ try {
     
     logFlush("\n✅ Setup completed successfully!");
 } catch (Exception $e) {
-    // echo "Fatal error: " . $e->getMessage() . "<br>";
-    logFlush("Fatal error: " . $e->getMessage() . "<br>");
-    exit(1);
+    logFlush("FATAL ERROR: " . $e->getMessage());
+    // خیلی مهم: یک خط ویژه با پیشوند ERROR: می‌فرستیم تا فرانت‌اند بفهمه خطا شده
+    logFlush("ERROR: Setup failed permanently");
+    // خروج با کد 1 اما استریم رو نبندیم تا خط آخر برسه
+    // exit(1); ← این رو حذف کن
+} finally {
+    // همیشه این خط آخر رو بفرست تا فرانت‌اند بفهمه تموم شده
+    logFlush("SETUP_FINISHED");
 }

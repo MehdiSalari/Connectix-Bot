@@ -221,11 +221,10 @@ if (file_exists('../config.php')) {
             <!-- Progress Section -->
             <div id="progressSection" class="hidden p-8 md:p-12 bg-gray-50">
                 <div class="text-center mb-8">
-                    <i class="fas fa-sync-alt text-6xl text-indigo-600 animate-spin mb-6"></i>
+                    <i id="statusIcon" class="fas fa-sync-alt text-6xl text-indigo-600 animate-spin mb-6"></i>
                     <h3 class="text-2xl font-bold text-gray-800">در حال نصب و همگام‌سازی اطلاعات...</h3>
                     <p class="text-gray-600 mt-3">لطفاً منتظر بمانید، این ممکن است چند دقیقه طول بکشد.</p>
                 </div>
-
                 <div class="mb-6">
                     <div class="progress-bar">
                         <div class="progress-fill" id="progressFill"></div>
@@ -253,87 +252,137 @@ if (file_exists('../config.php')) {
         </div>
     </div>
 
-    <script>
-        document.getElementById("setupFormElement").addEventListener("submit", function (e) {
-            e.preventDefault();
+<script>
+    document.getElementById("setupFormElement").addEventListener("submit", function (e) {
+        e.preventDefault();
 
-            const form = this;
-            const formData = new FormData(form);
+        const form = this;
+        const formData = new FormData(form);
 
-            if (formData.get("adminPassword") !== formData.get("reAdminPassword")) {
-                alert("رمز عبور و تکرار آن یکسان نیست!");
-                return;
-            }
+        if (formData.get("adminPassword") !== formData.get("reAdminPassword")) {
+            alert("رمز عبور و تکرار آن یکسان نیست!");
+            return;
+        }
 
-            document.getElementById("setupForm").classList.add("hidden");
-            document.getElementById("progressSection").classList.remove("hidden");
+        document.getElementById("setupForm").classList.add("hidden");
+        document.getElementById("progressSection").classList.remove("hidden");
 
-            const progressFill = document.getElementById("progressFill");
-            const progressPercent = document.getElementById("progressPercent");
-            const logBox = document.getElementById("logBox");
-            const finishBtn = document.getElementById("finishBtn");
+        const progressFill = document.getElementById("progressFill");
+        const progressPercent = document.getElementById("progressPercent");
+        const logBox = document.getElementById("logBox");
+        const finishBtn = document.getElementById("finishBtn");
 
-            let hasError = false;
+        let hasError = false;
+        let setupCompleted = false;
 
-            function log(msg) {
+        function log(msg) {
+            // اگر خطا بود علامت قرمز بذار
+            if (msg.includes("ERROR:") || msg.includes("FATAL") || msg.includes("failed") || msg.includes("خطا")) {
+                hasError = true;
+                logBox.innerHTML += `<span class="text-red-400 font-bold">✗ ${msg}</span><br>`;
+            } else if (msg.includes("SETUP_FINISHED")) {
+                setupCompleted = true;
+            } else {
                 logBox.innerHTML += msg + "<br>";
-                logBox.scrollTop = logBox.scrollHeight;
-                if (/error|fatal|failed/i.test(msg)) hasError = true;
             }
+            logBox.scrollTop = logBox.scrollHeight;
+        }
 
-            function updateProgress(percent) {
-                progressFill.style.width = percent + "%";
-                progressPercent.textContent = percent + "%";
-            }
+        function showErrorState() {
+            progressFill.style.width = "100%";
+            progressFill.style.background = "linear-gradient(90deg, #ef4444, #b91c1c)";
+            progressPercent.textContent = "خطا!";
+            progressPercent.classList.add("text-red-600");
 
-            // Poll progress
-            const poll = setInterval(() => {
-                fetch("setup_progress.php")
-                    .then(r => r.json())
-                    .then(d => {
-                        if (d.processedClients !== undefined) {
-                            const percent = d.total_clients > 0 ? Math.round((d.processedClients / d.total_clients) * 100) : 0;
-                            updateProgress(percent);
+            // عوض کردن آیکون به علامت خطا
+            document.getElementById("statusIcon").className = "fas fa-exclamation-triangle text-6xl text-red-600 mb-6";
+            document.querySelector("#progressSection h3").textContent = "نصب با خطا مواجه شد!";
+            document.querySelector("#progressSection p").textContent = "لطفاً اطلاعات وارد شده را بررسی کنید و دوباره تلاش کنید.";
+
+            finishBtn.classList.remove("hidden");
+            finishBtn.textContent = "تلاش مجدد";
+            finishBtn.className = "px-10 py-4 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl shadow-lg transition";
+            finishBtn.onclick = () => location.reload();
+        }
+
+        function showSuccessState() {
+            progressFill.style.width = "100%";
+            progressPercent.textContent = "100%";
+
+            // عوض کردن آیکون به تیک سبز
+            document.getElementById("statusIcon").className = "fas fa-check-circle text-6xl text-green-600 mb-6";
+            document.querySelector("#progressSection h3").textContent = "نصب با موفقیت انجام شد!";
+            document.querySelector("#progressSection p").textContent = "همه چیز آماده است. حالا می‌تونید وارد پنل بشید.";
+
+            log("<span class='text-green-400 font-bold'>نصب با موفقیت تکمیل شد!</span>");
+
+            finishBtn.classList.remove("hidden");
+            finishBtn.textContent = "تکمیل شد! برو به پنل";
+            finishBtn.className = "px-10 py-4 bg-gradient-to-r from-green-500 to-emerald-600 text-white font-bold rounded-xl shadow-lg hover:shadow-2xl transition transform hover:scale-105";
+            finishBtn.onclick = () => window.location.href = '../';
+        }
+
+        // Poll progress (اختیاری، می‌تونی نگه داری)
+        const poll = setInterval(() => {
+            fetch("setup_progress.php")
+                .then(r => r.json())
+                .then(d => {
+                    if (!hasError && d.processedClients !== undefined && d.total_clients > 0) {
+                        const percent = Math.round((d.processedClients / d.total_clients) * 100);
+                        if (percent < 100) {
+                            progressFill.style.width = percent + "%";
+                            progressPercent.textContent = percent + "%";
                         }
-                    })
-                    .catch(() => { });
-            }, 2000);
-
-            fetch("setup.php", {
-                method: "POST",
-                body: formData
-            }).then(r => r.body.getReader())
-                .then(reader => {
-                    const decoder = new TextDecoder("utf-8");
-                    let buffer = "";
-
-                    function read() {
-                        reader.read().then(({ done, value }) => {
-                            if (done) {
-                                clearInterval(poll);
-                                updateProgress(100);
-                                log("نصب با موفقیت تکمیل شد!");
-                                finishBtn.classList.remove("hidden");
-                                return;
-                            }
-                            buffer += decoder.decode(value, { stream: true });
-                            const lines = buffer.split("\n");
-                            buffer = lines.pop();
-                            lines.forEach(line => {
-                                if (line.trim()) log(line.trim());
-                            });
-                            read();
-                        });
                     }
-                    read();
                 })
-                .catch(err => {
-                    clearInterval(poll);
-                    log("خطا در ارتباط: " + err);
-                    finishBtn.classList.remove("hidden");
+                .catch(() => {});
+        }, 2000);
+
+        fetch("setup.php", {
+            method: "POST",
+            body: formData
+        })
+        .then(r => r.body.getReader())
+        .then(reader => {
+            const decoder = new TextDecoder("utf-8");
+            let buffer = "";
+
+            function read() {
+                reader.read().then(({ done, value }) => {
+                    if (done) {
+                        clearInterval(poll);
+
+                        // بعد از اتمام استریم بررسی کن
+                        if (hasError || !setupCompleted) {
+                            showErrorState();
+                        } else {
+                            showSuccessState();
+                        }
+                        return;
+                    }
+
+                    buffer += decoder.decode(value, { stream: true });
+                    const lines = buffer.split("\n");
+                    buffer = lines.pop();
+
+                    lines.forEach(line => {
+                        if (line.trim()) {
+                            log(line.trim());
+                        }
+                    });
+
+                    read();
                 });
+            }
+            read();
+        })
+        .catch(err => {
+            clearInterval(poll);
+            log("خطا در ارتباط با سرور: " + err.message);
+            showErrorState();
         });
-    </script>
+    });
+</script>
 </body>
 
 </html>
