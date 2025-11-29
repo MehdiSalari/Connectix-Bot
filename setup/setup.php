@@ -77,41 +77,24 @@ function setConfig($db_host, $db_name, $db_user, $db_pass, $panelToken, $botToke
 
 function setAdmin($email, $password, $panelToken, $admin_chat_id, $db_host, $db_name, $db_user, $db_pass) {
     try {
-        // Hash the password inside the function
-        $hashed_password = password_hash($password, PASSWORD_BCRYPT);
-        
-        $pdo = new PDO("mysql:host=$db_host;dbname=$db_name;charset=utf8", $db_user, $db_pass);
+        $pdo = new PDO("mysql:host=$db_host;dbname=$db_name;charset=utf8mb4", $db_user, $db_pass);
         $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
-        // چک کردن وجود جدول مدیران
-        $stmt = $pdo->prepare("SHOW TABLES LIKE 'admins'");
-        $stmt->execute();
-        $result = $stmt->fetchAll(PDO::FETCH_COLUMN);
-        if (!in_array('admins', $result)) {
-            // اگر جدول مدیران وجود نداشت، آن را ایجاد می‌کنیم
-            $pdo->exec("
-                CREATE TABLE admins (
-                    id INT AUTO_INCREMENT PRIMARY KEY,
-                    email VARCHAR(190) UNIQUE NOT NULL,
-                    password VARCHAR(255) NOT NULL,
-                    token VARCHAR(255) NOT NULL,
-                    chat_id VARCHAR(255) NOT NULL,
-                    role ENUM('admin','editor') NOT NULL DEFAULT 'editor'
-                )
-            ");
-            logFlush("admins table created");
-        }
+        $pdo->exec("CREATE TABLE IF NOT EXISTS admins (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            email VARCHAR(190) UNIQUE NOT NULL,
+            password VARCHAR(255) NOT NULL,
+            token VARCHAR(255) NOT NULL,
+            chat_id VARCHAR(255) NOT NULL,
+            role ENUM('admin','editor') DEFAULT 'admin'
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
-        // افزودن یا بروزرسانی مدیر اصلی
-        $stmt = $pdo->prepare("INSERT INTO admins (email, password, token, chat_id, role) VALUES (:email, :password, :token, :chat_id, :role) ON DUPLICATE KEY UPDATE password = :password, token = :token, chat_id = :chat_id, role = :role");
-        $stmt->execute([
-            ':email' => $email,
-            ':password' => $hashed_password,
-            ':token' => $panelToken,
-            ':chat_id' => $admin_chat_id,
-            ':role' => 'admin'
-        ]);
-        logFlush("Main admin added/updated: {$email}");
+        $hash = password_hash($password, PASSWORD_BCRYPT);
+        $stmt = $pdo->prepare("INSERT INTO admins (email, password, token, chat_id, role) 
+                            VALUES (?, ?, ?, ?, 'admin') 
+                            ON DUPLICATE KEY UPDATE password=VALUES(password), token=VALUES(token), chat_id=VALUES(chat_id)");
+        $stmt->execute([$email, $hash, $panelToken, $admin_chat_id]);
+        logFlush("Admin account created/updated");
     } catch (Exception $e) {
         logFlush("Set Admin Error: " . $e->getMessage());
         exit(1);
@@ -218,7 +201,7 @@ function setBotWebhook($token) {
     $current_url = $protocol . "://" . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
     $full_url = str_replace("setup/setup.php", "bot.php", $current_url);
 
-    // اگر http بود → خطا بده و متوقف کن (چون تلگرام فقط https قبول می‌کنه)
+    // If it's HTTP, throw an error and stop (Telegram only accepts HTTPS)
     if ($protocol !== 'https') {
         logFlush("ERROR: Webhook URL is HTTP! Telegram only accepts HTTPS.");
         logFlush("ERROR: Current URL detected: " . $full_url);
@@ -258,43 +241,73 @@ function logFlush($msg) {
 
 function http_get_json(string $token, string $url, array $headers = [])
 {
-
-    // global $token; // 👈 برای دسترسی به توکن بیرون تابع
-
     $defaultHeaders = [
         "Accept: application/json",
-        "Authorization: Bearer {$token}" // 👈 این خط جدید اضافه شده
+        "Authorization: Bearer {$token}"
     ];
 
-    // اگر هدرهای اضافی هم فرستاده بشن، باهم ترکیب می‌شن
     $headers = array_merge($defaultHeaders, $headers);
 
+    // Retry logic for SSL errors
+    $maxRetries = 3;
+    $retryDelay = 2; // seconds
+    $attempt = 0;
 
-
-    $ch = curl_init();
-    curl_setopt($ch, CURLOPT_URL, $url);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_TIMEOUT, 30);
-    curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-    if (!empty($headers)) {
-        curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-    }
-    $res = curl_exec($ch);
-    if ($res === false) {
-        $err = curl_error($ch);
+    while ($attempt < $maxRetries) {
+        $attempt++;
+        
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 45);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 15);
+        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+        
+        // Improved SSL handling
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
+        curl_setopt($ch, CURLOPT_SSL_CIPHER_LIST, 'DEFAULT:!aNULL:!eNULL:!MD5:!3DES:!DES:!RC4:!IDEA:!SEED:!aDSS:!SRP:!PSK');
+        
+        if (!empty($headers)) {
+            curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
+        }
+        
+        $res = curl_exec($ch);
+        $curlError = curl_error($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
-        throw new Exception("cURL error for {$url}: {$err}");
+
+        // If we got a valid JSON response
+        if ($res !== false && $httpCode >= 200 && $httpCode < 300) {
+            $json = json_decode($res, true);
+            if ($json !== null) {
+                return $json;
+            } else {
+                throw new Exception("Invalid JSON from {$url}: " . substr($res, 0, 500));
+            }
+        }
+
+        // If there was an SSL error and we have more retries left
+        if ($curlError && strpos($curlError, 'SSL') !== false && $attempt < $maxRetries) {
+            logFlush("   ⚠️ SSL error (attempt {$attempt}/{$maxRetries}), retrying in {$retryDelay}s...");
+            sleep($retryDelay);
+            $retryDelay += 1; // افزایش تدریجی delay
+            continue;
+        }
+
+        // If there was a cURL error
+        if ($res === false) {
+            throw new Exception("cURL error for {$url}: {$curlError}");
+        }
+
+        // If there was an HTTP error
+        if ($httpCode < 200 || $httpCode >= 300) {
+            throw new Exception("HTTP {$httpCode} when requesting {$url}: response: " . substr($res, 0, 500));
+        }
     }
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
-    if ($httpCode < 200 || $httpCode >= 300) {
-        throw new Exception("HTTP {$httpCode} when requesting {$url}: response: " . substr($res, 0, 500));
-    }
-    $json = json_decode($res, true);
-    if ($json === null) {
-        throw new Exception("Invalid JSON from {$url}: " . substr($res, 0, 500));
-    }
-    return $json;
+
+    // if all attempts failed
+    throw new Exception("Failed to fetch {$url} after {$maxRetries} attempts");
 }
 
 function dbSetup()
@@ -342,26 +355,6 @@ function dbSetup()
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     ");
 
-    $pdo->exec("
-    CREATE TABLE IF NOT EXISTS clients_plans (
-    plan_id VARCHAR(100) PRIMARY KEY,
-    client_id VARCHAR(100),
-    name VARCHAR(255),
-    price VARCHAR(100),
-    created_at_raw VARCHAR(100),
-    expire_date_raw VARCHAR(100),
-    is_in_queue TINYINT(1),
-    is_active TINYINT(1),
-    activated_at VARCHAR(100),
-    expired_at VARCHAR(100),
-    total_used_traffic VARCHAR(100),
-    FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-    ");
-
-    // ---- helper: http GET ----
-    
-
     // prepared statements for speed
     $selectUserByChat = $pdo->prepare("SELECT id FROM users WHERE chat_id = ? LIMIT 1");
     $insertUser = $pdo->prepare("INSERT INTO users (chat_id, telegram_id, name, email, phone, test) VALUES (?, ?, ?, ?, ?, ?)");
@@ -378,12 +371,15 @@ function dbSetup()
     // counters
     $processedClients = $insertedUsers = $insertedClients = $insertedPlans = 0;
     $skippedClientsNoDetail = 0;
+    $totalClientsCount = 0;
+
+    // NOTE: Do NOT reset progress file here! It already has 5% from setup steps.
+    // We'll read the existing progress to keep 5% as starting point for client import.
 
     try {
         // pagination loop
         $pageUrl = rtrim($endpoint, '/') . '/clients?page=1';
         $pageNum = 0;
-        $totalClientsCount = 0;
         while ($pageUrl !== null) {
             $pageNum++;
             // echo "<strong>Fetching page: {$pageUrl}</strong><br>";
@@ -403,6 +399,26 @@ function dbSetup()
                 } elseif (!empty($resp['clients']['meta']['total'])) {
                     $totalClientsCount = (int)$resp['clients']['meta']['total'];
                 }
+                
+                // If still 0, use count of current page as fallback
+                if ($totalClientsCount === 0) {
+                    $totalClientsCount = count($clientsArray);
+                }
+                
+                logFlush("Total clients to import: {$totalClientsCount}");
+                logFlush("Current page has: " . count($clientsArray) . " clients");
+                
+                // Write initial progress with total_clients set (starts at 5% since initial setup done)
+                file_put_contents(__DIR__ . '/setup_progress.json', json_encode([
+                    'page' => $pageNum,
+                    'processedClients' => 0,
+                    'insertedUsers' => $insertedUsers,
+                    'insertedClients' => $insertedClients,
+                    'insertedPlans' => $insertedPlans,
+                    'skipped' => $skippedClientsNoDetail,
+                    'total_clients' => $totalClientsCount,
+                    'percent' => 5
+                ]));
             }
 
             foreach ($clientsArray as $c) {
@@ -484,57 +500,6 @@ function dbSetup()
                         logFlush("   + inserted client {$clientDetail['id']}");
                     }
 
-                    // plans
-                    if (!empty($clientDetail['plans']) && is_array($clientDetail['plans'])) {
-                        foreach ($clientDetail['plans'] as $plan) {
-                            $planId = $plan['id'] ?? null;
-                            if (!$planId)
-                                continue;
-                            $selectPlan->execute([$planId]);
-                            $planExists = $selectPlan->fetch();
-                            $p_name = $plan['name'] ?? null;
-                            $p_price = $plan['price'] ?? null;
-                            $p_created_at = $plan['created_at'] ?? null;
-                            $p_expire_date = $plan['expire_date'] ?? null;
-                            $p_is_in_queue = !empty($plan['is_in_queue']) ? 1 : 0;
-                            $p_is_active = !empty($plan['is_active']) ? 1 : 0;
-                            $p_activated_at = $plan['activated_at'] ?? null;
-                            $p_expired_at = $plan['expired_at'] ?? null;
-                            $p_total_used = $plan['total_used_traffic'] ?? null;
-
-                            if ($planExists) {
-                                $updatePlan->execute([
-                                    $clientDetail['id'],
-                                    $p_name,
-                                    $p_price,
-                                    $p_created_at,
-                                    $p_expire_date,
-                                    $p_is_in_queue,
-                                    $p_is_active,
-                                    $p_activated_at,
-                                    $p_expired_at,
-                                    $p_total_used,
-                                    $planId
-                                ]);
-                            } else {
-                                $insertPlan->execute([
-                                    $planId,
-                                    $clientDetail['id'],
-                                    $p_name,
-                                    $p_price,
-                                    $p_created_at,
-                                    $p_expire_date,
-                                    $p_is_in_queue,
-                                    $p_is_active,
-                                    $p_activated_at,
-                                    $p_expired_at,
-                                    $p_total_used
-                                ]);
-                                $insertedPlans++;
-                            }
-                        }
-                    }
-
                     $pdo->commit();
                     $processedClients++;
                 } catch (Exception $e) {
@@ -545,6 +510,8 @@ function dbSetup()
             } // end foreach clientsArray
 
             // Write progress after each page
+            // Percent calculation: 5% (initial setup) + 95% (client import progress)
+            $currentPercent = $totalClientsCount > 0 ? (int)(5 + ($processedClients / $totalClientsCount * 95)) : 5;
             file_put_contents(__DIR__ . '/setup_progress.json', json_encode([
                 'page' => $pageNum,
                 'processedClients' => $processedClients,
@@ -552,18 +519,20 @@ function dbSetup()
                 'insertedClients' => $insertedClients,
                 'insertedPlans' => $insertedPlans,
                 'skipped' => $skippedClientsNoDetail,
-                'total_clients' => $totalClientsCount
+                'total_clients' => $totalClientsCount,
+                'percent' => $currentPercent
             ]));
+            logFlush("Progress: {$processedClients}/{$totalClientsCount} clients ({$currentPercent}%)");
 
             // prepare next page
             $nextPage = $resp['clients']['next_page_url'] ?? null;
             if ($nextPage) {
-                // 🔹 اصلاح لینک برای اطمینان از HTTPS و مسیر کامل
+                // Fix link to use HTTPS and absolute path for next page
                 if (strpos($nextPage, '//') === false) {
-                    // مسیر نسبی است → به ابتدای آن دامنه را اضافه کن
+                    // relative path -> add base path to the beginning
                     $nextPage = rtrim($endpoint, '/') . '/' . ltrim($nextPage, '/');
                 } elseif (strpos($nextPage, 'http://') === 0) {
-                    // اگر با http شروع شده → با https جایگزین کن
+                    // If the link starts with http, replace it with https
                     $nextPage = preg_replace('#^http://#', 'https://', $nextPage);
                 }
 
@@ -576,13 +545,6 @@ function dbSetup()
             logFlush("<hr><br>");
 
         } // end while pagination
-
-        // echo "<br>Done. summary:<br>";
-        // echo "Processed clients (detailed fetched): {$processedClients}<br>";
-        // echo "Inserted new users: {$insertedUsers}<br>";
-        // echo "Inserted new clients: {$insertedClients}<br>";
-        // echo "Inserted new plans: {$insertedPlans}<br>";
-        // echo "Skipped clients (no detail / errors): {$skippedClientsNoDetail}<br>";
 
         logFlush("Done. summary:");
         logFlush("Processed clients (detailed fetched): {$processedClients}<br>");
@@ -601,13 +563,16 @@ function dbSetup()
 
 try {
     // Step 1: Get Panel Token
+    logFlush("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    logFlush("Step 1/6: Getting panel token...");
     $panelToken = getPanelToken(
         $panelEmail,
         $panelPassword
     );
-
+    logFlush("✓ Panel token obtained");
 
     // Step 2: Create config.php first
+    logFlush("\nStep 2/6: Creating config.php...");
     setConfig(
         $db_host,
         $db_name,
@@ -616,11 +581,13 @@ try {
         $panelToken,
         $botToken
     );
+    logFlush("✓ Config file created");
     
     // Now require config.php since it was just created
     require_once '../config.php';
 
     // Step 3: Set up admin user
+    logFlush("\nStep 3/6: Setting up admin user...");
     setAdmin(
         $admin_email,
         $admin_password,
@@ -631,27 +598,44 @@ try {
         $db_user,
         $db_pass
     );
+    logFlush("✓ Admin user configured");
 
-    // Step 4: Set bot webhook (CRITICAL - must succeed)
-    setBotWebhook($botToken); 
+    // Step 4: Set bot webhook
+    logFlush("\nStep 4/6: Setting bot webhook...");
+    setBotWebhook($botToken);
+    logFlush("✓ Webhook configured");
 
-    // Step 5: Fetch clients from panel
+    // Step 5: Fetch bot config
+    logFlush("\nStep 5/6: Fetching bot configuration...");
     fetchBotConfig(
         $panelToken,
     );
+    logFlush("✓ Bot configuration fetched");
 
+    // Update progress to 5% before starting dbSetup
+    file_put_contents(__DIR__ . '/setup_progress.json', json_encode([
+        'page' => 0,
+        'processedClients' => 0,
+        'insertedUsers' => 0,
+        'insertedClients' => 0,
+        'insertedPlans' => 0,
+        'skipped' => 0,
+        'total_clients' => 0,
+        'percent' => 5,
+        'stage' => 'Initial setup completed. Starting client import...'
+    ]));
 
     // Step 6: Sync database with panel
+    logFlush("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    logFlush("Step 6/6: Importing clients from panel (this may take a while)...");
+    logFlush("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
     dbSetup();
     
     logFlush("\n✅ Setup completed successfully!");
 } catch (Exception $e) {
     logFlush("FATAL ERROR: " . $e->getMessage());
-    // خیلی مهم: یک خط ویژه با پیشوند ERROR: می‌فرستیم تا فرانت‌اند بفهمه خطا شده
     logFlush("ERROR: Setup failed permanently");
-    // خروج با کد 1 اما استریم رو نبندیم تا خط آخر برسه
-    // exit(1); ← این رو حذف کن
 } finally {
-    // همیشه این خط آخر رو بفرست تا فرانت‌اند بفهمه تموم شده
+    // Always execute this last line to finalize the setup process
     logFlush("SETUP_FINISHED");
 }

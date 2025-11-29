@@ -327,9 +327,10 @@ if (file_exists('../config.php')) {
             fetch("setup_progress.php")
                 .then(r => r.json())
                 .then(d => {
-                    if (!hasError && d.processedClients !== undefined && d.total_clients > 0) {
-                        const percent = Math.round((d.processedClients / d.total_clients) * 100);
-                        if (percent < 100) {
+                    if (!hasError && d.total_clients > 0) {
+                        // استفاده از percent که از سرور میاد
+                        let percent = d.percent || 0;
+                        if (percent >= 0) {
                             progressFill.style.width = percent + "%";
                             progressPercent.textContent = percent + "%";
                         }

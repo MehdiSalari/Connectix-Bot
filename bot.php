@@ -91,6 +91,7 @@ try {
                 'chat_id' => $callback_chat_id,
                 'message_id' => $callback_message_id,
                 'text' => message('get_test'),
+                'parse_mode' => 'html',
                 'reply_markup' => keyboard('get_test')
             ]);
             break;
@@ -100,6 +101,15 @@ try {
                 'message_id' => $callback_message_id,
                 'text' => message('my_accounts'),
                 'reply_markup' => keyboard('my_accounts')
+            ]);
+            break;
+        case 'not':
+            //show notification that this btn is nothing
+            $result = tg('answerCallbackQuery',[
+                'callback_query_id' => $callback_id,
+                'text' => "🤷🏻 این دکمه کاری انجام نمیده",
+                // 'text' => $callback_message,
+                'show_alert' => true
             ]);
             break;
         default:
