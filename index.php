@@ -6,7 +6,7 @@ if (!file_exists('config.php')) {
 require_once 'config.php';
 session_start();
 
-// === چک‌های امنیتی ===
+// === Security Checks ===
 if (empty($db_host) || empty($db_name) || empty($db_user) || empty($panelToken) || empty($botToken)) {
     header('Location: setup');
     exit();
@@ -165,7 +165,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>پنل مدیریت | ارسال پیام همگانی</title>
+    <title>پنل مدیریت | Connectix Bot</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -237,13 +237,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                     <div class="flex flex-wrap gap-3 justify-end w-full">
                         <a href="setup" class="bg-blue-500 hover:bg-blue-600 text-white px-5 py-3 rounded-lg font-semibold transition flex items-center gap-2 whitespace-nowrap">
-                            <i class="fas fa-cog"></i> تنظیمات اولیه
+                            <i class="fas fa-cloud-arrow-down"></i> تنظیمات اولیه
                         </a>
                         <a id="messagesBtn" href="#" class="bg-blue-500 hover:bg-blue-600 text-white px-5 py-3 rounded-lg font-semibold transition flex items-center gap-2 whitespace-nowrap">
-                            <i class="fas fa-comments"></i> پیام های بات
+                            <i class="fas fa-cog"></i> تنظیمات بات
                         </a>
                         <a id="broadcastBtn" href="#" class="bg-blue-500 hover:bg-blue-600 text-white px-5 py-3 rounded-lg font-semibold transition flex items-center gap-2 whitespace-nowrap">
-                            <i class="fas fa-users"></i> ارسال پیام همگانی
+                            <i class="fas fa-comments"></i> ارسال پیام همگانی
                         </a>
                         <a href="users" class="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-5 py-3 rounded-lg font-semibold transition flex items-center gap-2 whitespace-nowrap shadow-md">
                             <i class="fas fa-users"></i> لیست کاربران
@@ -253,11 +253,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </div>
         </div>
 
-        <!-- فرم تنظیمات پیام -->
+        <!-- Bot Settings Form -->
         <div id="messageFormContainer" class="bg-white rounded-xl shadow-xl p-8 mb-8" style="display: none;">
             <h2 class="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-3">
                 <i class="fas fa-comments text-blue-600"></i>
-                مدیریت پیام های بات
+                مدیریت تنظیمات بات
             </h2>
 
             <form id="messageForm" method="post" action="index.php" class="space-y-6">
@@ -349,7 +349,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     </textarea>
                 </div>
 
-                <!-- دکمه‌ها -->
+                <!-- Buttons -->
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <button type="button" id="closeBtn"
                         class="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold py-4 rounded-lg text-lg transition transform hover:scale-105 flex items-center justify-center gap-3">
@@ -365,7 +365,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </form>
         </div>
 
-        <!-- فرم ارسال پیام -->
+        <!-- Broadcast Form -->
         <div id="broadcastFormContainer" class="bg-white rounded-xl shadow-xl p-8 mb-8" style="display: none;">
             <h2 class="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-3">
                 <i class="fas fa-paper-plane text-blue-600"></i>
@@ -373,7 +373,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </h2>
 
             <form id="broadcastForm" enctype="multipart/form-data" class="space-y-6">
-                <!-- آپلود فایل -->
+                <!-- Upload File -->
                 <div>
                     <label class="block text-gray-700 font-semibold mb-2">فایل (عکس، ویدیو، فایل و ...):</label>
                     <input type="file" id="media" name="media" accept="image/*,video/*,audio/*,.pdf,.doc,.docx"
@@ -386,7 +386,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     </div>
                 </div>
 
-                <!-- متن پیام -->
+                <!-- Message Text -->
                 <div>
                     <label class="block text-gray-700 font-semibold mb-2">متن پیام (کپشن):</label>
                     <textarea id="message" name="message" rows="5"
@@ -394,7 +394,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         placeholder="متن پیام یا کپشن فایل را اینجا بنویسید..."></textarea>
                 </div>
 
-                <!-- دکمه‌ها -->
+                <!-- Buttons -->
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <button type="button" id="testBtn"
                         class="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold py-4 rounded-lg text-lg transition transform hover:scale-105 flex items-center justify-center gap-3">
@@ -410,7 +410,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </form>
         </div>
 
-        <!-- بخش پیشرفت زنده -->
+        <!-- Live Progress Section -->
         <div id="progressContainer" class="hidden bg-white rounded-xl shadow-xl p-8">
             <div class="text-center mb-6">
                 <h3 class="text-2xl font-bold text-gray-800">در حال ارسال...</h3>
@@ -499,7 +499,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         });
 
-        // تست پیام (با نمایش لودینگ تا تکمیل درخواست)
+        // Test Message (with loading indicator until request completes)
         document.getElementById('testBtn').addEventListener('click', async function () {
             const testBtn = this;
             const message = document.getElementById('message').value;
@@ -548,7 +548,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         });
 
-        // ارسال همگانی
+        // Broadcast to All Users
         document.getElementById('broadcastForm').addEventListener('submit', function (e) {
             e.preventDefault();
             const message = document.getElementById('message').value.trim();
@@ -571,10 +571,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             fetch('broadcast/broadcast_start.php', { method: 'POST', body: formData });
 
-            // اتصال به SSE برای دریافت پیشرفت زنده — فقط یک اتصال ایجاد کن
+            // Connect to SSE for live progress — only create one connection
             eventSource = new EventSource('broadcast/broadcast_progress.php');
             eventSource.onopen = function () {
-                // اتصال برقرار شد — پاک کن هر پیغام خطای قبلی
+                // Connection established — clear any previous error messages
                 console.log('SSE connection opened');
             };
 
@@ -633,7 +633,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 } catch (ex) {
                     // ignore and continue
                 }
-                // اگر به اینجا رسیدیم، ارور واقعی رخ داده — لاگ کن اما اجازه بده دیگر پیام‌ها دریافت شوند
+                // If we get here, an actual error occurred — log it but allow other messages to be received
                 logContainer.innerHTML += '<div class="log-item error p-3 rounded-lg">خطا در ارتباط با سرور!</div>';
             };
         });

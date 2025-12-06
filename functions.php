@@ -52,6 +52,13 @@ function tg($method, $params = []) {
 }
 
 function userInfo($chat_id, $user_id, $user_name) {
+    // Delete Redis key if exists
+    $redis = new Redis();
+    $redis->connect('127.0.0.1', 6379);
+    $redis->del("user:steps:$chat_id");
+    $redis->close();
+
+    // Update user info in the database
     global $db_host, $db_user, $db_pass, $db_name;
     $conn = new mysqli($db_host, $db_user, $db_pass, $db_name);
             if ($conn->connect_error) {
@@ -135,8 +142,155 @@ function callBackCheck($callback_data) {
         case "getTest":
             $result = getTest($query);
             return $result;
+        case "buy":
+            $result = buy($query);
+            return $result;
         default:
             return false;
+    }
+}
+
+function buy($info) {
+    $infoParts = explode(':', $info);
+    $step = $infoParts[0];
+    $data = $infoParts[1];
+    $uid = UID;
+
+    switch ($step) {
+        case 'group':
+            // Initialize Redis if not initialized
+            $redis = new Redis();
+            $redis->connect('127.0.0.1', 6379);
+
+            // Set Redis key with user id
+            $key = "user:steps:$uid";
+
+            //Set Redis data
+            $planData = [
+                'acc'   => 'new',
+                'group' => $data,
+                'plan'  => null
+            ];
+            // Save in Hash foramt
+            $redis->hmset($key, $planData);
+            
+            // Set expire time for 30mins 
+            $redis->expire($key, 1800);
+
+            // Close Redis connection
+            $redis->close();
+
+            return [
+                "message" => message('count'),
+                "keyboard" => keyboard('count')
+            ];
+        
+        case 'count':
+            // Initialize Redis if not initialized
+            $redis = new Redis();
+            $redis->connect('127.0.0.1', 6379);
+
+            // Set Redis key with user id
+            $key = "user:steps:$uid";
+
+            // Get Data from redis
+            $planData = $redis->hgetall($key);
+
+            // Close Redis connection
+            $redis->close();
+
+
+            $planGroup = $planData['group'];
+
+            $plans = getSellerPlans($planGroup);
+
+            $keyboard = [];
+            foreach ($plans as $plan) {
+                if ($plan['count_of_devices'] == $data) {
+                    $traffic = parsePlanTitle($plan['title'])['traffic_gb'];
+                    $traffic = ($traffic == '∞') ? 'نامحدود' : "$traffic گیگ";
+                    $period_text = parsePlanTitle($plan['title'])['period_text'];
+                    $planText = "$traffic • $period_text";
+                    $keyboard[] = [
+                        ['text' => $planText . ' | ' . $plan['sell_price'] . ' تومان', 'callback_data' => 'buy_plan:' . $plan['id']]
+                    ];
+                }
+            }
+
+            $keyboard[] = [
+                ['text' => '🏡 | خانه', 'callback_data' => 'main_menu'],
+                ['text' => '↪️ | بازگشت', 'callback_data' => 'buy_group:' . $planGroup]
+            ];
+
+            $keyboard = json_encode(['inline_keyboard' => $keyboard]);
+
+            $planGroupName = parseType($planGroup);
+            // $message = "لطفا از لیست زیر پلن $data کاربر مد نظر خود را انتخاب کنید:";
+            $message = "فهرست و قیمت سرویس‌های $data کاربره $planGroupName به شرح لیست زیر است.\n\nلطفاً سرویس مدنظر خود را انتخاب کنید: 👇";
+            return [
+                "message" => $message,
+                "keyboard" => $keyboard
+            ];
+        case 'plan':
+            $planId = $data;
+            $redis = new Redis();
+            $redis->connect('127.0.0.1', 6379);
+
+            // Set Redis key with user id
+            $key = "user:steps:$uid";
+
+            // Get Data from redis
+            $planData = $redis->hgetall($key);
+
+            $planGroup = $planData['group'];
+
+            $planData = [
+                'acc'   => 'new',
+                'group' => $planGroup,
+                'plan'  => $planId
+            ];
+            // Save in Hash foramt
+            $redis->hmset($key, $planData);
+            
+            // Set expire time for 30mins 
+            $redis->expire($key, 1800);
+
+            // Close Redis connection
+            $redis->close();
+
+            $plans = getSellerPlans($planGroup);
+            foreach ($plans as $plan) {
+                if ($plan['id'] == $planId) {
+                    $selectedPlan = $plan;
+                }
+            }
+
+            $planDetails = parsePlanTitle($selectedPlan['title']);
+            $planTitle = $planDetails['text'];
+            $planPrice = $selectedPlan['sell_price'];
+            $acc = ($planData['acc'] == 'new') ? "خرید اکانت جدید" : "تمدید اکانت " . $planData['acc'];
+
+            $message = "📝 اطلاعات اکانت شما\n\n📧 $acc\n📦 پلن: $planTitle\n💰 مبلغ: $planPrice تومان\n\nلطفا روش پرداخت را انتخاب کنید 👇🏻";
+            $keyboard = json_encode([
+                'inline_keyboard' => [
+                    [
+                        ['text' => '💳 | کارت به کارت', 'callback_data' => 'buy_pay:card']
+                    ],
+                    [
+                        // ['text' => '👝 | کسر از کیف پول', 'callback_data' => 'buy_pay:wallet'],
+                        ['text' => '🔜 | روش های دیگر به زودی...', 'callback_data' => 'not'],
+                    ],
+                    [
+                        ['text' => '🏡 | خانه', 'callback_data' => 'main_menu'],
+                        ['text' => '↪️ | بازگشت', 'callback_data' => 'buy_count:' . $selectedPlan['count_of_devices']]
+                    ]
+                ]
+            ]);
+
+            return [
+                "message" => $message,
+                "keyboard" => $keyboard
+            ];
     }
 }
 
@@ -242,6 +396,7 @@ function showClient($cid) {
         'inline_keyboard' => [
             [ $actionButton ],
             [
+                ['text' => '🏡 | خانه', 'callback_data' => 'main_menu'],
                 ['text' => '↪️ | بازگشت', 'callback_data' => 'my_accounts']
             ]
         ]
@@ -255,7 +410,7 @@ function showClient($cid) {
     return $data;
 }
 
-function getSellerPlans() {
+function getSellerPlans($type) {
     global $panelToken;
 
     $endpoint = "https://api.connectix.vip/v1/seller/seller-plans";
@@ -281,17 +436,91 @@ function getSellerPlans() {
         return false;
     }
 
-    // Get bot available plans
-    $validPlans = [];
-    foreach ($data['seller_plan_group'] as $group) {
-        foreach ($group['seller_plans'] as $plan) {
-            if ($plan['is_displayed_in_robot'] == true) {
-                $validPlans[] = $plan;
+    switch ($type) {
+        case "default":
+            $validPlans = [];
+            foreach ($data['seller_plan_group'] as $group) {
+                foreach ($group['seller_plans'] as $plan) {
+                    if ($plan['is_displayed_in_robot'] == true && $plan['type'] == "Premium" && stripos($plan['title'], 'Sublink') === false && stripos($plan['title'], 'Static IP') === false) {
+                        $validPlans[] = $plan;
+                    }
+                }
             }
-        }
+            return $validPlans;
+        case "Sublink":
+            $validPlans = [];
+            foreach ($data['seller_plan_group'] as $group) {
+                foreach ($group['seller_plans'] as $plan) {
+                    if ($plan['is_displayed_in_robot'] == true && $plan['type'] == "Premium" && (stripos($plan['title'], '+ Sublink') !== false || stripos($plan['title'], '+Sublink') !== false)) {
+                        $validPlans[] = $plan;
+                    }
+                }
+            }
+            return $validPlans;
+        case "Static IP":
+            $validPlans = [];
+            foreach ($data['seller_plan_group'] as $group) {
+                foreach ($group['seller_plans'] as $plan) {
+                    if ($plan['is_displayed_in_robot'] == true && $plan['type'] == "Premium" && stripos($plan['title'], 'Static IP') !== false) {
+                        $validPlans[] = $plan;
+                    }
+                }
+            }
+            return $validPlans;
+        case "free":
+            $validPlans = [];
+            foreach ($data['seller_plan_group'] as $group) {
+                foreach ($group['seller_plans'] as $plan) {
+                    if ($plan['is_displayed_in_robot'] == true && $plan['type'] == "Free") {
+                        $validPlans[] = $plan;
+                    }
+                }
+            }
+            return $validPlans;
+        case "all-bot":
+            foreach ($data['seller_plan_group'] as $group) {
+                foreach ($group['seller_plans'] as $plan) {
+                    if ($plan['is_displayed_in_robot'] == true && $plan['type'] == "Premium") {
+                        $validPlans[] = $plan;
+                    }
+                }
+            }
+            return $validPlans;
+        case "all":
+            $validPlans = [];
+            foreach ($data['seller_plan_group'] as $group) {
+                foreach ($group['seller_plans'] as $plan) {
+                    $validPlans[] = $plan;
+                }
+            }
+            return $validPlans;
+        case "group":
+            $groups = $data['groups'] ?? null;
+            if ($groups === null) {
+                return false;
+            }
+            return $groups;
+        case "periods":
+            $periods = $data['periods'] ?? null;
+            if ($periods === null) {
+                return false;
+            }
+            return $periods;
+        default:
+            return false;
     }
 
-    return $validPlans;
+    // Get bot available plans
+    // $validPlans = [];
+    // foreach ($data['seller_plan_group'] as $group) {
+    //     foreach ($group['seller_plans'] as $plan) {
+    //         if ($plan['is_displayed_in_robot'] == true) {
+    //             $validPlans[] = $plan;
+    //         }
+    //     }
+    // }
+
+    // return $validPlans;
 }
 
 function getTest($type) {
@@ -299,7 +528,7 @@ function getTest($type) {
         static $plans = null;
     
         if ($plans === null) {
-            $plans = getSellerPlans();
+            $plans = getSellerPlans("free");
             if ($plans === false) {
                 errorLog("Error: Failed to retrieve seller plans");
                 $message = "خطا در دریافت لیست پلن‌ها از سرور";
@@ -661,6 +890,16 @@ function approximateDays($num, $unit) {
     };
 }
 
+function parseType($type) {
+    $name = match($type) {
+        "default" => "ویژه",
+        "Sublink" => "ساب‌لینک",
+        "Static IP" => "آی‌پی ثابت",
+        default => $type
+    };
+    return $name;
+}
+
 function keyboard($keyboard) {
     try {
         $uid = UID;
@@ -697,7 +936,7 @@ function keyboard($keyboard) {
                     $test,
                     [
                         ['text' => '📦 | اکانت های من', 'callback_data' => 'my_accounts'],
-                        ['text' => '🛍️ | خرید اکانت جدید', 'callback_data' => 'buy']
+                        ['text' => '🛍️ | خرید / تمدید اکانت ', 'callback_data' => 'action:buy_or_renew_service']
                     ],
                     [
                         ['text' => '📱 | دانلود نرم افزار', 'callback_data' => 'apps'],
@@ -776,7 +1015,25 @@ function keyboard($keyboard) {
                     ['text' => '↪️ | بازگشت', 'callback_data' => 'main_menu']
                 ];
                 break;
-            case 'get_test':
+
+            case "count":
+                $keyboard = [
+                    [
+                        ['text'=> '2️⃣ | 2 کاربر', 'callback_data' => 'buy_count:2'],
+                        ['text'=> '1️⃣ | 1 کاربر', 'callback_data' => 'buy_count:1']
+                    ],
+                    [
+                        ['text'=> '4️⃣ | 4 کاربر', 'callback_data' => 'buy_count:4'],
+                        ['text'=> '3️⃣ | 3 کاربر', 'callback_data' => 'buy_count:3']
+                    ],
+                    [
+                        ['text' => '🏡 | خانه', 'callback_data' => 'main_menu'],
+                        ['text' => '↪️ | بازگشت', 'callback_data' => 'group']
+                    ]
+                ];
+                break;
+
+            case "get_test":
                 $keyboard = [
                     [
                         ['text' => '📱 | ویژه', 'callback_data' => 'getTest_normal'],
@@ -788,6 +1045,50 @@ function keyboard($keyboard) {
                     ]
                 ];
                 break;
+
+            case "buy":
+                $keyboard = [
+                    [
+                        ['text' => '🔄️ | تمدید اکانت فعلی', 'callback_data' => 'renew']
+                    ],
+                    [
+                        ['text' => '➕ | خرید اکانت جدبد', 'callback_data' => 'group']
+                    ],
+                    [
+                        ['text' => '↪️ | بازگشت', 'callback_data' => 'main_menu']
+                    ]
+                ];
+                break;
+
+            case "group":
+                $groups = getSellerPlans("group");
+                $keyboard = [];
+                foreach ($groups as $group) {
+                    $name = parseType($group['name']);
+                    $name =  match($group['name']) {
+                        "default" => "📱 | $name (پیشنهاد میشود)",
+                        "Sublink" => "🔗 | $name",
+                        "Static IP" => "📍 | $name",
+                        default => $group['name']
+                    };
+                    $keyboard[] = [
+                        ['text' => $name, 'callback_data' => 'buy_group:' . $group['name']]
+                    ];
+                }
+                $keyboard[] = [
+                    ['text' => '🏡 | خانه', 'callback_data' => 'main_menu'],
+                    ['text' => '↪️ | بازگشت', 'callback_data' => 'buy']
+                ];
+                break;
+
+            case "renew":
+                $keyboard = [
+                    [
+                        ['text' => '↪️ | بازگشت', 'callback_data' => 'buy']
+                    ]
+                ];
+                break;
+
             default:
                 return json_encode(['ok' => true]);
         }
@@ -798,13 +1099,14 @@ function keyboard($keyboard) {
 }
 
 function message($message) {
+    //get name ffrom bot_config.json
+    $data = file_get_contents('setup/bot_config.json');
+    $config = json_decode($data, true);
+    $appName = $config['app_name'] ?? '';
+    $welcomeMessage = $config['messages']['welcome_text'] ?? '';
 
     switch ($message) {
         case "welcome_message":
-            //get name ffrom bot_config.json
-            $data = file_get_contents('setup/bot_config.json');
-            $config = json_decode($data, true);
-            $welcomeMessage = $config['messages']['welcome_text'] ?? '';
             
             return $welcomeMessage;
 
@@ -815,6 +1117,23 @@ function message($message) {
         case "get_test":
             $msg = "🎁 لطفا نوع اکانت تست را انتخاب کنید:\n\n<b>📱 ویژه(پیشنهاد میشود):</b>\nدریافت نام کاربری و رمز عبور جهت ورود به نرم افزار Connectix و استفاده از 4 پروتکل و بیش از 10 کشور برای اتصال.\n\n<b>🔗 سابسکریبشن:</b>\nدریافت لینک سابسکریپشن جهت استفاده در نرم افزار هایی که از سرویس V2Ray پشتیبانی میکنند (مثل V2RayNG و V2Box)";
             return $msg;
+
+        case "count":
+            $msg = "🔢 این اکانت را برای چند کاربر (دستگاه) قابل استفاده باشد؟";
+            return $msg;
+
+        case "buy":
+            $msg = "با تشکر از اعتماد و حسن انتخاب شما در خرید سرویس فیلترشکن {$appName} .\nلطفا نوع خرید خود را انتخاب کنید:\n\n<b>🔄️ تمدید اکانت فعلی:</b>\nاین دکمه برای خرید اشتراک برای اکانت قبلی استفاده میشود.\n\n<b>➕ خرید اکانت جدید:</b>\nاین دکمه برای خرید اکانت جدید استفاده میشود.";
+            return $msg;
+
+        case "group":
+            $msg = "لطفاً ابتدا نوع سرویس مدنظر را انتخاب کنید: 👇\n\n<b>📱 ویژه (پیشنهاد میشود):</b>\nدریافت نام کاربری و رمز عبور جهت ورود به نرم افزار Connectix و استفاده از 4 پروتکل و بیش از 10 کشور برای اتصال.\n\n<b>🔗 سابسکریبشن:</b>\nدریافت لینک سابسکریپشن جهت استفاده در نرم افزار هایی که از سرویس V2Ray پشتیبانی میکنند (مثل V2RayNG و V2Box)\n\n<b>📍 آی‌پی ثابت:</b>\nدریافت نام کاربری و رمز عبور جهت ورود به نرم افزار Connectix و استفاده از آیپی ثابت.";
+            return $msg;
+            
+        case "renew":
+            $msg = "";
+            return $msg;
+
         default:
             return "پیام پیشفرض";
     }

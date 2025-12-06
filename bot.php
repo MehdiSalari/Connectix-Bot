@@ -103,12 +103,39 @@ try {
                 'reply_markup' => keyboard('my_accounts')
             ]);
             break;
+        case 'group':
+            $result = tg('editMessageText',[
+                'chat_id' => $callback_chat_id,
+                'message_id' => $callback_message_id,
+                'text' => message('group'),
+                'parse_mode' => 'html',
+                'reply_markup' => keyboard('group')
+            ]);
+            break;
+        case 'count':
+            $result = tg('editMessageText',[
+                'chat_id' => $callback_chat_id,
+                'message_id' => $callback_message_id,
+                'text' => message('count'),
+                'parse_mode' => 'html',
+                'reply_markup' => keyboard('count')
+            ]);
+            break;
+        case 'action:buy_or_renew_service':
+        case 'buy':
+            $result = tg('editMessageText',[
+                'chat_id' => $callback_chat_id,
+                'message_id' => $callback_message_id,
+                'text' => message('buy'),
+                'parse_mode' => 'html',
+                'reply_markup' => keyboard('buy')
+            ]);
+            break;
         case 'not':
             //show notification that this btn is nothing
             $result = tg('answerCallbackQuery',[
                 'callback_query_id' => $callback_id,
                 'text' => "🤷🏻 این دکمه کاری انجام نمیده",
-                // 'text' => $callback_message,
                 'show_alert' => true
             ]);
             break;
