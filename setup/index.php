@@ -223,7 +223,7 @@ if (file_exists('../config.php')) {
                 <div class="text-center mb-8">
                     <i id="statusIcon" class="fas fa-sync-alt text-6xl text-indigo-600 animate-spin mb-6"></i>
                     <h3 class="text-2xl font-bold text-gray-800">در حال نصب و همگام‌سازی اطلاعات...</h3>
-                    <p class="text-gray-600 mt-3">لطفاً منتظر بمانید، این ممکن است چند دقیقه طول بکشد.</p>
+                    <p class="text-gray-600 mt-3">لطفاً منتظر بمانید، این عملیات ممکن است چند دقیقه طول بکشد.</p>
                 </div>
                 <div class="mb-6">
                     <div class="progress-bar">

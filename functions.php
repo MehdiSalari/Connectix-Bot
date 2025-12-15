@@ -6,6 +6,8 @@ require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/gregorian_jalali.php';
 define('BOT_TOKEN', $botToken);  // Bot token for authentication with Telegram API
 define('TELEGRAM_URL', 'https://api.telegram.org/bot' . BOT_TOKEN . '/');  // Base URL for Telegram Bot API
+// // All tg() calls are tunneled through external proxy script
+// define('TELEGRAM_URL', 'https://mehdisalari.ir/bot/tgtunnel.php?bot_token=' . BOT_TOKEN . '&method=');
 
 function tg($method, $params = []) {
     if (!$params) {
@@ -145,6 +147,163 @@ function callBackCheck($callback_data) {
         case "buy":
             $result = buy($query);
             return $result;
+        case "renew":
+            $result = renew($query);
+            return $result;
+        case "pay":
+            $result = checkout($query);
+            return $result;
+        case "payment":
+            $result = paycheck($query);
+            return $result;
+        default:
+            return false;
+    }
+}
+
+function renew($info) {
+    $infoParts = explode(':', $info);
+    $step = $infoParts[0];
+    $data = $infoParts[1];
+    $uid = UID;
+
+    switch ($step) {
+        case 'acc':
+            $clientUsername = $data;
+            $redis = new Redis();
+            $redis->connect('127.0.0.1', 6379);
+
+            // Set Redis key with user id
+            $key = "user:steps:$uid";
+
+            //Set Redis data
+            $planData = [
+                'acc'   => $clientUsername,
+                'group' => null,
+                'plan'  => null,
+                'pay'   => null
+            ];
+            // Save in Hash foramt
+            $redis->hmset($key, $planData);
+            $redis->expire($key, 1800);
+            $redis->close();
+
+            //get client id from db
+            global $db_host, $db_user, $db_pass, $db_name;
+            $conn = new mysqli($db_host, $db_user, $db_pass, $db_name);
+            $stmt = $conn->prepare("SELECT id FROM clients WHERE username = ?");
+            $stmt->bind_param("s", $clientUsername);
+            $stmt->execute();
+            $result = $stmt->get_result();
+            $clientId = $result->fetch_assoc()['id'];
+            $stmt->close();
+            $conn->close();
+
+            $clientData = getClientData($clientId);
+            $clientPlans = $clientData['plans'];
+            //get last plan from client
+            $lastPlan = $clientPlans[0];
+
+            $lastPlanTitle = parsePlanTitle($lastPlan['name'])['text'];
+
+            $message = "آخرین اشتراک خریداری شده برای اکانت $clientUsername به شرح زیر می باشد:\n\n📦 پلن: $lastPlanTitle\n\nتمدید با همین پلن انجام شود یا درخواست پلن دیگری دارید؟";
+
+            $keyboard = [
+                [
+                    ['text' => '🔃 | تمدید با همین پلن', 'callback_data' => 'renew_plan:' . $lastPlan['name']]
+                ],
+                [
+                    ['text' => '➕ | انتخاب پلن دیگر', 'callback_data' => 'group']
+                ],
+                [
+                    ['text' => '🏡 | خانه', 'callback_data' => 'main_menu'],
+                    ['text' => '↪️ | بازگشت', 'callback_data' => 'renew']
+                ]
+            ];
+
+            $keyboard = json_encode([
+                'inline_keyboard' => $keyboard
+            ]);
+
+            return [
+                "message" => $message,
+                "keyboard" => $keyboard
+            ];
+
+        case 'plan':
+            $planTitle = $data;
+            
+            $plans = getSellerPlans("all-bot");
+
+            if (!$plans) {
+                return false;
+            }
+
+            foreach ($plans as $plan) {
+                if ($plan['title'] === $planTitle) {
+                    $planId = $plan['id'];
+                    $planPrice = $plan['sell_price'];
+                    break;
+                }
+            }
+
+            if (!$planId) {
+                $cbid = CBID;
+                $text = "پلن مورد نظر یافت نشد\nاین پلن دیگر موجود نمی باشد\n\nلطفا پلن دیگری را انتخاب کنید";
+                tg('answerCallbackQuery', [
+                    'callback_query_id' => $cbid,
+                    'text' => $text,
+                    'show_alert' => true
+                ]);
+                exit;
+            }
+
+            $redis = new Redis();
+            $redis->connect('127.0.0.1', 6379);
+
+            // Set Redis key with user id
+            $key = "user:steps:$uid";
+
+            //get data from redis
+            $planData = $redis->hgetall($key);
+
+            //Set Redis data
+            $planData = [
+                'acc'   => $planData['acc'],
+                'group' => $planData['group'],
+                'plan'  => $planId,
+                'pay'   => null
+            ];
+            // Save in Hash foramt
+            $redis->hmset($key, $planData);
+            $redis->expire($key, 1800);
+            $redis->close();
+
+            $planDetails = parsePlanTitle($planTitle);
+            $planTitle = $planDetails['text'];
+            $acc = ($planData['acc'] == 'new') ? "خرید اکانت جدید" : "تمدید اکانت: " . $planData['acc'];
+
+            $message = "📝 اطلاعات اکانت شما\n\n📧 $acc\n📦 پلن: $planTitle\n💰 مبلغ: $planPrice تومان\n\nلطفا روش پرداخت را انتخاب کنید 👇🏻";
+            $keyboard = json_encode([
+                'inline_keyboard' => [
+                    [
+                        ['text' => '💳 | کارت به کارت', 'callback_data' => "pay_card:$planPrice"]
+                    ],
+                    [
+                        // ['text' => '👝 | کسر از کیف پول', 'callback_data' => 'buy_pay:wallet'],
+                        ['text' => '🔜 | روش های دیگر به زودی...', 'callback_data' => 'not'],
+                    ],
+                    [
+                        ['text' => '🏡 | خانه', 'callback_data' => 'main_menu'],
+                        ['text' => '↪️ | بازگشت', 'callback_data' => 'renew_acc:' . $planData['acc']]
+                    ]
+                ]
+            ]);
+
+            return [
+                "message" => $message,
+                "keyboard" => $keyboard
+            ];
         default:
             return false;
     }
@@ -165,11 +324,18 @@ function buy($info) {
             // Set Redis key with user id
             $key = "user:steps:$uid";
 
+            // Check for acc
+            $acc = $redis->hget($key, 'acc');
+            if (!$acc) {
+                $acc = 'new';
+            }
+
             //Set Redis data
             $planData = [
-                'acc'   => 'new',
+                'acc'   => $acc,
                 'group' => $data,
-                'plan'  => null
+                'plan'  => null,
+                'pay'   => null
             ];
             // Save in Hash foramt
             $redis->hmset($key, $planData);
@@ -242,12 +408,15 @@ function buy($info) {
             // Get Data from redis
             $planData = $redis->hgetall($key);
 
+            $planAcc = $planData['acc'];
+
             $planGroup = $planData['group'];
 
             $planData = [
-                'acc'   => 'new',
+                'acc'   => $planAcc,
                 'group' => $planGroup,
-                'plan'  => $planId
+                'plan'  => $planId,
+                'pay'   => null
             ];
             // Save in Hash foramt
             $redis->hmset($key, $planData);
@@ -274,7 +443,7 @@ function buy($info) {
             $keyboard = json_encode([
                 'inline_keyboard' => [
                     [
-                        ['text' => '💳 | کارت به کارت', 'callback_data' => 'buy_pay:card']
+                        ['text' => '💳 | کارت به کارت', 'callback_data' => "pay_card:$planPrice"]
                     ],
                     [
                         // ['text' => '👝 | کسر از کیف پول', 'callback_data' => 'buy_pay:wallet'],
@@ -292,6 +461,176 @@ function buy($info) {
                 "keyboard" => $keyboard
             ];
     }
+}
+
+function checkout($data) {
+    global $uid;
+    $parts = explode(':', $data);
+    $method = $parts[0];
+    $amount = $parts[1];
+    $redis = new Redis();
+    $redis->connect('127.0.0.1', 6379);
+    $planData = $redis->hgetall("user:steps:$uid");
+    $planData['pay'] = $method;
+    $key = "user:steps:$uid";
+    $redis->hmset($key, $planData);
+    $redis->expire($key, 1800);
+    $redis->close();
+
+    $variables = [
+        'amount' => $amount
+    ];
+    $message = message('card', $variables);
+    $keyboard = json_encode([
+        'inline_keyboard' => [
+            [
+                ['text' => '❌ | انصراف', 'callback_data' => 'main_menu'],
+            ]
+        ]
+    ]);
+
+    return [
+        "message" => $message,
+        "keyboard" => $keyboard
+    ];
+}
+
+function payment($receipt) {
+    try {
+        $bot_config = file_get_contents('setup/bot_config.json');
+        $admin_chat_id = json_decode($bot_config, true)['admin_id'];
+
+        $uid = UID;
+
+        $redis = new Redis();
+        $redis->connect('127.0.0.1', 6379);
+        $planData = $redis->hgetall("user:steps:$uid");
+
+        $plans = getSellerPlans("all-bot");
+        foreach ($plans as $plan) {
+            if ($plan['id'] == $planData['plan']) {
+                $selectedPlan = $plan;
+                break;
+            }
+        }
+
+        $isPaid = null;
+
+        //Save payment to data base
+        global $db_host, $db_user, $db_pass, $db_name;
+        $conn = new mysqli($db_host, $db_user, $db_pass, $db_name);
+        if ($conn->connect_error) {
+            die("Connection failed: " . $conn->connect_error);
+        }
+
+        $stmt = $conn->prepare("INSERT INTO payments (chat_id, plan_id, price, is_paid, method, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
+        $stmt->bind_param("sssss", $uid, $selectedPlan['plan_id'], $selectedPlan['sell_price'], $isPaid, $planData['pay']);
+        $result = $stmt->execute();
+        $paymentId = $conn->insert_id;
+        $stmt->close();
+        $conn->close();
+
+        if (!$result) {
+            errorLog("Error in inserting payment: " . $conn->error);
+        }
+
+        $photo_id = end($receipt)['file_id'];
+
+        //send image
+        $result = tg('sendPhoto',[
+            'chat_id' => $admin_chat_id,
+            'photo' => $photo_id,
+            'caption' => "accepted?",
+            'reply_markup' => json_encode([
+                'inline_keyboard' => [
+                    [
+                        ['text' => '✅ |  تایید', 'callback_data' => "payment_accept:$paymentId"],
+                        ['text' => '❌ |  لغو', 'callback_data' => "payment_reject:$paymentId"],
+                    ]
+                ]
+            ])
+        ]);
+
+        if (!($result = json_decode($result))->ok) {
+            errorLog("Failed to send receipt error message to chat_id: $uid | Message: {$result->description}");
+            exit;
+        }
+
+        $redis->del("user:steps:$uid");
+        $redis->close();
+        return true;
+    } catch (Exception $e) {
+        errorLog("Error: Database operation failed: " . $e->getMessage());
+    }
+}
+
+function paycheck($query) {
+    $parts = explode(':', $query);
+    $paymentStatus = $parts[0];
+    $paymentId = $parts[1];
+
+    switch ($paymentStatus) {
+        case "accept":
+            global $db_host, $db_user, $db_pass, $db_name;
+            $conn = new mysqli($db_host, $db_user, $db_pass, $db_name);
+            if ($conn->connect_error) {
+                die("Connection failed: " . $conn->connect_error);
+            }
+            $stmt = $conn->prepare("SELECT chat_id FROM payments WHERE id = ?");
+            $stmt->bind_param("i", $paymentId);
+            $stmt->execute();
+            $result = $stmt->get_result();
+            $row = $result->fetch_assoc();
+            $chat_id = $row['chat_id'];
+            $stmt->close();
+
+            $stmt = $conn->prepare("UPDATE payments SET is_paid = 1 WHERE id = ?");
+            $stmt->bind_param("i", $paymentId);
+            $result = $stmt->execute();
+            $stmt->close();
+            $conn->close();
+            if (!$result) {
+                errorLog("Error in updating payment: " . $conn->error);
+            }
+
+            // Create or Update Account plan
+            // Accespt test
+            tg('sendMessage',[
+                'chat_id' => $chat_id,
+                'text' => "پرداخت با موفقیت انجام شد",
+            ]);
+            break;
+        case "reject":
+            // Delete payment from database
+            global $db_host, $db_user, $db_pass, $db_name;
+            $conn = new mysqli($db_host, $db_user, $db_pass, $db_name);
+            if ($conn->connect_error) {
+                die("Connection failed: " . $conn->connect_error);
+            }
+            $stmt = $conn->prepare("SELECT chat_id FROM payments WHERE id = ?");
+            $stmt->bind_param("i", $paymentId);
+            $stmt->execute();
+            $result = $stmt->get_result();
+            $row = $result->fetch_assoc();
+            $chat_id = $row['chat_id'];
+            $stmt->close();
+
+            $stmt = $conn->prepare("UPDATE payments SET is_paid = 0 WHERE id = ?");
+            $stmt->bind_param("i", $paymentId);
+            $result = $stmt->execute();
+            $stmt->close();
+            if (!$result) {
+                errorLog("Error in deleting payment: " . $conn->error);
+            }
+
+            tg('sendMessage',[
+                'chat_id' => $chat_id,
+                'text' => "❌پرداخت شما لغو شد.\n جهت اطلاع از وضعیت پرداخت، لطفا با پشتیبانی تماس بگیرید."
+            ]);
+            break;
+    }
+    return null;
+
 }
 
 function getClientData($cid) {
@@ -316,7 +655,7 @@ function getClientData($cid) {
 
     $data = json_decode($response, true);
     if (!$data || !isset($data['client'])) {
-        errorLog("❌ اکانت یافت نشد یا خطا در ارتباط با سرور.");
+        errorLog("❌ اکانت یافت نشد یا خطا در ارتباط با سرور. | آیدی آکانت: $cid");
     }
 
     $client = $data['client'];
@@ -997,7 +1336,7 @@ function keyboard($keyboard) {
                             $name = "بدون اشتراک";
                         } else {
                             $isActive = $currentPlan['is_active'] == 1;
-                            $status = $isActive ? "🟢 فعال" : "در صف";
+                            $status = $isActive ? "🟢 فعال" : "🔵 در صف";
 
                             // تبدیل اسم پلن به متن خوانا و کوتاه
                             $parsed = parsePlanTitle($currentPlan['name'], true);
@@ -1082,10 +1421,67 @@ function keyboard($keyboard) {
                 break;
 
             case "renew":
-                $keyboard = [
-                    [
-                        ['text' => '↪️ | بازگشت', 'callback_data' => 'buy']
-                    ]
+                $conn = new mysqli($db_host, $db_user, $db_pass, $db_name);
+                $stmt = $conn->prepare("SELECT * FROM clients WHERE chat_id = ?");
+                $stmt->bind_param("s", $uid);
+                $stmt->execute();
+
+                if ($conn->connect_error || $stmt->error) {
+                    errorLog("Error in connecting to DB or preparing statement: " . ($conn->connect_error ?? $stmt->error));
+                }
+
+                $result = $stmt->get_result();
+                $clients = $result->fetch_all(MYSQLI_ASSOC);
+                $stmt->close();
+                $conn->close();
+
+                $keyboard = [];
+
+                if (empty($clients)) {
+                    $keyboard[] = [['text' => '🤷🏻 | اکانتی به تلگرام شما متصل نیست', 'callback_data' => 'not']];
+                } else {
+                    foreach (array_reverse($clients) as $client) {
+                        $clientData = getClientData($client['id']);
+                        $plans = $clientData['plans'] ?? [];
+
+                        // پیدا کردن پلن فعال یا در صف
+                        $activePlan = null;
+                        $queuedPlan = null;
+
+                        foreach ($plans as $plan) {
+                            if ($plan['is_active'] == 1) {
+                                $activePlan = $plan;
+                                break; // اولین فعال رو پیدا کرد → تموم
+                            }
+                            if ($plan['is_in_queue'] && !$queuedPlan) {
+                                $queuedPlan = $plan; // اولین در صف
+                            }
+                        }
+
+                        // اگر فعال نبود، از در صف استفاده کن
+                        $currentPlan = $activePlan ?? $queuedPlan;
+
+                        if (!$currentPlan) {
+                            $status = "🔴 غیرفعال";
+                            $name = "بدون اشتراک";
+                        } else {
+                            $isActive = $currentPlan['is_active'] == 1;
+                            $status = $isActive ? "🟢 فعال" : "🔵 در صف";
+
+                            // تبدیل اسم پلن به متن خوانا و کوتاه
+                            $parsed = parsePlanTitle($currentPlan['name'], true);
+                            $name = $parsed['text'];
+                        }
+
+                        $keyboard[] = [
+                            ['text' => $name, 'callback_data' => 'renew_acc:' . $client['username']],
+                            ['text' => $status . ' | ' . $client['username'], 'callback_data' => 'renew_acc:' . $client['username']]
+                        ];
+                    }
+                }
+                $keyboard[] = [
+                    ['text' => '🏡 | خانه', 'callback_data' => 'main_menu'],
+                    ['text' => '↪️ | بازگشت', 'callback_data' => 'buy']
                 ];
                 break;
 
@@ -1098,7 +1494,7 @@ function keyboard($keyboard) {
     }
 }
 
-function message($message) {
+function message($message, $variables = []) {
     //get name ffrom bot_config.json
     $data = file_get_contents('setup/bot_config.json');
     $config = json_decode($data, true);
@@ -1131,9 +1527,15 @@ function message($message) {
             return $msg;
             
         case "renew":
-            $msg = "";
+            $msg = "📦 لطفا اکانت مدنظر خود را جهت تمدید اشتراک انتخاب کنید:";
             return $msg;
 
+        case "card":
+            $price = $variables['amount'];
+            $cardNumber = $config['card_number'];
+            $cardName = $config['card_name'];
+            $msg = "\n\n💴  لطفاً مبلغ «$price تومان» را به شماره کارت زیر واریز و سپس سند پرداخت را به صورت تصویری در ادامه ارسال کنید:\n\n💳 شماره کارت: $cardNumber\n👤 به نام: $cardName\n";
+            return $msg;
         default:
             return "پیام پیشفرض";
     }

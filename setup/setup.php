@@ -355,6 +355,18 @@ function dbSetup()
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     ");
 
+    $pdo->exec("
+    CREATE TABLE IF NOT EXISTS payments (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    chat_id VARCHAR(255),
+    plan_id VARCHAR(255),
+    price VARCHAR(255),
+    is_paid TINYINT(1) NULL,
+    method VARCHAR(255),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    ");
+
     // prepared statements for speed
     $selectUserByChat = $pdo->prepare("SELECT id FROM users WHERE chat_id = ? LIMIT 1");
     $insertUser = $pdo->prepare("INSERT INTO users (chat_id, telegram_id, name, email, phone, test) VALUES (?, ?, ?, ?, ?, ?)");
@@ -569,6 +581,10 @@ try {
         $panelEmail,
         $panelPassword
     );
+    if (empty($panelToken)) {
+        logFlush("✗ Panel token not obtained, check your credentials and try again");
+        exit(1);
+    }
     logFlush("✓ Panel token obtained");
 
     // Step 2: Create config.php first

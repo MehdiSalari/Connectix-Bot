@@ -37,12 +37,12 @@ $caption = $update['message']['caption'] ?? null;  // Caption for media (if any)
 
 $uid = $chat_id ?? $callback_chat_id;
 define('UID', $uid);
-
+define('CBID', $callback_id);
 
 try {
     //debug
     // file_put_contents('debug/user_info.txt', "Chat ID: $chat_id\nUser: $user_name\nMessage: $text\n");
-
+    
     // Handle the user's message
     switch ($text) {
         case '/start':
@@ -61,16 +61,45 @@ try {
             }
             break;
         default:
-            if ($text == null) {
+            if ($text == null && $photo == null) {
                 break;
             }
-            $message = "متن پیشفرض پاسخ به کاربر";
+            // $message = "متن پیشفرض پاسخ به کاربر";
+            $redis = new Redis();
+            $redis->connect('127.0.0.1', 6379);
+            $planData = $redis->hgetall("user:steps:$uid");
+            $redis->close();
 
-            $result = tg('sendMessage',[
-                'chat_id' => $chat_id,
-                'text' => $message
-            ]);
+            if (!$planData['pay']) {
+                break;
+            }
+            
+            // Check if send just image
+            if ($photo == null) {
+                $message = "🖼️ لطفا سند واریزی را به صورت تصویر ارسال کنید!";
+                $result = tg('sendMessage',[
+                    'chat_id' => $uid,
+                    'text' => $message,
+                    'reply_markup' => json_encode([
+                            'inline_keyboard' => [
+                                [
+                                    ['text' => '❌ | انصراف', 'callback_data' => 'main_menu'],
+                                ]
+                            ]
+                        ])
+                    ]);
+                if (!($result = json_decode($result))->ok) {
+                    errorLog("Failed to send receipt error message to chat_id: $uid | Message: {$result->description}");
+                    exit;
+                }
+                break;
+            }
 
+            $payment = payment($photo);
+
+            if (!$payment) {
+                errorLog("Failed to send receipt error message to chat_id: $uid");
+            }
             break;
     }
 
@@ -131,6 +160,15 @@ try {
                 'reply_markup' => keyboard('buy')
             ]);
             break;
+        case 'renew':
+            $result = tg('editMessageText',[
+                'chat_id' => $callback_chat_id,
+                'message_id' => $callback_message_id,
+                'text' => message('renew'),
+                'parse_mode' => 'html',
+                'reply_markup' => keyboard('renew')
+            ]);
+            break;
         case 'not':
             //show notification that this btn is nothing
             $result = tg('answerCallbackQuery',[
@@ -144,6 +182,9 @@ try {
                 break;
             }
             $result = callBackCheck($callback_data);
+            if(!$result) {
+                break;
+            }
             $message = $result['message'];
             $keyboard = $result['keyboard'];
 
