@@ -177,7 +177,7 @@ async function loadClientData(clientId, element) {
                         ${c.email ? `<p class="text-xs text-blue-600">${c.email}</p>` : ''}
                     </div>
                     <span class="px-3 py-1 rounded-full text-xs font-bold ${isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
-                        ${isActive ? 'فعال' : 'منقضی شده'}
+                        ${isActive ? 'فعال' : 'منقضی'}
                     </span>
                 </div>
 

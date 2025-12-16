@@ -358,7 +358,9 @@ function dbSetup()
     $pdo->exec("
     CREATE TABLE IF NOT EXISTS payments (
     id INT AUTO_INCREMENT PRIMARY KEY,
+    order_number VARCHAR(20) UNIQUE,
     chat_id VARCHAR(255),
+    client_id VARCHAR(255),
     plan_id VARCHAR(255),
     price VARCHAR(255),
     is_paid TINYINT(1) NULL,

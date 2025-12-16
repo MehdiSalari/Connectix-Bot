@@ -53,6 +53,21 @@ function tg($method, $params = []) {
     return $result;
 }
 
+function getUser($chat_id) {
+    global $db_host, $db_user, $db_pass, $db_name;
+    $conn = new mysqli($db_host, $db_user, $db_pass, $db_name);
+    if ($conn->connect_error) {
+        errorLog("Connection failed: " . $conn->connect_error);
+    }
+    $stmt = $conn->prepare("SELECT * FROM users WHERE chat_id = ?");
+    $stmt->bind_param("i", $chat_id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $user = $result->fetch_assoc();
+    $conn->close();
+    return $user;
+}
+
 function userInfo($chat_id, $user_id, $user_name) {
     // Delete Redis key if exists
     $redis = new Redis();
@@ -226,8 +241,8 @@ function renew($info) {
             ]);
 
             return [
-                "message" => $message,
-                "keyboard" => $keyboard
+                "text" => $message,
+                "reply_markup" => $keyboard
             ];
 
         case 'plan':
@@ -301,8 +316,8 @@ function renew($info) {
             ]);
 
             return [
-                "message" => $message,
-                "keyboard" => $keyboard
+                "text" => $message,
+                "reply_markup" => $keyboard
             ];
         default:
             return false;
@@ -347,8 +362,8 @@ function buy($info) {
             $redis->close();
 
             return [
-                "message" => message('count'),
-                "keyboard" => keyboard('count')
+                "text" => message('count'),
+                "reply_markup" => keyboard('count')
             ];
         
         case 'count':
@@ -394,8 +409,8 @@ function buy($info) {
             // $message = "لطفا از لیست زیر پلن $data کاربر مد نظر خود را انتخاب کنید:";
             $message = "فهرست و قیمت سرویس‌های $data کاربره $planGroupName به شرح لیست زیر است.\n\nلطفاً سرویس مدنظر خود را انتخاب کنید: 👇";
             return [
-                "message" => $message,
-                "keyboard" => $keyboard
+                "text" => $message,
+                "reply_markup" => $keyboard
             ];
         case 'plan':
             $planId = $data;
@@ -457,8 +472,8 @@ function buy($info) {
             ]);
 
             return [
-                "message" => $message,
-                "keyboard" => $keyboard
+                "text" => $message,
+                "reply_markup" => $keyboard
             ];
     }
 }
@@ -490,9 +505,23 @@ function checkout($data) {
     ]);
 
     return [
-        "message" => $message,
-        "keyboard" => $keyboard
+        "text" => $message,
+        "reply_markup" => $keyboard
     ];
+}
+
+function getClientByUsername($username) {
+    global $panelToken;
+    $endpoint = "https://api.connectix.vip/v1/seller/clients?username=$username";
+
+    $ch = curl_init($endpoint);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, ['Authorization: Bearer ' . $panelToken]);
+    $response = curl_exec($ch);
+    curl_close($ch);
+
+    $data = json_decode($response, true);
+    return $data['clients']['data'][0];
 }
 
 function payment($receipt) {
@@ -515,6 +544,7 @@ function payment($receipt) {
         }
 
         $isPaid = null;
+        $client_id = ($planData['acc'] == 'new') ? 'new' : getClientByUsername($planData['acc'])['id'];
 
         //Save payment to data base
         global $db_host, $db_user, $db_pass, $db_name;
@@ -523,10 +553,39 @@ function payment($receipt) {
             die("Connection failed: " . $conn->connect_error);
         }
 
-        $stmt = $conn->prepare("INSERT INTO payments (chat_id, plan_id, price, is_paid, method, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
-        $stmt->bind_param("sssss", $uid, $selectedPlan['plan_id'], $selectedPlan['sell_price'], $isPaid, $planData['pay']);
+        $stmt = $conn->prepare("INSERT INTO payments (chat_id, client_id, plan_id, price, is_paid, method, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())");
+        $stmt->bind_param("ssssss", $uid, $client_id, $selectedPlan['id'], $selectedPlan['sell_price'], $isPaid, $planData['pay']);
         $result = $stmt->execute();
         $paymentId = $conn->insert_id;
+        
+        //Today Date
+        $yy = date('y');
+        $mm = date('m');
+        $dd = date('d');
+        
+        //last order of the day
+        $prefix = "CX{$yy}{$mm}{$dd}";
+        $q = $conn->prepare("
+            SELECT COUNT(*) AS total 
+            FROM payments 
+            WHERE order_number LIKE CONCAT(?, '%')
+        ");
+        $q->bind_param("s", $prefix);
+        $q->execute();
+        $count = $q->get_result()->fetch_assoc()['total'] + 1;
+        $orderNumber = $prefix . str_pad($count, 2, '0', STR_PAD_LEFT);
+
+        // Submit order_number to database
+        $u = $conn->prepare("
+            UPDATE payments 
+            SET order_number = ? 
+            WHERE id = ?
+        ");
+        $u->bind_param("si", $orderNumber, $paymentId);
+        $u->execute();
+
+        $conn->commit();
+
         $stmt->close();
         $conn->close();
 
@@ -535,12 +594,25 @@ function payment($receipt) {
         }
 
         $photo_id = end($receipt)['file_id'];
+        $planName = parsePlanTitle($selectedPlan['title'])['text'];
+        $planPice = $selectedPlan['sell_price'];
+
+        // Receipt received message
+        $result = tg('sendMessage',[
+            'chat_id' => $uid,
+            'text' => "✅ سند پرداخت شما با موفقیت دریافت شد.\n\n📦 پلن انتخابی شما:\n $planName\n\n⌛ لطفا منتظر تایید بمانید."
+        ]);
+
+        if (!($result = json_decode($result))->ok) {
+            errorLog("Failed to send receipt error message to chat_id: $uid | Message: {$result->description}");
+            exit;
+        }
 
         //send image
         $result = tg('sendPhoto',[
             'chat_id' => $admin_chat_id,
             'photo' => $photo_id,
-            'caption' => "accepted?",
+            'caption' => "📃 سند واریزی مورد تایید میباشد؟\n\n📦 پلن: $planName\n💵 مبلغ واریزی: $planPice",
             'reply_markup' => json_encode([
                 'inline_keyboard' => [
                     [
@@ -569,20 +641,112 @@ function paycheck($query) {
     $paymentStatus = $parts[0];
     $paymentId = $parts[1];
 
+    global $db_host, $db_user, $db_pass, $db_name;
+    $conn = new mysqli($db_host, $db_user, $db_pass, $db_name);
+    if ($conn->connect_error) {
+        die("Connection failed: " . $conn->connect_error);
+    }
+    $stmt = $conn->prepare("SELECT * FROM payments WHERE id = ?");
+    $stmt->bind_param("i", $paymentId);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $payment = $result->fetch_assoc();
+    $orderNumber = $payment['order_number'];
+    $chat_id = $payment['chat_id'];
+    $stmt->close();
+
     switch ($paymentStatus) {
         case "accept":
-            global $db_host, $db_user, $db_pass, $db_name;
-            $conn = new mysqli($db_host, $db_user, $db_pass, $db_name);
-            if ($conn->connect_error) {
-                die("Connection failed: " . $conn->connect_error);
+            // Create or Update Account plan
+            switch ($payment['client_id']) {
+                // Create New Account
+                case 'new':
+                    $user = getUser($chat_id);
+                    $name = $user['name'];
+                    $telegram_id = $user['telegram_id'];
+                    $user_id = $user['id'];
+                    $response = createClient($name, $chat_id, $telegram_id, $payment['plan_id']);
+                    if ($response === false) {
+                        errorLog("Error in creating client: " . $conn->error);
+                        break 2;
+                    }
+                    $client_id = json_decode($response, true)['client_id'];
+                    $client = getClientData($client_id);
+                    $plan = $client['plans'][0];
+                    $planName = parsePlanTitle($plan['name'])['text'];
+                    $clientUsername = $client['username'] ?? '';
+                    $clientPassword = $client['password'] ?? '';
+                    $clientSublink = $client['subscription_link'] ?? null;
+                    $clientCOD = $client['count_of_devices'] ?? 0;
+                    // Create Cleint in DB
+                    $stmt = $conn->prepare("INSERT INTO clients (id, count_of_devices, username, password, chat_id, user_id, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())");
+                    $stmt->bind_param("sissii", $client_id, $clientCOD, $clientUsername, $clientPassword, $chat_id, $user_id);
+                    $result = $stmt->execute();
+                    $stmt->close();
+                    if (!$result) {
+                        errorLog("Error in inserting client: " . $conn->error);
+                    }
+
+                    // Send account data to user
+                    $msg = "\n\n👤 نام کاربری: <code>$clientUsername</code>\n🔑 رمز عبور: <code>$clientPassword</code>\n📦 پلن:\n$planName\n";
+                    if ($clientSublink) {
+                        $msg .= "\n🔗 لینک سابسکریبشن: <code>$clientSublink</code>";
+                    }
+                    $message = 'اکانت شما با موفقیت ایجاد شد.';
+                    $message .= $msg;
+                    $keyboard = [
+                        'inline_keyboard' => [
+                            [
+                                ['text' => '📦 | اکانت های من', 'callback_data' => 'my_accounts']
+                            ],
+                            [
+                                ['text' => '↪️ | بازگشت', 'callback_data' => 'main_menu']
+                            ]
+                        ]
+                    ];
+                    tg ('sendMessage',[
+                        'chat_id' => $chat_id,
+                        'text' => $message,
+                        'parse_mode' => 'HTML',
+                        'reply_markup' => json_encode($keyboard)
+                    ]);
+                    
+                    break;
+                default: // Update Account
+                    $response = updateClient($payment['client_id'], $payment['plan_id']);
+                    if ($response === false) {
+                        errorLog("Error in updating client: " . $conn->error);
+                        break 2;
+                    }
+                    $client_id = $payment['client_id'];
+                    $client = getClientData($client_id);
+                    $clientUsername = $client['username'] ?? '';
+                    $plan = $client['plans'][0] ?? null;
+                    $planName = parsePlanTitle($plan['name'])['text'];
+
+                    $msg = "\n\n👤 نام کاربری: <code>$clientUsername</code>\n📦 پلن:\n $planName";
+                    $message = "اکانت شما با موفقیت تمدید شد.\n\n";
+                    $message .= "🛍 شماره سفارش: <code>$orderNumber</code>\n"; 
+                    $message .= $msg;
+                    $keyboard = [
+                        'inline_keyboard' => [
+                            [
+                                ['text' => '📦 | اکانت های من', 'callback_data' => 'my_accounts']
+                            ],
+                            [
+                                ['text' => '↪️ | بازگشت', 'callback_data' => 'main_menu']
+                            ]
+                        ]
+                    ];
+                    tg ('sendMessage',[
+                        'chat_id' => $chat_id,
+                        'text' => $message,
+                        'parse_mode' => 'HTML',
+                        'reply_markup' => json_encode($keyboard)
+                    ]);
+                    break;
             }
-            $stmt = $conn->prepare("SELECT chat_id FROM payments WHERE id = ?");
-            $stmt->bind_param("i", $paymentId);
-            $stmt->execute();
-            $result = $stmt->get_result();
-            $row = $result->fetch_assoc();
-            $chat_id = $row['chat_id'];
-            $stmt->close();
+
 
             $stmt = $conn->prepare("UPDATE payments SET is_paid = 1 WHERE id = ?");
             $stmt->bind_param("i", $paymentId);
@@ -593,44 +757,62 @@ function paycheck($query) {
                 errorLog("Error in updating payment: " . $conn->error);
             }
 
-            // Create or Update Account plan
-            // Accespt test
-            tg('sendMessage',[
-                'chat_id' => $chat_id,
-                'text' => "پرداخت با موفقیت انجام شد",
-            ]);
-            break;
-        case "reject":
-            // Delete payment from database
-            global $db_host, $db_user, $db_pass, $db_name;
-            $conn = new mysqli($db_host, $db_user, $db_pass, $db_name);
-            if ($conn->connect_error) {
-                die("Connection failed: " . $conn->connect_error);
-            }
-            $stmt = $conn->prepare("SELECT chat_id FROM payments WHERE id = ?");
-            $stmt->bind_param("i", $paymentId);
-            $stmt->execute();
-            $result = $stmt->get_result();
-            $row = $result->fetch_assoc();
-            $chat_id = $row['chat_id'];
-            $stmt->close();
+            $plan = getSellerPlans($payment['plan_id']);
+            $planName = parsePlanTitle($plan['title'])['text'];
+            $planPrice = $plan['sell_price'] ?? null;
 
+            // Update paycheck message for admin
+            $caption = "✅ سفارش شماره <code>$orderNumber</code> با موفقیت تایید شد\n\n👤 نام کاربری: <code>$clientUsername</code>\n📦 پلن:\n $planName\n💵 مبلغ: $planPrice";
+            $keyboard = [
+                'inline_keyboard' => [
+                    [
+                        ['text' => '✅ | تایید شده', 'callback_data' => 'not']
+                    ]
+                ]
+            ];
+
+            return ['caption' => $caption, 'reply_markup' => $keyboard];
+
+
+        case "reject":
+            // Update paid status to false
             $stmt = $conn->prepare("UPDATE payments SET is_paid = 0 WHERE id = ?");
             $stmt->bind_param("i", $paymentId);
             $result = $stmt->execute();
             $stmt->close();
             if (!$result) {
-                errorLog("Error in deleting payment: " . $conn->error);
+                errorLog("Error in updating payment: " . $conn->error);
             }
+
+            $plan = getSellerPlans($payment['plan_id']);
+            $planName = parsePlanTitle($plan['title'])['text'];
+            $planPrice = $plan['sell_price'] ?? null;
 
             tg('sendMessage',[
                 'chat_id' => $chat_id,
-                'text' => "❌پرداخت شما لغو شد.\n جهت اطلاع از وضعیت پرداخت، لطفا با پشتیبانی تماس بگیرید."
+                'text' => "❌پرداخت شما تایید نشد.\n🛍 شماره سفارش: <code>$orderNumber</code>\n\n جهت اطلاع از وضعیت پرداخت، لطفا با پشتیبانی تماس بگیرید.",
+                'parse_mode' => 'HTML',
+                'reply_markup' => json_encode([
+                    'inline_keyboard' => [
+                        [
+                            ['text' => '🏡 | خانه', 'callback_data' => 'main_menu']
+                        ]
+                    ]
+                ])
             ]);
-            break;
-    }
-    return null;
 
+            // Update paycheck message for admin
+            $caption = "❌ سفارش شماره <code>$orderNumber</code> تایید نشد\n\n📦 پلن:\n $planName\n💵 مبلغ: $planPrice";
+            $keyboard = [
+                'inline_keyboard' => [
+                    [
+                        ['text' => '❌ | تایید نشده', 'callback_data' => 'not']
+                    ]
+                ]
+            ];
+
+            return ['caption' => $caption, 'reply_markup' => $keyboard];
+    }
 }
 
 function getClientData($cid) {
@@ -728,8 +910,8 @@ function showClient($cid) {
     
     // choose action label depending on whether client has an active plan
     $actionButton = $activePlan
-        ? ['text' => '📆 | رزرو اشتراک جدید برای این اکانت', 'callback_data' => "updateClient_$cid"]
-        : ['text' => '🛒 | خرید اشتراک برای این اکانت', 'callback_data' => "updateClient_$cid"];
+        ? ['text' => '📆 | رزرو اشتراک جدید برای این اکانت', 'callback_data' => "renew_acc:" . $client['username']]
+        : ['text' => '🛒 | خرید اشتراک برای این اکانت', 'callback_data' => "renew_acc:" . $client['username']];
 
     $keyboard = [
         'inline_keyboard' => [
@@ -742,8 +924,8 @@ function showClient($cid) {
     ];
 
     $data = [
-        'message' => $message,
-        'keyboard' => $keyboard
+        'text' => $message,
+        'reply_markup' => $keyboard
     ];
 
     return $data;
@@ -846,7 +1028,16 @@ function getSellerPlans($type) {
             }
             return $periods;
         default:
-            return false;
+            // Search by id
+            $validPlans = [];
+            foreach ($data['seller_plan_group'] as $group) {
+                foreach ($group['seller_plans'] as $plan) {
+                    if ($plan['is_displayed_in_robot'] == true && $plan['id'] == $type) {
+                        $validPlans[] = $plan;
+                    }
+                }
+            }
+            return $validPlans[0];
     }
 
     // Get bot available plans
@@ -871,7 +1062,7 @@ function getTest($type) {
             if ($plans === false) {
                 errorLog("Error: Failed to retrieve seller plans");
                 $message = "خطا در دریافت لیست پلن‌ها از سرور";
-                return ['message' => $message, 'keyboard' => []];
+                return ['text' => $message, 'reply_markup' => []];
             }
         }
     
@@ -900,7 +1091,7 @@ function getTest($type) {
         if (!$selectedPlan) {
             errorLog("Error: No suitable plan found for type: $type");
             $message = "پلن مناسب برای نوع درخواستی ($type) یافت نشد.";
-            return ['message' => $message, 'keyboard' => []];
+            return ['text' => $message, 'reply_markup' => []];
         }
 
         // Get user data
@@ -909,14 +1100,14 @@ function getTest($type) {
         $conn = new mysqli($db_host, $db_user, $db_pass, $db_name);
         if ($conn->connect_error) {
             errorLog("Error: Database connection failed: " . $conn->connect_error);
-            return ['message' => 'خطا در اتصال به دیتابیس', 'keyboard' => []];
+            return ['text' => 'خطا در اتصال به دیتابیس', 'reply_markup' => []];
         }
         
         $stmt = $conn->prepare("SELECT * FROM users WHERE chat_id = ?");
         if (!$stmt) {
             errorLog("Error: Prepare failed: " . $conn->error);
             $conn->close();
-            return ['message' => 'خطا در دریافت اطلاعات کاربر', 'keyboard' => []];
+            return ['text' => 'خطا در دریافت اطلاعات کاربر', 'reply_markup' => []];
         }
         
         $stmt->bind_param("i", $uid);
@@ -928,7 +1119,7 @@ function getTest($type) {
         if (!$user) {
             errorLog("Error: User not found for chat_id: $uid");
             $conn->close();
-            return ['message' => 'کاربر یافت نشد', 'keyboard' => []];
+            return ['text' => 'کاربر یافت نشد', 'reply_markup' => []];
         }
 
         $userTest = $user['test'] ?? null;
@@ -941,7 +1132,7 @@ function getTest($type) {
                     ]
                 ]
             ];
-            return ['message' => '⚠️ شما قبلا درخواست تست داده اید!', 'keyboard' => $keyboard];
+            return ['text' => '⚠️ شما قبلا درخواست تست داده اید!', 'reply_markup' => $keyboard];
         }
 
         $name = $user['name'] ?? null;
@@ -949,78 +1140,76 @@ function getTest($type) {
         $user_id = $user['id'] ?? null;
         $planId = $selectedPlan['id'];
 
-        // Generate password
-        $characters = '0123456789abcdefghijklmnopqrstuvwxyz';
-        $password = '';
-        for ($i = 0; $i < 5; $i++) {
-            $password .= $characters[rand(0, strlen($characters) - 1)];
-        }
+        // // Generate password
+        // $characters = '0123456789abcdefghijklmnopqrstuvwxyz';
+        // $password = '';
+        // for ($i = 0; $i < 5; $i++) {
+        //     $password .= $characters[rand(0, strlen($characters) - 1)];
+        // }
     
-        // Prepare data for API request
-        $data = json_encode([
-            "id" => null,
-            "name" => $name,
-            "email" => null,
-            "created_at" => null,
-            "remains_days" => null,
-            "expire_date" => null,
-            "count_of_plans" => null,
-            "plans" => [],
-            "count_of_devices" => 0,
-            "added_by" => null,
-            "password" => $password,
-            "phone" => null,
-            "chat_id" => $uid,
-            "telegram_id" => $telegram_id,
-            "group_id" => null,
-            "plan_id" => $planId,
-            "enable_plan_after_first_login" => true,
-            "username" => "",
-            "group_name" => "",
-            "plan_name" => "",
-            "used_traffic" => "",
-            "is_active" => false,
-            "is_expired" => false,
-            "connection_status" => "",
-            "last_active_date" => "",
-            "subscription_link" => "",
-            "used_devices" => [
-                "os" => "",
-                "model" => ""
-            ],
-            "outline_link" => "",
-            "is_child_protection_enabled" => false,
-            "notes" => ""
-        ]);
+        // // Prepare data for API request
+        // $data = json_encode([
+        //     "id" => null,
+        //     "name" => $name,
+        //     "email" => null,
+        //     "created_at" => null,
+        //     "remains_days" => null,
+        //     "expire_date" => null,
+        //     "count_of_plans" => null,
+        //     "plans" => [],
+        //     "count_of_devices" => 0,
+        //     "added_by" => null,
+        //     "password" => $password,
+        //     "phone" => null,
+        //     "chat_id" => $uid,
+        //     "telegram_id" => $telegram_id,
+        //     "group_id" => null,
+        //     "plan_id" => $planId,
+        //     "enable_plan_after_first_login" => true,
+        //     "username" => "",
+        //     "group_name" => "",
+        //     "plan_name" => "",
+        //     "used_traffic" => "",
+        //     "is_active" => false,
+        //     "is_expired" => false,
+        //     "connection_status" => "",
+        //     "last_active_date" => "",
+        //     "subscription_link" => "",
+        //     "used_devices" => [
+        //         "os" => "",
+        //         "model" => ""
+        //     ],
+        //     "outline_link" => "",
+        //     "is_child_protection_enabled" => false,
+        //     "notes" => ""
+        // ]);
         
-        // Store client on panel
-        $endpoint = 'https://api.connectix.vip/v1/seller/clients/store';
-        $ch = curl_init($endpoint);
-        curl_setopt_array($ch, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_POST => true,
-            CURLOPT_POSTFIELDS => $data,
-            CURLOPT_HTTPHEADER => [
-                'Authorization: Bearer ' . $panelToken,
-                'Accept: application/json',
-                'Content-Type: application/json',
-                'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-            ],
-        ]);
-        $response = curl_exec($ch);
+        // // Store client on panel
+        // $endpoint = 'https://api.connectix.vip/v1/seller/clients/store';
+        // $ch = curl_init($endpoint);
+        // curl_setopt_array($ch, [
+        //     CURLOPT_RETURNTRANSFER => true,
+        //     CURLOPT_POST => true,
+        //     CURLOPT_POSTFIELDS => $data,
+        //     CURLOPT_HTTPHEADER => [
+        //         'Authorization: Bearer ' . $panelToken,
+        //         'Accept: application/json',
+        //         'Content-Type: application/json',
+        //         'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        //     ],
+        // ]);
+        // $response = curl_exec($ch);
+        $response = createClient($name, $uid, $telegram_id, $planId);
         if ($response === false) {
-            errorLog("Error: cURL failed to create client: " . curl_error($ch));
-            curl_close($ch);
             $conn->close();
-            return ['message' => 'خطا در ایجاد اکانت روی سرور', 'keyboard' => []];
+            return ['text' => 'خطا در ایجاد اکانت روی سرور', 'reply_markup' => []];
         }
-        curl_close($ch);
 
         $result = json_decode($response, true);
         if (!isset($result['client_id'])) {
             errorLog("Error: Failed to create client on panel. Response: " . print_r($result, true));
             $conn->close();
-            return ['message' => 'خطا در ایجاد اکانت', 'keyboard' => []];
+            return ['text' => 'خطا در ایجاد اکانت', 'reply_markup' => []];
         }
         
         $client_id = $result['client_id'];
@@ -1070,7 +1259,7 @@ function getTest($type) {
         } catch (Exception $e) {
             errorLog("Error: Database operation failed: " . $e->getMessage());
             $conn->close();
-            return ['message' => 'خطا در ذخیره اطلاعات اکانت', 'keyboard' => []];
+            return ['text' => 'خطا در ذخیره اطلاعات اکانت', 'reply_markup' => []];
         }
 
         // Send message to user
@@ -1102,12 +1291,116 @@ function getTest($type) {
         ];
         
         // errorLog("Success: Test account created successfully for chat_id: $uid, client_id: $client_id");
-        return ['message' => $message, 'keyboard' => $keyboard];
+        return ['text' => $message, 'reply_markup' => $keyboard];
             
     } catch (Exception $e) {
         errorLog("Error: Create test account exception: " . $e->getMessage());
-        return ['message' => 'خطا: ' . $e->getMessage(), 'keyboard' => []];
+        return ['text' => 'خطا: ' . $e->getMessage(), 'reply_markup' => []];
     }
+}
+
+function createClient($name, $uid, $telegram_id, $planId) {
+    global $panelToken;
+    // Generate password
+    $characters = '0123456789abcdefghijklmnopqrstuvwxyz';
+    $password = '';
+    for ($i = 0; $i < 5; $i++) {
+        $password .= $characters[rand(0, strlen($characters) - 1)];
+    }
+
+    // Prepare data for API request
+    $data = json_encode([
+        "id" => null,
+        "name" => $name,
+        "email" => null,
+        "created_at" => null,
+        "remains_days" => null,
+        "expire_date" => null,
+        "count_of_plans" => null,
+        "plans" => [],
+        "count_of_devices" => 0,
+        "added_by" => null,
+        "password" => $password,
+        "phone" => null,
+        "chat_id" => $uid,
+        "telegram_id" => $telegram_id,
+        "group_id" => null,
+        "plan_id" => $planId,
+        "enable_plan_after_first_login" => true,
+        "username" => "",
+        "group_name" => "",
+        "plan_name" => "",
+        "used_traffic" => "",
+        "is_active" => false,
+        "is_expired" => false,
+        "connection_status" => "",
+        "last_active_date" => "",
+        "subscription_link" => "",
+        "used_devices" => [
+            "os" => "",
+            "model" => ""
+        ],
+        "outline_link" => "",
+        "is_child_protection_enabled" => false,
+        "notes" => ""
+    ]);
+    
+    // Store client on panel
+    $endpoint = 'https://api.connectix.vip/v1/seller/clients/store';
+    $ch = curl_init($endpoint);
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_POST => true,
+        CURLOPT_POSTFIELDS => $data,
+        CURLOPT_HTTPHEADER => [
+            'Authorization: Bearer ' . $panelToken,
+            'Accept: application/json',
+            'Content-Type: application/json',
+            'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        ],
+    ]);
+    $response = curl_exec($ch);
+    if ($response === false) {
+        errorLog("Error: cURL failed to create client: " . curl_error($ch));
+    }
+    curl_close($ch);
+    return $response;
+}
+
+function updateClient($client_id, $plan_id) {
+    global $panelToken;
+
+    $endpoint = 'https://api.connectix.vip/v1/seller/clients/add-plan';
+
+    $ch = curl_init($endpoint);
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_SSL_VERIFYPEER => false,
+        CURLOPT_SSL_VERIFYHOST => false,
+        CURLOPT_POST => true,
+        CURLOPT_POSTFIELDS => json_encode([
+            "id" => $client_id,
+            "plan_id" => $plan_id
+        ]),
+        CURLOPT_HTTPHEADER     => [
+            "Authorization: Bearer {$panelToken}",
+            "Accept: application/json",
+            "Content-Type: application/json",
+            "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        ],
+    ]);
+    $response = curl_exec($ch);
+    if ($response === false || curl_getinfo($ch, CURLINFO_HTTP_CODE) !== 200) {
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlErr  = curl_error($ch);
+
+        errorLog("Error: cURL updateClient failed | HTTP: {$httpCode} | cURL: {$curlErr} | Response: {$response} | Client ID: $client_id | Plan ID: $plan_id");
+
+        return false;
+    }
+    curl_close($ch);
+
+    return $response;
 }
 
 function parsePlanTitle($title, $short = false) {
@@ -1268,7 +1561,9 @@ function keyboard($keyboard) {
                 // include test button row only when user didn't get test account
                 $test = ($user['test'] == 0) ? [
                     ['text' => '🎁 | دریافت اکانت تست', 'callback_data' => 'get_test']
-                ] : [];
+                ] : [
+                    // ['text' => '🙋🏻 | همون همیشگی', 'callback_data' => 'always']
+                ];
 
                 $keyboard = [
                     // test row (may be empty)
@@ -1350,7 +1645,7 @@ function keyboard($keyboard) {
                     }
                 }
                 $keyboard[] = [
-                    ['text' => '➕ | اضافه کردن اکانت', 'callback_data' => 'add_account'],
+                    ['text' => '➕ | اضافه کردن اکانت', 'callback_data' => 'group'],
                     ['text' => '↪️ | بازگشت', 'callback_data' => 'main_menu']
                 ];
                 break;
@@ -1391,7 +1686,7 @@ function keyboard($keyboard) {
                         ['text' => '🔄️ | تمدید اکانت فعلی', 'callback_data' => 'renew']
                     ],
                     [
-                        ['text' => '➕ | خرید اکانت جدبد', 'callback_data' => 'group']
+                        ['text' => '➕ | خرید اکانت جدید', 'callback_data' => 'group']
                     ],
                     [
                         ['text' => '↪️ | بازگشت', 'callback_data' => 'main_menu']

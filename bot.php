@@ -181,20 +181,22 @@ try {
             if ($callback_data == null) {
                 break;
             }
-            $result = callBackCheck($callback_data);
-            if(!$result) {
-                break;
-            }
-            $message = $result['message'];
-            $keyboard = $result['keyboard'];
+            $params = callBackCheck($callback_data);
 
-            $result = tg('editMessageText',[
-                'chat_id' => $callback_chat_id,
-                'message_id' => $callback_message_id,
-                'text' => $message,
-                'parse_mode' => 'html',
-                'reply_markup' => $keyboard
-            ]);
+            if (!empty($params) && is_array($params)) {
+                $method = (isset($params['caption'])) ? 'editMessageCaption' : 'editMessageText';
+                $result = tg($method, array_merge([
+                    'chat_id' => $callback_chat_id,
+                    'message_id' => $callback_message_id,
+                    'parse_mode' => 'html'
+                ], $params));
+
+                if (!($result = json_decode($result))->ok) {
+                    errorLog("Error in sending message to chat_id: $uid | Message: {$result->description}");
+                    exit;
+                }
+            }
+
             break;
     }
     if ($result && !($result = json_decode($result))->ok) {
