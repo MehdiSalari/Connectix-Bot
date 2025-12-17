@@ -76,13 +76,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $ch = curl_init();
     curl_setopt_array($ch, [
-        CURLOPT_URL            => $endpoint,
+        CURLOPT_URL => $endpoint,
         CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_TIMEOUT        => 30,
+        CURLOPT_TIMEOUT => 30,
         CURLOPT_CONNECTTIMEOUT => 10,
         CURLOPT_SSL_VERIFYPEER => false, // Connectix sometimes has SSL issues
         CURLOPT_SSL_VERIFYHOST => false,
-        CURLOPT_HTTPHEADER     => [
+        CURLOPT_HTTPHEADER => [
             "Authorization: Bearer {$panelToken}",
             "Accept: application/json",
             "Content-Type: application/json",
@@ -124,13 +124,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $endpoint = "https://api.connectix.vip/v1/seller/telegram-bot/update-bot";
         $ch = curl_init();
         curl_setopt_array($ch, [
-            CURLOPT_URL            => $endpoint,
+            CURLOPT_URL => $endpoint,
             CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT        => 30,
+            CURLOPT_TIMEOUT => 30,
             CURLOPT_CONNECTTIMEOUT => 10,
             CURLOPT_SSL_VERIFYPEER => false, // Connectix sometimes has SSL issues
             CURLOPT_SSL_VERIFYHOST => false,
-            CURLOPT_HTTPHEADER     => [
+            CURLOPT_HTTPHEADER => [
                 "Authorization: Bearer {$panelToken}",
                 "Accept: application/json",
                 "Content-Type: application/json",
@@ -138,8 +138,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 "Origin: https://connectix.vip",
                 "Referer: https://connectix.vip/"
             ],
-            CURLOPT_POST           => true,
-            CURLOPT_POSTFIELDS     => $newConfig
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => $newConfig
         ]);
 
         $response = curl_exec($ch);
@@ -163,18 +163,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $file = $_FILES["video_$plat"];
 
                 // اعتبارسنجی دوباره در سرور
-                if ($file['error'] !== UPLOAD_ERR_OK) continue;
+                if ($file['error'] !== UPLOAD_ERR_OK)
+                    continue;
 
                 $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
                 if ($ext !== 'mp4' || $file['type'] !== 'video/mp4') {
                     continue;
                 }
 
-                if ($file['size'] > 100 * 1024 * 1024) continue;
+                if ($file['size'] > 100 * 1024 * 1024)
+                    continue;
 
                 $targetPath = $uploadBasePath . $plat . '.mp4';
                 move_uploaded_file($file['tmp_name'], $targetPath);
-                
+
             }
         }
 
@@ -199,10 +201,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@100..900&display=swap" rel="stylesheet">
     <link rel="icon" href="favicon.ico" type="image/x-icon">
     <style>
-        html, body { height: 100%; }
-        html {background-color: #e7edff;}
-        body { font-family: 'Vazirmatn', sans-serif; display: flex; flex-direction: column; min-height: 100vh; }
-        body > .container { flex: 1 0 auto; }
+        html,
+        body {
+            height: 100%;
+        }
+
+        html {
+            background-color: #e7edff;
+        }
+
+        body {
+            font-family: 'Vazirmatn', sans-serif;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        body>.container {
+            flex: 1 0 auto;
+        }
 
         #messageForm label {
             font-weight: bolder;
@@ -229,23 +246,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             max-height: 200px;
             object-fit: cover;
         }
+
         .copyright {
-                width: 100%;
-                text-align: center;
-                color: #777;
-                font-size: 15px;
-                direction: ltr;
-                margin: auto;
-                padding-bottom: 10px;
-                flex-shrink: 0;
-            }
-        .copyright a { color: #b500bbff; text-decoration: none; }
+            width: 100%;
+            text-align: center;
+            color: #777;
+            font-size: 15px;
+            direction: ltr;
+            margin: auto;
+            padding-bottom: 10px;
+            flex-shrink: 0;
+        }
+
+        .copyright a {
+            color: #b500bbff;
+            text-decoration: none;
+        }
     </style>
 </head>
 
-<body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen">
+<body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen scroll-smooth">
     <div class="container mx-auto px-4 py-8 max-w-4xl">
-        <!-- هدر -->
+        <!-- Header -->
         <div class="bg-white rounded-xl shadow-lg p-6 mb-8">
             <div class="grid md:grid-cols-2 gap-6 items-start">
 
@@ -256,22 +278,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 <div class="flex flex-col gap-5 items-end">
 
-                    <a href="logout.php" class="bg-red-500 hover:bg-red-600 text-white px-6 py-3 rounded-lg font-semibold transition flex items-center gap-2 w-fit">
+                    <a href="logout.php"
+                        class="bg-red-500 hover:bg-red-600 text-white px-6 py-3 rounded-lg font-semibold transition flex items-center gap-2 w-fit">
                         <i class="fas fa-sign-out-alt"></i> خروج
                     </a>
 
 
                     <div class="flex flex-wrap gap-3 justify-end w-full">
-                        <a href="setup" class="bg-blue-500 hover:bg-blue-600 text-white px-5 py-3 rounded-lg font-semibold transition flex items-center gap-2 whitespace-nowrap">
+                        <a href="setup"
+                            class="bg-blue-500 hover:bg-blue-600 text-white px-5 py-3 rounded-lg font-semibold transition flex items-center gap-2 whitespace-nowrap">
                             <i class="fas fa-cloud-arrow-down"></i> تنظیمات اولیه
                         </a>
-                        <a id="messagesBtn" href="#" class="bg-blue-500 hover:bg-blue-600 text-white px-5 py-3 rounded-lg font-semibold transition flex items-center gap-2 whitespace-nowrap">
+                        <a id="messagesBtn" href="#"
+                            class="bg-blue-500 hover:bg-blue-600 text-white px-5 py-3 rounded-lg font-semibold transition flex items-center gap-2 whitespace-nowrap">
                             <i class="fas fa-cog"></i> تنظیمات بات
                         </a>
-                        <a id="broadcastBtn" href="#" class="bg-blue-500 hover:bg-blue-600 text-white px-5 py-3 rounded-lg font-semibold transition flex items-center gap-2 whitespace-nowrap">
+                        <a id="broadcastBtn" href="#"
+                            class="bg-blue-500 hover:bg-blue-600 text-white px-5 py-3 rounded-lg font-semibold transition flex items-center gap-2 whitespace-nowrap">
                             <i class="fas fa-comments"></i> ارسال پیام همگانی
                         </a>
-                        <a href="users" class="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-5 py-3 rounded-lg font-semibold transition flex items-center gap-2 whitespace-nowrap shadow-md">
+                        <a href="users"
+                            class="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-5 py-3 rounded-lg font-semibold transition flex items-center gap-2 whitespace-nowrap shadow-md">
                             <i class="fas fa-users"></i> لیست کاربران
                         </a>
                     </div>
@@ -282,7 +309,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <!-- Bot Settings Form -->
         <div id="messageFormContainer" class="bg-white rounded-xl shadow-xl p-8 mb-8" style="display: none;">
             <h2 class="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-3">
-                <i class="fas fa-cog text-blue-600"></i>
+                <i class="fas fa-cog text-gray-600"></i>
                 مدیریت تنظیمات بات
             </h2>
 
@@ -297,7 +324,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $telegramChannel = $config['channel_telegram'] ?? '';
                 $cardNumber = $config['card_number'] ?? '';
                 $cardName = $config['card_name'] ?? '';
-                
+
                 $welcomeMessage = $config['messages']['welcome_text'] ?? '';
                 $supportMessage = $config['messages']['contact_support'] ?? '';
                 $faqMessage = $config['messages']['questions_and_answers'] ?? '';
@@ -321,9 +348,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             class="w-full px-4 py-3 border border-gray-300 rounded-lg file:mr-4 file:py-3 file:px-6 file:rounded-lg file:border-0 file:bg-blue-600 file:text-white hover:file:bg-blue-700">
                     </div>
                     <div class="input-group">
-                    <label class="block text-gray-700 font-semibold mb-2"> آیدی عددی ادمین</label>
-                    <input type="text" id="admin_id" name="admin_id" value="<?= $adminId ?>"
-                        class="w-full px-4 py-3 border border-gray-300 rounded-lg file:mr-4 file:py-3 file:px-6 file:rounded-lg file:border-0 file:bg-blue-600 file:text-white hover:file:bg-blue-700">
+                        <label class="block text-gray-700 font-semibold mb-2"> آیدی عددی ادمین</label>
+                        <input type="text" id="admin_id" name="admin_id" value="<?= $adminId ?>"
+                            class="w-full px-4 py-3 border border-gray-300 rounded-lg file:mr-4 file:py-3 file:px-6 file:rounded-lg file:border-0 file:bg-blue-600 file:text-white hover:file:bg-blue-700">
                     </div>
                 </div>
 
@@ -334,9 +361,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             class="w-full px-4 py-3 border border-gray-300 rounded-lg file:mr-4 file:py-3 file:px-6 file:rounded-lg file:border-0 file:bg-blue-600 file:text-white hover:file:bg-blue-700">
                     </div>
                     <div class="input-group">
-                    <label class="block text-gray-700 font-semibold mb-2">نام کاربری کانال تلگرام</label>
-                    <input type="text" id="telegram_channel" name="telegram_channel" value="<?= $telegramChannel ?>"
-                        class="w-full px-4 py-3 border border-gray-300 rounded-lg file:mr-4 file:py-3 file:px-6 file:rounded-lg file:border-0 file:bg-blue-600 file:text-white hover:file:bg-blue-700">
+                        <label class="block text-gray-700 font-semibold mb-2">نام کاربری کانال تلگرام</label>
+                        <input type="text" id="telegram_channel" name="telegram_channel" value="<?= $telegramChannel ?>"
+                            class="w-full px-4 py-3 border border-gray-300 rounded-lg file:mr-4 file:py-3 file:px-6 file:rounded-lg file:border-0 file:bg-blue-600 file:text-white hover:file:bg-blue-700">
                     </div>
                 </div>
 
@@ -347,9 +374,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             class="w-full px-4 py-3 border border-gray-300 rounded-lg file:mr-4 file:py-3 file:px-6 file:rounded-lg file:border-0 file:bg-blue-600 file:text-white hover:file:bg-blue-700">
                     </div>
                     <div class="input-group">
-                    <label class="block text-gray-700 font-semibold mb-2">شماره کارت</label>
-                    <input type="text" id="card_number" name="card_number" value="<?= $cardNumber ?>"
-                        class="w-full px-4 py-3 border border-gray-300 rounded-lg file:mr-4 file:py-3 file:px-6 file:rounded-lg file:border-0 file:bg-blue-600 file:text-white hover:file:bg-blue-700">
+                        <label class="block text-gray-700 font-semibold mb-2">شماره کارت</label>
+                        <input type="text" id="card_number" name="card_number" value="<?= $cardNumber ?>"
+                            class="w-full px-4 py-3 border border-gray-300 rounded-lg file:mr-4 file:py-3 file:px-6 file:rounded-lg file:border-0 file:bg-blue-600 file:text-white hover:file:bg-blue-700">
                     </div>
                 </div>
 
@@ -379,92 +406,92 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         foreach ($platforms as $key => $label):
                             $videoPath = $uploadBasePath . $key . '.mp4';
                             $videoUrl = $videoPath . '?t=' . (file_exists($videoPath) ? filemtime($videoPath) : time());
-                        ?>
-                        <div class="space-y-3">
-                            <label class="block text-gray-700 font-semibold"><?= $label ?></label>
-                            
-                            <!-- پیش‌نمایش ویدیو -->
-                            <div id="preview-<?= $key ?>" class="rounded-xl overflow-hidden shadow-lg bg-gray-50 aspect-video relative">
-                                <?php if (file_exists($videoPath)): ?>
-                                    <video controls class="w-full h-full object-cover">
-                                        <source src="<?= $videoUrl ?>" type="video/mp4">
-                                        مرورگر شما از ویدیو پشتیبانی نمی‌کند.
-                                    </video>
-                                <?php else: ?>
-                                    <div class="flex flex-col items-center justify-center h-full text-gray-400">
-                                        <i class="fas fa-video text-5xl mb-3"></i>
-                                        <p class="text-sm">ویدیویی آپلود نشده</p>
-                                    </div>
-                                <?php endif; ?>
-                            </div>
+                            ?>
+                            <div class="space-y-3">
+                                <label class="block text-gray-700 font-semibold"><?= $label ?></label>
 
-                            <!-- آپلود فقط mp4 -->
-                            <input type="file" name="video_<?= $key ?>" id="video_<?= $key ?>" accept="video/mp4"
-                                class="block w-full text-sm text-gray-600 
+                                <!-- پیش‌نمایش ویدیو -->
+                                <div id="preview-<?= $key ?>"
+                                    class="rounded-xl overflow-hidden shadow-lg bg-gray-50 aspect-video relative">
+                                    <?php if (file_exists($videoPath)): ?>
+                                        <video controls class="w-full h-full object-cover">
+                                            <source src="<?= $videoUrl ?>" type="video/mp4">
+                                            مرورگر شما از ویدیو پشتیبانی نمی‌کند.
+                                        </video>
+                                    <?php else: ?>
+                                        <div class="flex flex-col items-center justify-center h-full text-gray-400">
+                                            <i class="fas fa-video text-5xl mb-3"></i>
+                                            <p class="text-sm">ویدیویی آپلود نشده</p>
+                                        </div>
+                                    <?php endif; ?>
+                                </div>
+
+                                <!--  Just Upload mp4 -->
+                                <input type="file" name="video_<?= $key ?>" id="video_<?= $key ?>" accept="video/mp4" class="block w-full text-sm text-gray-600 
                                     file:mr-4 file:py-3 file:px-6 file:rounded-lg file:border-0 
                                     file:text-sm file:font-semibold file:bg-indigo-600 file:text-white 
                                     hover:file:bg-indigo-700 cursor-pointer">
-                            
-                            <p class="text-xs text-gray-500 mt-1">فقط فایل MP4 (حداکثر ۱۰۰ مگابایت)</p>
-                        </div>
+
+                                <p class="text-xs text-gray-500 mt-1">فقط فایل MP4 (حداکثر ۱۰۰ مگابایت)</p>
+                            </div>
                         <?php endforeach; ?>
                     </div>
                 </div>
 
                 <!-- Messages -->
-                 <div class="border-t-2 border-gray-200 pt-8"></div>
-                    <h3 class="text-xl font-bold text-gray-800 mb-6 flex items-center gap-3">
-                        <i class="fas fa-comments text-purple-600"></i>
-                        پیام های بات
-                    </h3>
-                    <div>
-                        <label class="block text-gray-700 font-semibold mb-2">پیام خوش آمد گویی</label>
-                        <textarea id="welcome_message" name="welcome_message" rows="5"
-                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-4 focus:ring-blue-200 focus:border-blue-500 outline-none transition"
-                            placeholder="متن پیام خوش آمد گویی را اینجا بنویسید..."><?= htmlspecialchars($welcomeMessage) ?>
+                <div class="border-t-2 border-gray-200 pt-8"></div>
+                <h3 class="text-xl font-bold text-gray-800 mb-6 flex items-center gap-3">
+                    <i class="fas fa-comments text-blue-600"></i>
+                    پیام های بات
+                </h3>
+                <div>
+                    <label class="block text-gray-700 font-semibold mb-2">پیام خوش آمد گویی</label>
+                    <textarea id="welcome_message" name="welcome_message" rows="5"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-4 focus:ring-blue-200 focus:border-blue-500 outline-none transition"
+                        placeholder="متن پیام خوش آمد گویی را اینجا بنویسید..."><?= htmlspecialchars($welcomeMessage) ?>
                         </textarea>
-                    </div>
-
-                    <div>
-                        <label class="block text-gray-700 font-semibold mb-2">پیام پشتیبانی</label>
-                        <textarea id="support_message" name="support_message" rows="5"
-                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-4 focus:ring-blue-200 focus:border-blue-500 outline-none transition"
-                            placeholder="متن پیام خوش آمد گویی را اینجا بنویسید..."><?= htmlspecialchars($supportMessage) ?>
-                        </textarea>
-                    </div>
-
-                    <div>
-                        <label class="block text-gray-700 font-semibold mb-2">سوالات متداول</label>
-                        <textarea id="faq_message" name="faq_message" rows="5"
-                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-4 focus:ring-blue-200 focus:border-blue-500 outline-none transition"
-                            placeholder="متن پیام خوش آمد گویی را اینجا بنویسید..."><?= htmlspecialchars($faqMessage) ?>
-                        </textarea>
-                    </div>
-
-                    <div>
-                        <label class="block text-gray-700 font-semibold mb-2">متن پیام دریافت اکانت تست</label>
-                        <textarea id="free_trial_message" name="free_trial_message" rows="5"
-                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-4 focus:ring-blue-200 focus:border-blue-500 outline-none transition"
-                            placeholder="متن پیام خوش آمد گویی را اینجا بنویسید..."><?= htmlspecialchars($freeTrialMessage) ?>
-                        </textarea>
-                    </div>   
-
-                    <!-- Buttons -->
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <button type="button" id="closeBtn"
-                            class="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold py-4 rounded-lg text-lg transition transform hover:scale-105 flex items-center justify-center gap-3">
-                            <i class="fas fa-circle-xmark"></i>بستن
-                        </button>
-
-                        <button type="submit" id="submitBtn"
-                            class="bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white font-bold py-4 rounded-lg text-lg transition transform hover:scale-105 flex items-center justify-center gap-3">
-                            <i class="fas fa-circle-check"></i>
-                            <span id="btnText">ثبت اطلاعات</span>
-                        </button>
-                    </div>
                 </div>
-            </form>
+
+                <div>
+                    <label class="block text-gray-700 font-semibold mb-2">پیام پشتیبانی</label>
+                    <textarea id="support_message" name="support_message" rows="5"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-4 focus:ring-blue-200 focus:border-blue-500 outline-none transition"
+                        placeholder="متن پیام خوش آمد گویی را اینجا بنویسید..."><?= htmlspecialchars($supportMessage) ?>
+                        </textarea>
+                </div>
+
+                <div>
+                    <label class="block text-gray-700 font-semibold mb-2">سوالات متداول</label>
+                    <textarea id="faq_message" name="faq_message" rows="5"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-4 focus:ring-blue-200 focus:border-blue-500 outline-none transition"
+                        placeholder="متن پیام خوش آمد گویی را اینجا بنویسید..."><?= htmlspecialchars($faqMessage) ?>
+                        </textarea>
+                </div>
+
+                <div>
+                    <label class="block text-gray-700 font-semibold mb-2">متن پیام دریافت اکانت تست</label>
+                    <textarea id="free_trial_message" name="free_trial_message" rows="5"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-4 focus:ring-blue-200 focus:border-blue-500 outline-none transition"
+                        placeholder="متن پیام خوش آمد گویی را اینجا بنویسید..."><?= htmlspecialchars($freeTrialMessage) ?>
+                        </textarea>
+                </div>
+
+                <!-- Buttons -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <button type="button" id="closeBtn"
+                        class="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold py-4 rounded-lg text-lg transition transform hover:scale-105 flex items-center justify-center gap-3">
+                        <i class="fas fa-circle-xmark"></i>بستن
+                    </button>
+
+                    <button type="submit" id="submitBtn"
+                        class="bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white font-bold py-4 rounded-lg text-lg transition transform hover:scale-105 flex items-center justify-center gap-3">
+                        <i class="fas fa-circle-check"></i>
+                        <span id="btnText">ثبت اطلاعات</span>
+                    </button>
+                </div>
         </div>
+        </form>
+        <!-- </div> -->
 
         <!-- Broadcast Form -->
         <div id="broadcastFormContainer" class="bg-white rounded-xl shadow-xl p-8 mb-8" style="display: none;">
@@ -542,8 +569,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </div>
         </div>
     </div>
+    </div>
     <div class="copyright">
-        <p>&copy; 2024 - <?= date('Y') ?> Connectix Bot designed by <a href="https://github.com/MehdiSalari" target="_blank">Mehdi Salari</a>. All rights reserved.</p>
+        <p>&copy; 2024 - <?= date('Y') ?> Connectix Bot designed by <a href="https://github.com/MehdiSalari"
+                target="_blank">Mehdi Salari</a>. All rights reserved.</p>
     </div>
 
     <script>
@@ -744,7 +773,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         });
 
         document.querySelectorAll('input[type="file"][accept="video/mp4"]').forEach(input => {
-            input.addEventListener('change', function() {
+            input.addEventListener('change', function () {
                 const file = this.files[0];
                 const previewId = 'preview-' + this.id.replace('video_', '');
                 const previewContainer = document.getElementById(previewId);
