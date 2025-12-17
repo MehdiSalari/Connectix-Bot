@@ -64,43 +64,78 @@ try {
             if ($text == null && $photo == null) {
                 break;
             }
-            // $message = "متن پیشفرض پاسخ به کاربر";
+
             $redis = new Redis();
             $redis->connect('127.0.0.1', 6379);
-            $planData = $redis->hgetall("user:steps:$uid");
+            $RedisData = $redis->hgetall("user:steps:$uid");
             $redis->close();
 
-            if (!$planData['pay']) {
-                break;
-            }
-            
-            // Check if send just image
-            if ($photo == null) {
-                $message = "🖼️ لطفا سند واریزی را به صورت تصویر ارسال کنید!";
-                $result = tg('sendMessage',[
-                    'chat_id' => $uid,
-                    'text' => $message,
-                    'reply_markup' => json_encode([
-                            'inline_keyboard' => [
-                                [
-                                    ['text' => '❌ | انصراف', 'callback_data' => 'main_menu'],
+            if ($RedisData['pay']) {
+                // Check if send just image
+                if ($photo == null) {
+                    $message = "🖼️ لطفا سند واریزی را به صورت تصویر ارسال کنید!";
+                    $result = tg('sendMessage',[
+                        'chat_id' => $uid,
+                        'text' => $message,
+                        'reply_markup' => json_encode([
+                                'inline_keyboard' => [
+                                    [
+                                        ['text' => '❌ | انصراف', 'callback_data' => 'main_menu'],
+                                    ]
                                 ]
-                            ]
-                        ])
-                    ]);
-                if (!($result = json_decode($result))->ok) {
-                    errorLog("Failed to send receipt error message to chat_id: $uid | Message: {$result->description}");
-                    exit;
+                            ])
+                        ]);
+                    if (!($result = json_decode($result))->ok) {
+                        errorLog("Failed to send receipt error message to chat_id: $uid | Message: {$result->description}");
+                        exit;
+                    }
+                    break;
+                }
+
+                $payment = payment($photo);
+
+                if (!$payment) {
+                    errorLog("Failed to send receipt error message to chat_id: $uid");
                 }
                 break;
             }
 
-            $payment = payment($photo);
-
-            if (!$payment) {
-                errorLog("Failed to send receipt error message to chat_id: $uid");
+            if ($RedisData['action'] == 'add_account') {
+                switch($RedisData['step']) {
+                    case 'get_username':
+                        $username = $text;
+                        addAccount("get_password", $username);
+                        
+                        $result = tg('sendMessage',[
+                            'chat_id' => $uid,
+                            'text' => "نام کاربری واردشده: $username\nلطفا رمزعبور حساب را وارد نمایید",
+                        ]);
+                        if (!($result = json_decode($result))->ok) {
+                            errorLog("Failed to send receipt error message to chat_id: $uid | Message: {$result->description}");
+                            exit;
+                        }
+                        break;
+                    case 'get_password':
+                        $password = $text;
+                        $message = addAccount("add_account", $password);
+                        $result = tg('sendMessage',[
+                            'chat_id' => $uid,
+                            'text' => $message,
+                            'reply_markup' => json_encode([
+                                    'inline_keyboard' => [
+                                        [
+                                            ['text' => '🏡 | خانه', 'callback_data' => 'main_menu'],
+                                        ]
+                                    ]
+                            ])
+                        ]);
+                        if (!($result = json_decode($result))->ok) {
+                            errorLog("Failed to send receipt error message to chat_id: $uid | Message: {$result->description}");
+                            exit;
+                        }
+                        break;
+                }
             }
-            break;
     }
 
     //Handle Callbacks
@@ -131,6 +166,15 @@ try {
                 'text' => message('my_accounts'),
                 'reply_markup' => keyboard('my_accounts')
             ]);
+            break;
+        case 'add_account':
+            $result = tg('editMessageText',[
+                'chat_id' => $callback_chat_id,
+                'message_id' => $callback_message_id,
+                'text' => message('add_account'),
+                'reply_markup' => keyboard('add_account')
+            ]);
+            addAccount('get_username');
             break;
         case 'group':
             $result = tg('editMessageText',[

@@ -5,9 +5,9 @@ if (!file_exists(__DIR__ . '/config.php')) {
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/gregorian_jalali.php';
 define('BOT_TOKEN', $botToken);  // Bot token for authentication with Telegram API
-define('TELEGRAM_URL', 'https://api.telegram.org/bot' . BOT_TOKEN . '/');  // Base URL for Telegram Bot API
+// define('TELEGRAM_URL', 'https://api.telegram.org/bot' . BOT_TOKEN . '/');  // Base URL for Telegram Bot API
 // // All tg() calls are tunneled through external proxy script
-// define('TELEGRAM_URL', 'https://mehdisalari.ir/bot/tgtunnel.php?bot_token=' . BOT_TOKEN . '&method=');
+define('TELEGRAM_URL', 'https://mehdisalari.ir/bot/tgtunnel.php?bot_token=' . BOT_TOKEN . '&method=');
 
 function tg($method, $params = []) {
     if (!$params) {
@@ -176,6 +176,52 @@ function callBackCheck($callback_data) {
     }
 }
 
+function addAccount($step, $data = null) {
+    $redis = new Redis();
+    $redis->connect('127.0.0.1', 6379);
+    $key = "user:steps:" . UID;
+    switch ($step) {
+        case "get_username":
+            $redis->hmset($key, ['action' => 'add_account', 'step' => $step, 'username' => null]);
+            $redis->expire($key, 1800);
+            break;
+        case "get_password":
+            $redis->hmset($key, ['action' => 'add_account', 'step' => $step, 'username' => $data]);
+            $redis->expire($key, 1800);
+            break;
+        case "add_account":
+            $redisData = $redis->hgetall($key);
+            $username = $redisData['username'];
+            $password = $data;
+            $uid = UID;
+
+            $client = getClientByUsername($username);
+            if (!$client || $client['password'] != $password || !$client['username']) {
+                return "نام کاربری و یا رمز عبور اشتباه است.";
+            }
+
+            global $db_host, $db_user, $db_pass, $db_name;
+            $conn = new mysqli($db_host, $db_user, $db_pass, $db_name); 
+            $stmt = $conn->prepare("SELECT id FROM users WHERE chat_id = ?");
+            $stmt->bind_param("s", $uid);
+            $stmt->execute();
+            $result = $stmt->get_result();
+            $user = $result->fetch_assoc();
+            
+            // Update chat_id and user_id in clients table
+            $stmt = $conn->prepare("UPDATE clients SET chat_id = ?, user_id = ? WHERE id = ?");
+            $stmt->bind_param("sss", $uid, $user['id'], $client['id']);
+            $stmt->execute();
+            $stmt->close();
+            $conn->close();
+            $redis->del("user:steps:$uid");
+            $redis->close();
+            return "✅ اکانت با نام کاربری $username با موفقیت حساب تلگرام شما متصل شد.";
+
+
+    }
+}
+
 function renew($info) {
     $infoParts = explode(':', $info);
     $step = $infoParts[0];
@@ -305,7 +351,7 @@ function renew($info) {
                         ['text' => '💳 | کارت به کارت', 'callback_data' => "pay_card:$planPrice"]
                     ],
                     [
-                        // ['text' => '👝 | کسر از کیف پول', 'callback_data' => 'buy_pay:wallet'],
+                        // ['text' => '👝 | پرداخت با کیف پول', 'callback_data' => 'buy_pay:wallet'],
                         ['text' => '🔜 | روش های دیگر به زودی...', 'callback_data' => 'not'],
                     ],
                     [
@@ -1039,18 +1085,6 @@ function getSellerPlans($type) {
             }
             return $validPlans[0];
     }
-
-    // Get bot available plans
-    // $validPlans = [];
-    // foreach ($data['seller_plan_group'] as $group) {
-    //     foreach ($group['seller_plans'] as $plan) {
-    //         if ($plan['is_displayed_in_robot'] == true) {
-    //             $validPlans[] = $plan;
-    //         }
-    //     }
-    // }
-
-    // return $validPlans;
 }
 
 function getTest($type) {
@@ -1140,65 +1174,6 @@ function getTest($type) {
         $user_id = $user['id'] ?? null;
         $planId = $selectedPlan['id'];
 
-        // // Generate password
-        // $characters = '0123456789abcdefghijklmnopqrstuvwxyz';
-        // $password = '';
-        // for ($i = 0; $i < 5; $i++) {
-        //     $password .= $characters[rand(0, strlen($characters) - 1)];
-        // }
-    
-        // // Prepare data for API request
-        // $data = json_encode([
-        //     "id" => null,
-        //     "name" => $name,
-        //     "email" => null,
-        //     "created_at" => null,
-        //     "remains_days" => null,
-        //     "expire_date" => null,
-        //     "count_of_plans" => null,
-        //     "plans" => [],
-        //     "count_of_devices" => 0,
-        //     "added_by" => null,
-        //     "password" => $password,
-        //     "phone" => null,
-        //     "chat_id" => $uid,
-        //     "telegram_id" => $telegram_id,
-        //     "group_id" => null,
-        //     "plan_id" => $planId,
-        //     "enable_plan_after_first_login" => true,
-        //     "username" => "",
-        //     "group_name" => "",
-        //     "plan_name" => "",
-        //     "used_traffic" => "",
-        //     "is_active" => false,
-        //     "is_expired" => false,
-        //     "connection_status" => "",
-        //     "last_active_date" => "",
-        //     "subscription_link" => "",
-        //     "used_devices" => [
-        //         "os" => "",
-        //         "model" => ""
-        //     ],
-        //     "outline_link" => "",
-        //     "is_child_protection_enabled" => false,
-        //     "notes" => ""
-        // ]);
-        
-        // // Store client on panel
-        // $endpoint = 'https://api.connectix.vip/v1/seller/clients/store';
-        // $ch = curl_init($endpoint);
-        // curl_setopt_array($ch, [
-        //     CURLOPT_RETURNTRANSFER => true,
-        //     CURLOPT_POST => true,
-        //     CURLOPT_POSTFIELDS => $data,
-        //     CURLOPT_HTTPHEADER => [
-        //         'Authorization: Bearer ' . $panelToken,
-        //         'Accept: application/json',
-        //         'Content-Type: application/json',
-        //         'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        //     ],
-        // ]);
-        // $response = curl_exec($ch);
         $response = createClient($name, $uid, $telegram_id, $planId);
         if ($response === false) {
             $conn->close();
@@ -1240,7 +1215,6 @@ function getTest($type) {
                 throw new Exception("Execute failed: " . $stmt->error);
             }
             $stmt->close();
-            // errorLog("Success: Updated user test status for chat_id: $uid");
             
             // Insert client
             $stmt = $conn->prepare("INSERT INTO clients (id, count_of_devices, username, password, chat_id, user_id, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())");
@@ -1406,7 +1380,7 @@ function updateClient($client_id, $plan_id) {
 function parsePlanTitle($title, $short = false) {
     $title = trim($title);
 
-    // پترن دقیق برای تمام پلن‌های Connectix
+    // Exact pattern for all Connectix plans
     preg_match('/^\((\d+)x\)\s*(Free-)?(?:([\d.]+)GB-)?(?:Unlimited-)?(\d+)([WMYD])?(?:\s*\+\s*(\d+)D)?\s*(.*)$/', $title, $matches);
 
     if (!$matches) {
@@ -1430,7 +1404,7 @@ function parsePlanTitle($title, $short = false) {
     $giftDays    = $matches[6] ?? null; // مثلاً + 3D
     $extraText   = trim($matches[7] ?? '');
 
-    // تبدیل زمان
+    // Convert period to text
     $periodText = match($periodUnit) {
         'D' => "$periodNum روز",
         'W' => "$periodNum هفته",
@@ -1439,29 +1413,34 @@ function parsePlanTitle($title, $short = false) {
         default => "$periodNum ماه"
     };
 
-    // تشخیص اکسترا
+    // Parse extras
     $extras = [];
     if ($giftDays) $extras[] = "+$giftDays روز هدیه";
     if (str_contains($extraText, 'Sublink')) $extras[] = 'ساب‌لینک';
     if (str_contains($extraText, 'Static IP')) $extras[] = 'آی‌پی ثابت';
 
-    // حالت کوتاه (فقط دستگاه + مدت اصلی + نوع — بدون هدیه و حجم)
+    // Short Mode (Just show devices and Traffic)
     if ($short) {
         if ($isFree) {
             $text = "تست رایگان • $periodText";
         } elseif ($isUnlimited) {
             $text = "$devices دستگاه • نامحدود • $periodText";
         } else {
-            $text = "$devices دستگاه • $periodText";
+            // If traffic is specified, show total traffic
+            if ($traffic) {
+                $text = "$devices دستگاه • {$traffic}GB";
+            } else {
+                // fallback 
+                $text = "$devices دستگاه • $periodText";
+            }
 
             if (in_array('ساب‌لینک', $extras)) {
                 $text .= " • ساب‌لینک";
             } elseif (in_array('آی‌پی ثابت', $extras)) {
                 $text .= " • آی‌پی ثابت";
-            } elseif (empty($extras) || count($extras) === 1 && $extras[0] === "+$giftDays روز هدیه") {
+            } elseif (empty($extras) || (count($extras) === 1 && $extras[0] === "+$giftDays روز هدیه")) {
                 $text .= " • ویژه";
             }
-            // اگر فقط هدیه روز داره → هیچ نوع خاصی نشون نده (مثل قبل)
         }
 
         return [
@@ -1475,7 +1454,7 @@ function parsePlanTitle($title, $short = false) {
         ];
     }
 
-    // حالت کامل (پیش‌فرض)
+    // Full Mode (Default)
     $finalText = $isFree ? "تست رایگان" : "$devices دستگاه";
 
     if ($isUnlimited) {
@@ -1490,7 +1469,7 @@ function parsePlanTitle($title, $short = false) {
         $finalText .= " • " . implode(" • ", $extras);
     }
 
-    // اگر هیچ اکسترایی نبود → ویژه
+    // Add "ویژه" if there are no extras
     if (empty($extras) && !$isFree && !$isUnlimited) {
         $finalText .= " • ویژه";
     }
@@ -1604,26 +1583,27 @@ function keyboard($keyboard) {
 
                 if (empty($clients)) {
                     $keyboard[] = [['text' => '🤷🏻 | اکانتی به تلگرام شما متصل نیست', 'callback_data' => 'not']];
+                    $keyboard[] = [['text' => '🛍 | خرید اکانت جدید', 'callback_data' => 'group']];
                 } else {
                     foreach (array_reverse($clients) as $client) {
                         $clientData = getClientData($client['id']);
                         $plans = $clientData['plans'] ?? [];
 
-                        // پیدا کردن پلن فعال یا در صف
+                        // Find active and queued plans
                         $activePlan = null;
                         $queuedPlan = null;
 
                         foreach ($plans as $plan) {
                             if ($plan['is_active'] == 1) {
                                 $activePlan = $plan;
-                                break; // اولین فعال رو پیدا کرد → تموم
+                                break; // Found first active plan
                             }
                             if ($plan['is_in_queue'] && !$queuedPlan) {
-                                $queuedPlan = $plan; // اولین در صف
+                                $queuedPlan = $plan; // First queued plan
                             }
                         }
 
-                        // اگر فعال نبود، از در صف استفاده کن
+                        // If no active plan, use queued plan
                         $currentPlan = $activePlan ?? $queuedPlan;
 
                         if (!$currentPlan) {
@@ -1633,7 +1613,7 @@ function keyboard($keyboard) {
                             $isActive = $currentPlan['is_active'] == 1;
                             $status = $isActive ? "🟢 فعال" : "🔵 در صف";
 
-                            // تبدیل اسم پلن به متن خوانا و کوتاه
+                            // Parse plan title
                             $parsed = parsePlanTitle($currentPlan['name'], true);
                             $name = $parsed['text'];
                         }
@@ -1645,7 +1625,7 @@ function keyboard($keyboard) {
                     }
                 }
                 $keyboard[] = [
-                    ['text' => '➕ | اضافه کردن اکانت', 'callback_data' => 'group'],
+                    ['text' => '➕ | افزودن اکانت به لیست', 'callback_data' => 'add_account'],
                     ['text' => '↪️ | بازگشت', 'callback_data' => 'main_menu']
                 ];
                 break;
@@ -1739,21 +1719,21 @@ function keyboard($keyboard) {
                         $clientData = getClientData($client['id']);
                         $plans = $clientData['plans'] ?? [];
 
-                        // پیدا کردن پلن فعال یا در صف
+                        // Find active and queued plans
                         $activePlan = null;
                         $queuedPlan = null;
 
                         foreach ($plans as $plan) {
                             if ($plan['is_active'] == 1) {
                                 $activePlan = $plan;
-                                break; // اولین فعال رو پیدا کرد → تموم
+                                break; // Found first active plan
                             }
                             if ($plan['is_in_queue'] && !$queuedPlan) {
-                                $queuedPlan = $plan; // اولین در صف
+                                $queuedPlan = $plan; // Found first queued plan
                             }
                         }
 
-                        // اگر فعال نبود، از در صف استفاده کن
+                        // If no active plan, use queued plan
                         $currentPlan = $activePlan ?? $queuedPlan;
 
                         if (!$currentPlan) {
@@ -1763,7 +1743,7 @@ function keyboard($keyboard) {
                             $isActive = $currentPlan['is_active'] == 1;
                             $status = $isActive ? "🟢 فعال" : "🔵 در صف";
 
-                            // تبدیل اسم پلن به متن خوانا و کوتاه
+                            // Parse plan title
                             $parsed = parsePlanTitle($currentPlan['name'], true);
                             $name = $parsed['text'];
                         }
@@ -1779,7 +1759,14 @@ function keyboard($keyboard) {
                     ['text' => '↪️ | بازگشت', 'callback_data' => 'buy']
                 ];
                 break;
-
+            case "add_account":
+                $keyboard = [
+                    [
+                        ['text' => '🏡 | خانه', 'callback_data' => 'main_menu'],
+                        ['text' => '↪️ | بازگشت', 'callback_data' => 'my_accounts']
+                    ]
+                ];
+                break;
             default:
                 return json_encode(['ok' => true]);
         }
@@ -1830,6 +1817,9 @@ function message($message, $variables = []) {
             $cardNumber = $config['card_number'];
             $cardName = $config['card_name'];
             $msg = "\n\n💴  لطفاً مبلغ «$price تومان» را به شماره کارت زیر واریز و سپس سند پرداخت را به صورت تصویری در ادامه ارسال کنید:\n\n💳 شماره کارت: $cardNumber\n👤 به نام: $cardName\n";
+            return $msg;
+        case "add_account":
+            $msg = "🔗 شما در حال متصل کردن اکانت قبلی به حساب تلگرام خود هستید.\n\n👤 لطفا نام کاربری اکانت را وارد نمایید:";
             return $msg;
         default:
             return "پیام پیشفرض";
