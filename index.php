@@ -152,6 +152,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             exit();
         }
 
+        $uploadBasePath = 'assets/videos/guide/';
+        if (!is_dir($uploadBasePath)) {
+            mkdir($uploadBasePath, 0755, true);
+        }
+
+        $platforms = ['android', 'ios', 'windows', 'mac', 'use'];
+        foreach ($platforms as $plat) {
+            if (!empty($_FILES["video_$plat"]['name'])) {
+                $file = $_FILES["video_$plat"];
+
+                // اعتبارسنجی دوباره در سرور
+                if ($file['error'] !== UPLOAD_ERR_OK) continue;
+
+                $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+                if ($ext !== 'mp4' || $file['type'] !== 'video/mp4') {
+                    continue;
+                }
+
+                if ($file['size'] > 100 * 1024 * 1024) continue;
+
+                $targetPath = $uploadBasePath . $plat . '.mp4';
+                move_uploaded_file($file['tmp_name'], $targetPath);
+                
+            }
+        }
+
         echo "<script>alert('تنظیمات با موفقیت ذخیره شد!')</script>";
     }
 }
@@ -256,11 +282,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <!-- Bot Settings Form -->
         <div id="messageFormContainer" class="bg-white rounded-xl shadow-xl p-8 mb-8" style="display: none;">
             <h2 class="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-3">
-                <i class="fas fa-comments text-blue-600"></i>
+                <i class="fas fa-cog text-blue-600"></i>
                 مدیریت تنظیمات بات
             </h2>
 
-            <form id="messageForm" method="post" action="index.php" class="space-y-6">
+            <form id="messageForm" method="post" action="index.php" enctype="multipart/form-data" class="space-y-6">
                 <?php
                 //get data from bot_config.json
                 $data = file_get_contents('setup/bot_config.json');
@@ -276,7 +302,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $supportMessage = $config['messages']['contact_support'] ?? '';
                 $faqMessage = $config['messages']['questions_and_answers'] ?? '';
                 $freeTrialMessage = $config['messages']['free_test_account_created'] ?? '';
+
+                // Videos path
+                $videos = $config['videos'] ?? [
+                    'use' => '',
+                    'android' => '',
+                    'ios' => '',
+                    'windows' => '',
+                    'mac' => '',
+                    'linux' => '',
+                ];
                 ?>
+                <!-- Main Settings -->
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div class="input-group">
                         <label class="block text-gray-700 font-semibold mb-2">نام برنامه</label>
@@ -316,51 +353,115 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     </div>
                 </div>
 
+                <!-- Guide Videos -->
+                <div class="border-t-2 border-gray-200 pt-8">
+                    <h3 class="text-xl font-bold text-gray-800 mb-6 flex items-center gap-3">
+                        <i class="fas fa-video text-purple-600"></i>
+                        ویدیوهای آموزشی
+                    </h3>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                        <?php
+                        $platforms = [
+                            'use' => 'نحوه استفاده کلی',
+                            'android' => 'آموزش اندروید',
+                            'ios' => 'آموزش iOS',
+                            'windows' => 'آموزش ویندوز',
+                            'mac' => 'آموزش مک',
+                            'linux' => 'آموزش لینوکس'
+                        ];
+
+                        $uploadBasePath = 'assets/videos/guide/';
+                        if (!is_dir($uploadBasePath)) {
+                            mkdir($uploadBasePath, 0755, true);
+                        }
+
+                        foreach ($platforms as $key => $label):
+                            $videoPath = $uploadBasePath . $key . '.mp4';
+                            $videoUrl = $videoPath . '?t=' . (file_exists($videoPath) ? filemtime($videoPath) : time());
+                        ?>
+                        <div class="space-y-3">
+                            <label class="block text-gray-700 font-semibold"><?= $label ?></label>
+                            
+                            <!-- پیش‌نمایش ویدیو -->
+                            <div id="preview-<?= $key ?>" class="rounded-xl overflow-hidden shadow-lg bg-gray-50 aspect-video relative">
+                                <?php if (file_exists($videoPath)): ?>
+                                    <video controls class="w-full h-full object-cover">
+                                        <source src="<?= $videoUrl ?>" type="video/mp4">
+                                        مرورگر شما از ویدیو پشتیبانی نمی‌کند.
+                                    </video>
+                                <?php else: ?>
+                                    <div class="flex flex-col items-center justify-center h-full text-gray-400">
+                                        <i class="fas fa-video text-5xl mb-3"></i>
+                                        <p class="text-sm">ویدیویی آپلود نشده</p>
+                                    </div>
+                                <?php endif; ?>
+                            </div>
+
+                            <!-- آپلود فقط mp4 -->
+                            <input type="file" name="video_<?= $key ?>" id="video_<?= $key ?>" accept="video/mp4"
+                                class="block w-full text-sm text-gray-600 
+                                    file:mr-4 file:py-3 file:px-6 file:rounded-lg file:border-0 
+                                    file:text-sm file:font-semibold file:bg-indigo-600 file:text-white 
+                                    hover:file:bg-indigo-700 cursor-pointer">
+                            
+                            <p class="text-xs text-gray-500 mt-1">فقط فایل MP4 (حداکثر ۱۰۰ مگابایت)</p>
+                        </div>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+
                 <!-- Messages -->
-                <div>
-                    <label class="block text-gray-700 font-semibold mb-2">پیام خوش آمد گویی</label>
-                    <textarea id="welcome_message" name="welcome_message" rows="5"
-                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-4 focus:ring-blue-200 focus:border-blue-500 outline-none transition"
-                        placeholder="متن پیام خوش آمد گویی را اینجا بنویسید..."><?= htmlspecialchars($welcomeMessage) ?>
-                    </textarea>
-                </div>
+                 <div class="border-t-2 border-gray-200 pt-8"></div>
+                    <h3 class="text-xl font-bold text-gray-800 mb-6 flex items-center gap-3">
+                        <i class="fas fa-comments text-purple-600"></i>
+                        پیام های بات
+                    </h3>
+                    <div>
+                        <label class="block text-gray-700 font-semibold mb-2">پیام خوش آمد گویی</label>
+                        <textarea id="welcome_message" name="welcome_message" rows="5"
+                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-4 focus:ring-blue-200 focus:border-blue-500 outline-none transition"
+                            placeholder="متن پیام خوش آمد گویی را اینجا بنویسید..."><?= htmlspecialchars($welcomeMessage) ?>
+                        </textarea>
+                    </div>
 
-                <div>
-                    <label class="block text-gray-700 font-semibold mb-2">پیام پشتیبانی</label>
-                    <textarea id="support_message" name="support_message" rows="5"
-                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-4 focus:ring-blue-200 focus:border-blue-500 outline-none transition"
-                        placeholder="متن پیام خوش آمد گویی را اینجا بنویسید..."><?= htmlspecialchars($supportMessage) ?>
-                    </textarea>
-                </div>
+                    <div>
+                        <label class="block text-gray-700 font-semibold mb-2">پیام پشتیبانی</label>
+                        <textarea id="support_message" name="support_message" rows="5"
+                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-4 focus:ring-blue-200 focus:border-blue-500 outline-none transition"
+                            placeholder="متن پیام خوش آمد گویی را اینجا بنویسید..."><?= htmlspecialchars($supportMessage) ?>
+                        </textarea>
+                    </div>
 
-                <div>
-                    <label class="block text-gray-700 font-semibold mb-2">سوالات متداول</label>
-                    <textarea id="faq_message" name="faq_message" rows="5"
-                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-4 focus:ring-blue-200 focus:border-blue-500 outline-none transition"
-                        placeholder="متن پیام خوش آمد گویی را اینجا بنویسید..."><?= htmlspecialchars($faqMessage) ?>
-                    </textarea>
-                </div>
+                    <div>
+                        <label class="block text-gray-700 font-semibold mb-2">سوالات متداول</label>
+                        <textarea id="faq_message" name="faq_message" rows="5"
+                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-4 focus:ring-blue-200 focus:border-blue-500 outline-none transition"
+                            placeholder="متن پیام خوش آمد گویی را اینجا بنویسید..."><?= htmlspecialchars($faqMessage) ?>
+                        </textarea>
+                    </div>
 
-                <div>
-                    <label class="block text-gray-700 font-semibold mb-2">متن پیام دریافت اکانت تست</label>
-                    <textarea id="free_trial_message" name="free_trial_message" rows="5"
-                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-4 focus:ring-blue-200 focus:border-blue-500 outline-none transition"
-                        placeholder="متن پیام خوش آمد گویی را اینجا بنویسید..."><?= htmlspecialchars($freeTrialMessage) ?>
-                    </textarea>
-                </div>
+                    <div>
+                        <label class="block text-gray-700 font-semibold mb-2">متن پیام دریافت اکانت تست</label>
+                        <textarea id="free_trial_message" name="free_trial_message" rows="5"
+                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-4 focus:ring-blue-200 focus:border-blue-500 outline-none transition"
+                            placeholder="متن پیام خوش آمد گویی را اینجا بنویسید..."><?= htmlspecialchars($freeTrialMessage) ?>
+                        </textarea>
+                    </div>   
 
-                <!-- Buttons -->
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <button type="button" id="closeBtn"
-                        class="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold py-4 rounded-lg text-lg transition transform hover:scale-105 flex items-center justify-center gap-3">
-                        <i class="fas fa-circle-xmark"></i>بستن
-                    </button>
+                    <!-- Buttons -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <button type="button" id="closeBtn"
+                            class="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold py-4 rounded-lg text-lg transition transform hover:scale-105 flex items-center justify-center gap-3">
+                            <i class="fas fa-circle-xmark"></i>بستن
+                        </button>
 
-                    <button type="submit" id="submitBtn"
-                        class="bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white font-bold py-4 rounded-lg text-lg transition transform hover:scale-105 flex items-center justify-center gap-3">
-                        <i class="fas fa-circle-check"></i>
-                        <span id="btnText">ثبت اطلاعات</span>
-                    </button>
+                        <button type="submit" id="submitBtn"
+                            class="bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white font-bold py-4 rounded-lg text-lg transition transform hover:scale-105 flex items-center justify-center gap-3">
+                            <i class="fas fa-circle-check"></i>
+                            <span id="btnText">ثبت اطلاعات</span>
+                        </button>
+                    </div>
                 </div>
             </form>
         </div>
@@ -640,6 +741,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         closeProgress.addEventListener('click', () => {
             progressContainer.classList.add('hidden');
+        });
+
+        document.querySelectorAll('input[type="file"][accept="video/mp4"]').forEach(input => {
+            input.addEventListener('change', function() {
+                const file = this.files[0];
+                const previewId = 'preview-' + this.id.replace('video_', '');
+                const previewContainer = document.getElementById(previewId);
+
+                if (file) {
+                    const url = URL.createObjectURL(file);
+                    previewContainer.innerHTML = `
+                        <video controls class="w-full h-full object-cover rounded-xl">
+                            <source src="${url}" type="${file.type}">
+                            مرورگر شما از ویدیو پشتیبانی نمی‌کند.
+                        </video>
+                    `;
+                }
+            });
         });
     </script>
 </body>

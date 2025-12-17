@@ -207,17 +207,26 @@ function callBackCheck($callback_data) {
 
 function guide($action) {
     $cbmid = CBMID;
+    $cbid = CBID;
     $uid = UID;
     switch ($action) {
         case 'use':
+            $videoPath = realpath('assets/videos/guide/use.mp4');
+            if (!$videoPath) {
+                tg('answerCallbackQuery', [
+                    'callback_query_id' => $cbid,
+                    'text' => '🙅🏻 فعلا ویدیو آموزشی در دسترس نمی باشد!',
+                    'show_alert' => true
+                ]);
+                exit();
+            }
             tg('deleteMessage',[
                 'chat_id' => $uid,
                 'message_id' => $cbmid
             ]);
-            $videoPath = realpath('assets/videos/guide/use.mp4');
+            
             $result = tg('sendVideo',[
                 'chat_id' => $uid,
-                // 'video'   => new CURLFile($videoPath, 'video/mp4', 'guide.mp4'),
                 'video'   => new CURLFile($videoPath, 'video/mp4', 'guide.mp4'),
                 'reply_markup' => json_encode([
                     'inline_keyboard' => [
@@ -246,6 +255,9 @@ function guide($action) {
                         ['text' => '💻 | ویندوز', 'callback_data' => 'guide_windows']
                     ],
                     [
+                        ['text' => '🐧 | لینوکس (Debian)', 'callback_data' => 'guide_linux']
+                    ],
+                    [
                         ['text' => '↪️ | بازگشت', 'callback_data' => 'guide']
                     ]
                 ]
@@ -253,11 +265,19 @@ function guide($action) {
 
             return ['text' => $message, 'reply_markup' => $keyboard];
         default:
+            $videoPath = realpath("assets/videos/guide/$action.mp4");
+            if (!$videoPath) {
+                tg('answerCallbackQuery', [
+                    'callback_query_id' => $cbid,
+                    'text' => '🙅🏻 فعلا ویدیو آموزشی در دسترس نمی باشد!',
+                    'show_alert' => true
+                ]);
+                exit();
+            }
             tg('deleteMessage',[
                 'chat_id' => $uid,
                 'message_id' => $cbmid
             ]);
-            $videoPath = realpath("assets/videos/guide/$action.mp4");
             $result = tg('sendVideo',[
                 'chat_id' => $uid,
                 'video'   => new CURLFile($videoPath, 'video/mp4', 'guide.mp4'),
