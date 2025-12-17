@@ -38,6 +38,7 @@ $caption = $update['message']['caption'] ?? null;  // Caption for media (if any)
 $uid = $chat_id ?? $callback_chat_id;
 define('UID', $uid);
 define('CBID', $callback_id);
+define('CBMID', $callback_message_id);
 
 try {
     //debug
@@ -220,6 +221,36 @@ try {
                 'text' => message('apps'),
                 'parse_mode' => 'html',
                 'reply_markup' => keyboard('apps')
+            ]);
+            break;
+        case 'guide':
+            tg('deleteMessage',[
+                'chat_id' => $callback_chat_id,
+                'message_id' => $callback_message_id
+            ]);
+            $result = tg('sendMessage',[
+                'chat_id' => $callback_chat_id,
+                'text' => message('guide'),
+                'parse_mode' => 'html',
+                'reply_markup' => keyboard('guide')
+            ]);
+            break;
+        case 'faq':
+            $result = tg('editMessageText',[
+                'chat_id' => $callback_chat_id,
+                'message_id' => $callback_message_id,
+                'text' => message('faq'),
+                'parse_mode' => 'html',
+                'reply_markup' => keyboard('faq')
+            ]);
+            break;
+        case 'support':
+            $result = tg('editMessageText',[
+                'chat_id' => $callback_chat_id,
+                'message_id' => $callback_message_id,
+                'text' => message('support'),
+                'parse_mode' => 'html',
+                'reply_markup' => keyboard('support')
             ]);
             break;
         case 'not':

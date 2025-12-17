@@ -5,9 +5,7 @@ if (!file_exists(__DIR__ . '/config.php')) {
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/gregorian_jalali.php';
 define('BOT_TOKEN', $botToken);  // Bot token for authentication with Telegram API
-// define('TELEGRAM_URL', 'https://api.telegram.org/bot' . BOT_TOKEN . '/');  // Base URL for Telegram Bot API
-// // All tg() calls are tunneled through external proxy script
-define('TELEGRAM_URL', 'https://mehdisalari.ir/bot/tgtunnel.php?bot_token=' . BOT_TOKEN . '&method=');
+define('TELEGRAM_URL', 'https://api.telegram.org/bot' . BOT_TOKEN . '/');  // Base URL for Telegram Bot API
 
 function tg($method, $params = []) {
     if (!$params) {
@@ -191,41 +189,93 @@ function callBackCheck($callback_data) {
     $data = explode('_', $callback_data);
     $cmd = $data[0];
     $query = $data[1];
-    
-    switch ($cmd) {
-        case "showClient":
-            $result = showClient($query);
-            break;
 
-        case "getTest":
-            $result = getTest($query);
-            break;
-
-        case "buy":
-            $result = buy($query);
-            break;
-
-        case "renew":
-            $result = renew($query);
-            break;
-
-        case "pay":
-            $result = checkout($query);
-            break;
-
-        case "payment":
-            $result = paycheck($query);
-            break;
-
-        case "app":
-            $result = app($query);
-            break;
-        default:
-            $result = null;
-            break;
-    }
+    $result = match ($cmd) {
+        "showClient" => showClient($query),
+        "getTest" => getTest($query),
+        "buy" => buy($query),
+        "renew" => renew($query),
+        "pay" => checkout($query),
+        "payment" => paycheck($query),
+        "app" => app($query),
+        "guide" => guide($query),
+        default => null,
+    };
 
     return $result;
+}
+
+function guide($action) {
+    $cbmid = CBMID;
+    $uid = UID;
+    switch ($action) {
+        case 'use':
+            tg('deleteMessage',[
+                'chat_id' => $uid,
+                'message_id' => $cbmid
+            ]);
+            $videoPath = realpath('assets/videos/guide/use.mp4');
+            $result = tg('sendVideo',[
+                'chat_id' => $uid,
+                // 'video'   => new CURLFile($videoPath, 'video/mp4', 'guide.mp4'),
+                'video'   => new CURLFile($videoPath, 'video/mp4', 'guide.mp4'),
+                'reply_markup' => json_encode([
+                    'inline_keyboard' => [
+                        [
+                            ['text' => '↪️ | بازگشت', 'callback_data' => 'guide']
+                        ],
+                    ]
+                ])
+            ]);
+
+            if (!($result = json_decode($result))->ok) {
+                errorLog("Error in sending message to chat_id: $uid | Message: {$result->description}");
+                exit;
+            }
+            exit();
+        case 'install':
+            $message = "⚙ سیستم عامل مورد نظر را انتخاب نمایید:";
+            $keyboard = [
+                'inline_keyboard' => [
+                    [
+                        ['text' => '📱 | آیفون (iOS)', 'callback_data' => 'guide_ios'],
+                        ['text' => '🤖 | اندروید', 'callback_data' => 'guide_android']
+                    ],
+                    [
+                        ['text' => '🖥 | مک', 'callback_data' => 'guide_mac'],
+                        ['text' => '💻 | ویندوز', 'callback_data' => 'guide_windows']
+                    ],
+                    [
+                        ['text' => '↪️ | بازگشت', 'callback_data' => 'guide']
+                    ]
+                ]
+            ];
+
+            return ['text' => $message, 'reply_markup' => $keyboard];
+        default:
+            tg('deleteMessage',[
+                'chat_id' => $uid,
+                'message_id' => $cbmid
+            ]);
+            $videoPath = realpath("assets/videos/guide/$action.mp4");
+            $result = tg('sendVideo',[
+                'chat_id' => $uid,
+                'video'   => new CURLFile($videoPath, 'video/mp4', 'guide.mp4'),
+                'reply_markup' => json_encode([
+                    'inline_keyboard' => [
+                        [
+                            ['text' => '↪️ | بازگشت', 'callback_data' => 'guide']
+                        ],
+                    ]
+                ])
+            ]);
+
+            if (!($result = json_decode($result))->ok) {
+                errorLog("Error in sending message to chat_id: $uid | Message: {$result->description}");
+                exit;
+            }
+            exit();
+    }
 }
 
 function app($platform) {
@@ -255,7 +305,7 @@ function app($platform) {
 
         $keyboard[] = [
             [
-                'text' => "⬇️ | {$link->label}",
+                'text' => "📥 | {$link->label}",
                 'url'  => $link->url
             ]
         ];
@@ -1626,14 +1676,13 @@ function keyboard($keyboard) {
     try {
         $uid = UID;
         global $db_host, $db_user, $db_pass, $db_name;
+        //get bot data from bot_config.json
+        $data = file_get_contents('setup/bot_config.json');
+        $config = json_decode($data, true);
+        $supportTelegram = $config['support_telegram'] ?? '';
+        $channelTelegram = $config['channel_telegram'] ?? '';
         switch ($keyboard) {
             case "main_menu":
-                //get bot data from bot_config.json
-                $data = file_get_contents('setup/bot_config.json');
-                $config = json_decode($data, true);
-                $supportTelegram = $config['support_telegram'] ?? '';
-                $channelTelegram = $config['channel_telegram'] ?? '';
-
                 //check if user get test account
                 $conn = new mysqli($db_host, $db_user, $db_pass, $db_name);
                 $stmt = $conn->prepare("SELECT test FROM users WHERE chat_id = ?");
@@ -1667,7 +1716,8 @@ function keyboard($keyboard) {
                         ['text' => '💡 | آموزش ها', 'callback_data' => 'guide']
                     ],
                     [
-                        ['text' => '💁🏻‍♂️ | پشتیبانی', 'url' => "t.me/$supportTelegram"],
+                        ['text' => '💁🏻‍♂️ | پشتیبانی', 'callback_data' => 'support'],
+                        ['text' => '❓ | سوالات متداول', 'callback_data' => 'faq'],
                     ],
                     [
                         ['text' => '📣 | اخبار و اطلاعیه ها', 'url' => "t.me/$channelTelegram"]
@@ -1898,6 +1948,39 @@ function keyboard($keyboard) {
                 ];
                 break;
 
+            case 'guide':
+                $keyboard = [
+                    [
+                        ['text' => '📲 | آموزش استفاده از نرم افزار', 'callback_data' => 'guide_use']
+                    ],
+                    [
+                        ['text' => '⚙ | آموزش نصب نرم افزار', 'callback_data' => 'guide_install'],
+                    ],
+                    [
+                        ['text' => '↪️ | بازگشت', 'callback_data' => 'main_menu']
+                    ]
+                ];
+                break;
+
+            case 'faq':
+                $keyboard = [
+                    [
+                        ['text' => '↪️ | بازگشت', 'callback_data' => 'main_menu']
+                    ]
+                ];
+                break;
+
+            case 'support':
+                $keyboard = [
+                    [
+                        ['text' => '📩 |  پیام به پشتیبانی', 'url' => "t.me/$supportTelegram"]
+                    ],
+                    [
+                        ['text' => '↪️ | بازگشت', 'callback_data' => 'main_menu']
+                    ]
+                ];
+                break;
+
             default:
                 return json_encode(['ok' => true]);
         }
@@ -1913,54 +1996,24 @@ function message($message, $variables = []) {
     $config = json_decode($data, true);
     $appName = $config['app_name'] ?? '';
     $welcomeMessage = $config['messages']['welcome_text'] ?? '';
+    $supportMessage = $config['messages']['contact_support'] ?? '';
+    $faq = $config['messages']['questions_and_answers'] ?? '';
 
-    switch ($message) {
-        case "welcome_message":
-            $msg = $welcomeMessage;
-            break;
-
-        case "my_accounts":
-            $msg = "📦 اکانت های متصل یه حساب تلگرام شما:\n\n* در صورت عدم مشاهده اکانت خود، آن را اضافه کنید.";
-            break;
-
-        case "get_test":
-            $msg = "🎁 لطفا نوع اکانت تست را انتخاب کنید:\n\n<b>📱 ویژه(پیشنهاد میشود):</b>\nدریافت نام کاربری و رمز عبور جهت ورود به نرم افزار Connectix و استفاده از 4 پروتکل و بیش از 10 کشور برای اتصال.\n\n<b>🔗 سابسکریبشن:</b>\nدریافت لینک سابسکریپشن جهت استفاده در نرم افزار هایی که از سرویس V2Ray پشتیبانی میکنند (مثل V2RayNG و V2Box)";
-            break;
-
-        case "count":
-            $msg = "🔢 این اکانت را برای چند کاربر (دستگاه) قابل استفاده باشد؟";
-            break;
-
-        case "buy":
-            $msg = "با تشکر از اعتماد و حسن انتخاب شما در خرید سرویس فیلترشکن {$appName} .\nلطفا نوع خرید خود را انتخاب کنید:\n\n<b>🔄️ تمدید اکانت فعلی:</b>\nاین دکمه برای خرید اشتراک برای اکانت قبلی استفاده میشود.\n\n<b>➕ خرید اکانت جدید:</b>\nاین دکمه برای خرید اکانت جدید استفاده میشود.";
-            break;
-
-        case "group":
-            $msg = "لطفاً ابتدا نوع سرویس مدنظر را انتخاب کنید: 👇\n\n<b>📱 ویژه (پیشنهاد میشود):</b>\nدریافت نام کاربری و رمز عبور جهت ورود به نرم افزار Connectix و استفاده از 4 پروتکل و بیش از 10 کشور برای اتصال.\n\n<b>🔗 سابسکریبشن:</b>\nدریافت لینک سابسکریپشن جهت استفاده در نرم افزار هایی که از سرویس V2Ray پشتیبانی میکنند (مثل V2RayNG و V2Box)\n\n<b>📍 آی‌پی ثابت:</b>\nدریافت نام کاربری و رمز عبور جهت ورود به نرم افزار Connectix و استفاده از آیپی ثابت.";
-            break;
-            
-        case "renew":
-            $msg = "📦 لطفا اکانت مدنظر خود را جهت تمدید اشتراک انتخاب کنید:";
-            break;
-
-        case "card":
-            $price = $variables['amount'];
-            $cardNumber = $config['card_number'];
-            $cardName = $config['card_name'];
-            $msg = "\n\n💴  لطفاً مبلغ «$price تومان» را به شماره کارت زیر واریز و سپس سند پرداخت را به صورت تصویری در ادامه ارسال کنید:\n\n💳 شماره کارت: $cardNumber\n👤 به نام: $cardName\n";
-            break;
-
-        case "add_account":
-            $msg = "🔗 شما در حال متصل کردن اکانت قبلی به حساب تلگرام خود هستید.\n\n👤 لطفا نام کاربری اکانت را وارد نمایید:";
-            break;
-
-        case "apps":
-            $msg = "⚙ لطفا سیستم عامل مدنظر خود را انتخاب کنید:";
-            break;
-
-        default:
-            $msg = "پیام پیشفرض";
-            break;
-    }
+    $msg = match ($message) {
+        "welcome_message" => $welcomeMessage,
+        "my_accounts" => "📦 اکانت های متصل یه حساب تلگرام شما:\n\n* در صورت عدم مشاهده اکانت خود، آن را اضافه کنید.",
+        "get_test" => "🎁 لطفا نوع اکانت تست را انتخاب کنید:\n\n<b>📱 ویژه(پیشنهاد میشود):</b>\nدریافت نام کاربری و رمز عبور جهت ورود به نرم افزار Connectix و استفاده از 4 پروتکل و بیش از 10 کشور برای اتصال.\n\n<b>🔗 سابسکریبشن:</b>\nدریافت لینک سابسکریپشن جهت استفاده در نرم افزار هایی که از سرویس V2Ray پشتیبانی میکنند (مثل V2RayNG و V2Box)",
+        "count" => "🔢 این اکانت را برای چند کاربر (دستگاه) قابل استفاده باشد؟",
+        "buy" => "با تشکر از اعتماد و حسن انتخاب شما در خرید سرویس فیلترشکن {$appName} .\nلطفا نوع خرید خود را انتخاب کنید:\n\n<b>🔄️ تمدید اکانت فعلی:</b>\nاین دکمه برای خرید اشتراک برای اکانت قبلی استفاده میشود.\n\n<b>➕ خرید اکانت جدید:</b>\nاین دکمه برای خرید اکانت جدید استفاده میشود.",
+        "group" => "لطفاً ابتدا نوع سرویس مدنظر را انتخاب کنید: 👇\n\n<b>📱 ویژه (پیشنهاد میشود):</b>\nدریافت نام کاربری و رمز عبور جهت ورود به نرم افزار Connectix و استفاده از 4 پروتکل و بیش از 10 کشور برای اتصال.\n\n<b>🔗 سابسکریبشن:</b>\nدریافت لینک سابسکریپشن جهت استفاده در نرم افزار هایی که از سرویس V2Ray پشتیبانی میکنند (مثل V2RayNG و V2Box)\n\n<b>📍 آی‌پی ثابت:</b>\nدریافت نام کاربری و رمز عبور جهت ورود به نرم افزار Connectix و استفاده از آیپی ثابت.",
+        "renew" => "📦 لطفا اکانت مدنظر خود را جهت تمدید اشتراک انتخاب کنید:",
+        "card" => "\n\n💴  لطفاً مبلغ «" . $variables['amount'] . " تومان» را به شماره کارت زیر واریز و سپس سند پرداخت را به صورت تصویری در ادامه ارسال کنید:\n\n💳 شماره کارت: " . $config['card_number'] . "\n👤 به نام: " . $config['card_name'] . "\n",
+        "add_account" => "🔗 شما در حال متصل کردن اکانت قبلی به حساب تلگرام خود هستید.\n\n👤 لطفا نام کاربری اکانت را وارد نمایید:",
+        "apps" => "⚙ لطفا سیستم عامل مدنظر خود را انتخاب کنید:",
+        "guide" => "📖 لطفا نحوه آموزش را انتحاب کنید.",
+        "faq" => $faq,
+        "support" => $supportMessage,
+        default => "پیام پیشفرض",
+    };
     return $msg;
 }
