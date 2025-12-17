@@ -1,5 +1,7 @@
 config.php
 debug/*.*
+.vscode/*
+assets/videos/guide/*
 broadcast/uploads/*
 broadcast/*.json
 broadcast/*.txt

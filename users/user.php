@@ -224,6 +224,15 @@ async function loadClientData(clientId, element) {
                             </button>
                         </div>
                     </div>
+                    ${c.subscription_link ? `
+                    <div class="flex flex-col items-center justify-between text-sm">
+                        <span class="text-gray-600 mb-2 text-right w-full">لینک سابیکریپشن:</span>
+                        <div class="flex items-center gap-2">
+                            <code dir="ltr" class="bg-gray-100 px-3 py-1 rounded font-mono text-xs">${c.subscription_link || '—'}</code>
+                            ${c.subscription_link ? `<button onclick="copyToClipboard('${c.subscription_link}')" class="copy-btn text-indigo-600 text-xs"><i class="fas fa-copy"></i></button>` : ''}
+                        </div>
+                    </div>` : ''}
+
                 </div>
 
                 <button onclick="window.open('https://seller.connectix.vip/client/${c.id}', '_blank')" 

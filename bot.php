@@ -224,15 +224,15 @@ try {
             ]);
             break;
         case 'guide':
-            tg('deleteMessage',[
-                'chat_id' => $callback_chat_id,
-                'message_id' => $callback_message_id
-            ]);
             $result = tg('sendMessage',[
                 'chat_id' => $callback_chat_id,
                 'text' => message('guide'),
                 'parse_mode' => 'html',
                 'reply_markup' => keyboard('guide')
+            ]);
+            tg('deleteMessage',[
+                'chat_id' => $callback_chat_id,
+                'message_id' => $callback_message_id
             ]);
             break;
         case 'faq':

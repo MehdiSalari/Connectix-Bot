@@ -171,7 +171,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     continue;
                 }
 
-                if ($file['size'] > 100 * 1024 * 1024)
+                if ($file['size'] > 10 * 1024 * 1024)
                     continue;
 
                 $targetPath = $uploadBasePath . $plat . '.mp4';
@@ -432,7 +432,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                     file:text-sm file:font-semibold file:bg-indigo-600 file:text-white 
                                     hover:file:bg-indigo-700 cursor-pointer">
 
-                                <p class="text-xs text-gray-500 mt-1">فقط فایل MP4 (حداکثر ۱۰۰ مگابایت)</p>
+                                <p class="text-xs text-gray-500 mt-1">فقط فایل MP4 (حداکثر ۱۰ مگابایت)</p>
                             </div>
                         <?php endforeach; ?>
                     </div>

