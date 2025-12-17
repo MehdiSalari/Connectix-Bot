@@ -213,6 +213,15 @@ try {
                 'reply_markup' => keyboard('renew')
             ]);
             break;
+        case 'apps':
+            $result = tg('editMessageText',[
+                'chat_id' => $callback_chat_id,
+                'message_id' => $callback_message_id,
+                'text' => message('apps'),
+                'parse_mode' => 'html',
+                'reply_markup' => keyboard('apps')
+            ]);
+            break;
         case 'not':
             //show notification that this btn is nothing
             $result = tg('answerCallbackQuery',[

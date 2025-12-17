@@ -146,6 +146,46 @@ function errorLog($message) {
     $conn->close();
 }
 
+function getDownloadLinks($platform = null) {
+    $html = file_get_contents('https://connectix.space/#download');
+
+    libxml_use_internal_errors(true);
+
+    $dom = new DOMDocument();
+    $dom->loadHTML($html);
+
+    $xpath = new DOMXPath($dom);
+
+
+    $cards = $xpath->query('//section[@id="download"]//div[contains(@class,"service-box")]');
+
+    $data = [];
+
+    foreach ($cards as $card) {
+        $title = trim($xpath->query('.//h5', $card)[0]->textContent);
+        $links = $xpath->query('.//a[@href]', $card);
+
+        foreach ($links as $a) {
+            $data[] = [
+                'platform' => preg_replace('/\s+.*/', '', $title),
+                'label'    => trim($a->textContent),
+                'url'      => $a->getAttribute('href')
+            ];
+        }
+    }
+
+    $response = match ($platform) {
+      "android" => json_encode(array_filter($data, fn($item) => $item['platform'] === 'Android')),
+      "ios" => json_encode(array_filter($data, fn($item) => $item['platform'] === 'iOS')),
+      "windows" => json_encode(array_filter($data, fn($item) => $item['platform'] === 'Windows')),
+      "mac" => json_encode(array_filter($data, fn($item) => $item['platform'] === 'Mac')),
+      "linux" => json_encode(array_filter($data, fn($item) => $item['platform'] === 'Linux')),
+      default => json_encode($data),
+    };
+
+    return $response;
+}
+
 function callBackCheck($callback_data) {
     //check first part of data
     $data = explode('_', $callback_data);
@@ -155,25 +195,96 @@ function callBackCheck($callback_data) {
     switch ($cmd) {
         case "showClient":
             $result = showClient($query);
-            return $result;
+            break;
+
         case "getTest":
             $result = getTest($query);
-            return $result;
+            break;
+
         case "buy":
             $result = buy($query);
-            return $result;
+            break;
+
         case "renew":
             $result = renew($query);
-            return $result;
+            break;
+
         case "pay":
             $result = checkout($query);
-            return $result;
+            break;
+
         case "payment":
             $result = paycheck($query);
-            return $result;
+            break;
+
+        case "app":
+            $result = app($query);
+            break;
         default:
-            return false;
+            $result = null;
+            break;
     }
+
+    return $result;
+}
+
+function app($platform) {
+    $data = getDownloadLinks($platform);
+    $links = json_decode($data);
+    // Parse platform name
+    match ($platform) {
+        'android' => $platformLabel = 'اندروید 🤖',
+        'ios' => $platformLabel = 'آیفون (iOS) 📱',
+        'windows' => $platformLabel = 'ویندوز 💻',
+        'mac' => $platformLabel = 'مک 🖥',
+        'linux' => $platformLabel = 'لینوکس 🐧',
+        default => $platformLabel = 'نامشخص'
+    };
+
+    $message = "دانلود اپلیکیشن Connectix برای <b>{$platformLabel}</b>\n\nبرای دانلود از دکمه های زیر استفاده کنید.";
+
+    $keyboard = [];
+
+    foreach ($links as $link) {
+        if (empty($link->label) || empty($link->url)) {
+            continue;
+        }
+
+        // Replace "Download" with "دانلود"
+        $link->label = str_replace('Download', 'دانلود مستقیم', $link->label);
+
+        $keyboard[] = [
+            [
+                'text' => "⬇️ | {$link->label}",
+                'url'  => $link->url
+            ]
+        ];
+    }
+
+    if ($platform !== 'ios' && $platform !== 'linux') {
+        $directLink = match ($platform) {
+            'android' => '4',
+            'windows' => '5',
+            'mac' => '11',
+            default => ''
+        };
+        $keyboard[] = [
+            ['text' => '📲 | دانلود از تلگرام', 'url' => "https://t.me/connectixapp/$directLink"]
+        ];
+    }
+    $keyboard[] = [
+        ['text' => '🏡 | خانه', 'callback_data' => 'main_menu'],
+        ['text' => '↪️ | بازگشت', 'callback_data' => 'apps']
+    ];
+
+    $replyMarkup = [
+        'inline_keyboard' => $keyboard
+    ];
+
+    return [
+        'text' => $message,
+        'reply_markup' => json_encode($replyMarkup, JSON_UNESCAPED_UNICODE)
+    ];
 }
 
 function addAccount($step, $data = null) {
@@ -1552,7 +1663,7 @@ function keyboard($keyboard) {
                         ['text' => '🛍️ | خرید / تمدید اکانت ', 'callback_data' => 'action:buy_or_renew_service']
                     ],
                     [
-                        ['text' => '📱 | دانلود نرم افزار', 'callback_data' => 'apps'],
+                        ['text' => '📲 | دانلود نرم افزار', 'callback_data' => 'apps'],
                         ['text' => '💡 | آموزش ها', 'callback_data' => 'guide']
                     ],
                     [
@@ -1767,6 +1878,26 @@ function keyboard($keyboard) {
                     ]
                 ];
                 break;
+
+            case "apps":
+                $keyboard = [
+                    [
+                        ['text' => '📱 | آیفون (iOS)', 'callback_data' => 'app_ios'],
+                        ['text' => '🤖 | اندروید', 'callback_data' => 'app_android']
+                    ],
+                    [
+                        ['text' => '🖥 | مک', 'callback_data' => 'app_mac'],
+                        ['text' => '💻 | ویندوز', 'callback_data' => 'app_windows']
+                    ],
+                    [
+                        ['text' => '🐧 | لینوکس (Debian)', 'callback_data' => 'app_linux']
+                    ],
+                    [
+                        ['text' => '↪️ | بازگشت', 'callback_data' => 'main_menu']
+                    ]
+                ];
+                break;
+
             default:
                 return json_encode(['ok' => true]);
         }
@@ -1785,43 +1916,51 @@ function message($message, $variables = []) {
 
     switch ($message) {
         case "welcome_message":
-            
-            return $welcomeMessage;
+            $msg = $welcomeMessage;
+            break;
 
         case "my_accounts":
             $msg = "📦 اکانت های متصل یه حساب تلگرام شما:\n\n* در صورت عدم مشاهده اکانت خود، آن را اضافه کنید.";
-            return $msg;
+            break;
 
         case "get_test":
             $msg = "🎁 لطفا نوع اکانت تست را انتخاب کنید:\n\n<b>📱 ویژه(پیشنهاد میشود):</b>\nدریافت نام کاربری و رمز عبور جهت ورود به نرم افزار Connectix و استفاده از 4 پروتکل و بیش از 10 کشور برای اتصال.\n\n<b>🔗 سابسکریبشن:</b>\nدریافت لینک سابسکریپشن جهت استفاده در نرم افزار هایی که از سرویس V2Ray پشتیبانی میکنند (مثل V2RayNG و V2Box)";
-            return $msg;
+            break;
 
         case "count":
             $msg = "🔢 این اکانت را برای چند کاربر (دستگاه) قابل استفاده باشد؟";
-            return $msg;
+            break;
 
         case "buy":
             $msg = "با تشکر از اعتماد و حسن انتخاب شما در خرید سرویس فیلترشکن {$appName} .\nلطفا نوع خرید خود را انتخاب کنید:\n\n<b>🔄️ تمدید اکانت فعلی:</b>\nاین دکمه برای خرید اشتراک برای اکانت قبلی استفاده میشود.\n\n<b>➕ خرید اکانت جدید:</b>\nاین دکمه برای خرید اکانت جدید استفاده میشود.";
-            return $msg;
+            break;
 
         case "group":
             $msg = "لطفاً ابتدا نوع سرویس مدنظر را انتخاب کنید: 👇\n\n<b>📱 ویژه (پیشنهاد میشود):</b>\nدریافت نام کاربری و رمز عبور جهت ورود به نرم افزار Connectix و استفاده از 4 پروتکل و بیش از 10 کشور برای اتصال.\n\n<b>🔗 سابسکریبشن:</b>\nدریافت لینک سابسکریپشن جهت استفاده در نرم افزار هایی که از سرویس V2Ray پشتیبانی میکنند (مثل V2RayNG و V2Box)\n\n<b>📍 آی‌پی ثابت:</b>\nدریافت نام کاربری و رمز عبور جهت ورود به نرم افزار Connectix و استفاده از آیپی ثابت.";
-            return $msg;
+            break;
             
         case "renew":
             $msg = "📦 لطفا اکانت مدنظر خود را جهت تمدید اشتراک انتخاب کنید:";
-            return $msg;
+            break;
 
         case "card":
             $price = $variables['amount'];
             $cardNumber = $config['card_number'];
             $cardName = $config['card_name'];
             $msg = "\n\n💴  لطفاً مبلغ «$price تومان» را به شماره کارت زیر واریز و سپس سند پرداخت را به صورت تصویری در ادامه ارسال کنید:\n\n💳 شماره کارت: $cardNumber\n👤 به نام: $cardName\n";
-            return $msg;
+            break;
+
         case "add_account":
             $msg = "🔗 شما در حال متصل کردن اکانت قبلی به حساب تلگرام خود هستید.\n\n👤 لطفا نام کاربری اکانت را وارد نمایید:";
-            return $msg;
+            break;
+
+        case "apps":
+            $msg = "⚙ لطفا سیستم عامل مدنظر خود را انتخاب کنید:";
+            break;
+
         default:
-            return "پیام پیشفرض";
+            $msg = "پیام پیشفرض";
+            break;
     }
+    return $msg;
 }
