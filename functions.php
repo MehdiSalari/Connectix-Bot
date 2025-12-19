@@ -593,9 +593,88 @@ function buy($info) {
             // Close Redis connection
             $redis->close();
 
+            // Get plans based on group
+            $plans = getSellerPlans($data);
+
+            if (empty($plans)) {
+                tg('answerCallbackQuery', [
+                    'callback_query_id' => CBID,
+                    'text' => 'هیچ پلنی در این گروه یافت نشد!',
+                    'show_alert' => true
+                ]);
+                exit;
+            }
+
+            // Find the maximum number of devices in this group
+            $maxDevices = 0;
+            foreach ($plans as $plan) {
+                $devices = (int)$plan['count_of_devices'];
+                if ($devices > $maxDevices) {
+                    $maxDevices = $devices;
+                }
+            }
+
+            // Limit to a maximum of 4 devices
+            $maxDevices = min($maxDevices, 4);
+
+            if ($maxDevices === 0) {
+                tg('answerCallbackQuery', [
+                    'callback_query_id' => CBID,
+                    'text' => 'هیچ پلن معتبری در این گروه وجود ندارد.',
+                    'show_alert' => true
+                ]);
+                exit;
+            }
+
+            // Construct keyboard buttons for device count (two in each row)
+            $keyboard = [];
+
+            // First, sort all the buttons from small to large
+            $buttons = [];
+            for ($i = 1; $i <= $maxDevices; $i++) {
+                $emoji = match ($i) {
+                    1 => '1️⃣',
+                    2 => '2️⃣',
+                    3 => '3️⃣',
+                    4 => '4️⃣',
+                    default => "$i"
+                };
+                $text = "$emoji | $i کاربر";
+
+                $buttons[] = ['text' => $text, 'callback_data' => "buy_count:$i"];
+            }
+
+            // Now, I'll pair the buttons and add them to the keyboard.
+            for ($i = 0; $i < count($buttons); $i += 2) {
+                $row = [];
+
+                // If we have a pair of buttons, put the larger one first, then the smaller one.
+                if (isset($buttons[$i + 1])) {
+                    $row[] = $buttons[$i + 1];  // First add the larger one
+                    $row[] = $buttons[$i];      // Then add the smaller one
+                } else {
+                    // If only one is left (e.g. 3 of them)
+                    $row[] = $buttons[$i];
+                }
+
+                $keyboard[] = $row;
+            }
+
+            // Home and back buttons
+            $keyboard[] = [
+                ['text' => '🏡 | خانه', 'callback_data' => 'main_menu'],
+                ['text' => '↪️ | بازگشت', 'callback_data' => 'group']
+            ];
+
+            $keyboard = json_encode(['inline_keyboard' => $keyboard]);
+
+            $groupName = parseType($data);
+
+            $variables = ['groupName' => $groupName];
+
             return [
-                "text" => message('count'),
-                "reply_markup" => keyboard('count')
+                "text" => message('count', $variables),
+                "reply_markup" => $keyboard
             ];
         
         case 'count':
@@ -638,7 +717,7 @@ function buy($info) {
             $keyboard = json_encode(['inline_keyboard' => $keyboard]);
 
             $planGroupName = parseType($planGroup);
-            // $message = "لطفا از لیست زیر پلن $data کاربر مد نظر خود را انتخاب کنید:";
+
             $message = "فهرست و قیمت سرویس‌های $data کاربره $planGroupName به شرح لیست زیر است.\n\nلطفاً سرویس مدنظر خود را انتخاب کنید: 👇";
             return [
                 "text" => $message,
@@ -1816,23 +1895,6 @@ function keyboard($keyboard) {
                 ];
                 break;
 
-            case "count":
-                $keyboard = [
-                    [
-                        ['text'=> '2️⃣ | 2 کاربر', 'callback_data' => 'buy_count:2'],
-                        ['text'=> '1️⃣ | 1 کاربر', 'callback_data' => 'buy_count:1']
-                    ],
-                    [
-                        ['text'=> '4️⃣ | 4 کاربر', 'callback_data' => 'buy_count:4'],
-                        ['text'=> '3️⃣ | 3 کاربر', 'callback_data' => 'buy_count:3']
-                    ],
-                    [
-                        ['text' => '🏡 | خانه', 'callback_data' => 'main_menu'],
-                        ['text' => '↪️ | بازگشت', 'callback_data' => 'group']
-                    ]
-                ];
-                break;
-
             case "get_test":
                 $keyboard = [
                     [
@@ -1847,12 +1909,28 @@ function keyboard($keyboard) {
                 break;
 
             case "buy":
-                $keyboard = [
+                // Check if user account
+                $conn = new mysqli($db_host, $db_user, $db_pass, $db_name);
+                $stmt = $conn->prepare("SELECT * FROM clients WHERE chat_id = ?");
+                $stmt->bind_param("s", $uid);
+                $stmt->execute();
+                $result = $stmt->get_result();
+                $clients = $result->fetch_all(MYSQLI_ASSOC);
+                $stmt->close();
+                $conn->close();
+                $keyboard = (empty($clients)) ? [
+                    [
+                        ['text' => '🛍 | خرید اکانت جدید', 'callback_data' => 'group']
+                    ],
+                    [
+                        ['text' => '↪️ | بازگشت', 'callback_data' => 'main_menu']
+                    ]
+                ] : [
                     [
                         ['text' => '🔄️ | تمدید اکانت فعلی', 'callback_data' => 'renew']
                     ],
                     [
-                        ['text' => '➕ | خرید اکانت جدید', 'callback_data' => 'group']
+                        ['text' => '🛍 | خرید اکانت جدید', 'callback_data' => 'group']
                     ],
                     [
                         ['text' => '↪️ | بازگشت', 'callback_data' => 'main_menu']
@@ -2024,12 +2102,23 @@ function message($message, $variables = []) {
     $supportMessage = $config['messages']['contact_support'] ?? '';
     $faq = $config['messages']['questions_and_answers'] ?? '';
 
+    if ($variables['groupName']) {
+        $typeEmoji = match ($variables['groupName']) {
+            "ویژه" => "📱",
+            "ساب‌لینک" => "🔗",
+            "آی‌پی ثابت" => "📍",
+            default => "📱"
+        };
+        $groupName = $variables['groupName'];
+    }
+        
+
     $msg = match ($message) {
         "welcome_message" => $welcomeMessage,
         "my_accounts" => "📦 اکانت های متصل یه حساب تلگرام شما:\n\n* در صورت عدم مشاهده اکانت خود، آن را اضافه کنید.",
         "get_test" => "🎁 لطفا نوع اکانت تست را انتخاب کنید:\n\n<b>📱 ویژه(پیشنهاد میشود):</b>\nدریافت نام کاربری و رمز عبور جهت ورود به نرم افزار Connectix و استفاده از 4 پروتکل و بیش از 10 کشور برای اتصال.\n\n<b>🔗 سابسکریبشن:</b>\nدریافت لینک سابسکریپشن جهت استفاده در نرم افزار هایی که از سرویس V2Ray پشتیبانی میکنند (مثل V2RayNG و V2Box)",
-        "count" => "🔢 این اکانت را برای چند کاربر (دستگاه) قابل استفاده باشد؟",
-        "buy" => "با تشکر از اعتماد و حسن انتخاب شما در خرید سرویس فیلترشکن {$appName} .\nلطفا نوع خرید خود را انتخاب کنید:\n\n<b>🔄️ تمدید اکانت فعلی:</b>\nاین دکمه برای خرید اشتراک برای اکانت قبلی استفاده میشود.\n\n<b>➕ خرید اکانت جدید:</b>\nاین دکمه برای خرید اکانت جدید استفاده میشود.",
+        "count" => "$typeEmoji نوع سرویس $groupName انتخاب شد.\n\n🔢 این اکانت را برای چند کاربر (دستگاه) قابل استفاده باشد؟",
+        "buy" => "با تشکر از اعتماد و حسن انتخاب شما در خرید سرویس فیلترشکن {$appName} .\nلطفا نوع خرید خود را انتخاب کنید:\n\n<b>🔄️ تمدید اکانت فعلی:</b>\nاین دکمه برای خرید اشتراک برای اکانت قبلی استفاده میشود.\n\n<b>🛍️ خرید اکانت جدید:</b>\nاین دکمه برای خرید اکانت جدید استفاده میشود.",
         "group" => "لطفاً ابتدا نوع سرویس مدنظر را انتخاب کنید: 👇\n\n<b>📱 ویژه (پیشنهاد میشود):</b>\nدریافت نام کاربری و رمز عبور جهت ورود به نرم افزار Connectix و استفاده از 4 پروتکل و بیش از 10 کشور برای اتصال.\n\n<b>🔗 سابسکریبشن:</b>\nدریافت لینک سابسکریپشن جهت استفاده در نرم افزار هایی که از سرویس V2Ray پشتیبانی میکنند (مثل V2RayNG و V2Box)\n\n<b>📍 آی‌پی ثابت:</b>\nدریافت نام کاربری و رمز عبور جهت ورود به نرم افزار Connectix و استفاده از آیپی ثابت.",
         "renew" => "📦 لطفا اکانت مدنظر خود را جهت تمدید اشتراک انتخاب کنید:",
         "card" => "\n\n💴  لطفاً مبلغ «" . $variables['amount'] . " تومان» را به شماره کارت زیر واریز و سپس سند پرداخت را به صورت تصویری در ادامه ارسال کنید:\n\n💳 شماره کارت: " . $config['card_number'] . "\n👤 به نام: " . $config['card_name'] . "\n",
