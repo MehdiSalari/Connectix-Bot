@@ -5,9 +5,7 @@ if (!file_exists(__DIR__ . '/config.php')) {
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/gregorian_jalali.php';
 define('BOT_TOKEN', $botToken);  // Bot token for authentication with Telegram API
-// define('TELEGRAM_URL', 'https://api.telegram.org/bot' . BOT_TOKEN . '/');  // Base URL for Telegram Bot API
-// // All tg() calls are tunneled through external proxy script
-define('TELEGRAM_URL', 'https://mehdisalari.ir/bot/tgtunnel.php?bot_token=' . BOT_TOKEN . '&method=');
+define('TELEGRAM_URL', 'https://api.telegram.org/bot' . BOT_TOKEN . '/');  // Base URL for Telegram Bot API
 
 function tg($method, $params = []) {
     if (!$params) {
@@ -137,7 +135,7 @@ function errorLog($message) {
     while ($row = $result->fetch_assoc()) {
         //send message to admin
         $chat_id = $row['chat_id'];
-        $tgResponse = tg('sendMessage',[
+        tg('sendMessage',[
             'chat_id' => $chat_id,
             'text' => $message
         ]);
@@ -186,8 +184,185 @@ function getDownloadLinks($platform = null) {
     return $response;
 }
 
-function walletBalance($action, $user = null, $amount = null) {
-    global $panelToken , $db_host, $db_user, $db_pass, $db_name;
+function walletReqs($query) {
+    global $db_host, $db_user, $db_pass, $db_name;
+    $parts = explode(':', $query);
+    $action = $parts[0];
+    $txID = $parts[1];
+    $uid = UID;
+    switch ($action) {
+        case 'increase':
+            $redis = new Redis();
+            $redis->connect('127.0.0.1', 6379);
+            $key = "user:steps:" . $uid;
+            $redis->hmset($key, ['action' => 'wallet_increase', 'step' => 'get_amount', 'amount' => null]);
+            $redis->expire($key, 1800);
+            $redis->close();
+            
+            $tgResult = tg('editMessageText',[
+                'chat_id' => $uid,
+                'message_id' => CBMID,
+                'text' => message('wallet_increase'),
+                'parse_mode' => 'html',
+                'reply_markup' => keyboard('wallet_increase')
+            ]);
+            break;
+        case 'cancel':
+            $txID = createWalletTransaction($txID, 'CANCLED_BY_USER');
+            $redis = new Redis();
+            $redis->connect('127.0.0.1', 6379);
+            $redis->del("user:steps:" . $uid);
+            $redis->close();
+            $tgResult = tg('editMessageText',[
+                'chat_id' => $uid,
+                'message_id' => CBMID,
+                'text' => message('wallet'),
+                'parse_mode' => 'html',
+                'reply_markup' => keyboard('wallet')
+            ]);
+            break;
+        case 'accept':
+            $txID = createWalletTransaction($txID, 'SUCCESS');
+            $conn = new mysqli($db_host, $db_user, $db_pass, $db_name);
+            $stmt = $conn->prepare("SELECT * FROM wallet_transactions WHERE id = ?");
+            $stmt->bind_param("i", $txID);
+            $stmt->execute();
+            $result = $stmt->get_result();
+            $tx = $result->fetch_assoc();
+            $stmt->close();
+            $conn->close();
+
+            $txUser = $tx['chat_id'];
+            $txAmount = $tx['amount'];
+
+            $textAmount = number_format($txAmount);
+            $walletID = wallet('INCREASE', $txUser, $txAmount);
+            
+            $redis = new Redis();
+            $redis->connect('127.0.0.1', 6379);
+            $redis->del("user:steps:" . $txUser);
+            $redis->close();
+
+            $walletBalance = wallet('get', $txUser)['balance'];
+
+            //to user
+            $message = "✅ تراکنش شما جهت افزایش موجودی کیف پول تایید شد.\n\n";
+            $message .= "💵 مبلغ تراکنش: $textAmount\n";
+            $message .= "💰 موجودی کیف پول: $walletBalance";
+
+            $keyboard = [
+                'inline_keyboard' => [
+                    [
+                        ['text' => '👝 |  کیف پول', 'callback_data' => 'wallet']
+                    ],
+                    [
+                        ['text' => '🏡 | خانه', 'callback_data' => 'main_menu']
+                    ]
+                ]
+            ];
+
+            $tgResult = tg('sendMessage',[
+                'chat_id' => $txUser,
+                'text' => $message,
+                'reply_markup' => $keyboard
+            ]);
+
+            // to admin
+            $userName = getUser($txUser)['telegram_id'] ?? null; 
+            if ($userName) {
+                $userName = "@$userName";
+            } else {
+                $userName = "نامشخص";
+            }
+
+            $message = "✅ شماره تراکنش $txID با موفقیت تایید شد.\n\n";
+            $message .= "👝 شماره کیف پول: $walletID\n";
+            $message .= "🔢 آیدی: <code>$txUser</code>\n";
+            $message .= "👤 نام کاربری: $userName\n";
+            $message .= "💵 مبلغ: $textAmount";
+            $keyboard = [
+                'inline_keyboard' => [
+                    [
+                        ['text' => '✅ | تایید شده', 'callback_data' => 'not']
+                    ]
+                ]
+            ];
+
+            return ['caption' => $message, 'reply_markup' => $keyboard];
+
+        case 'reject':
+            createWalletTransaction($txID, 'REJECTED_BY_ADMIN');
+            $conn = new mysqli($db_host, $db_user, $db_pass, $db_name);
+            $stmt = $conn->prepare("SELECT * FROM wallet_transactions WHERE id = ?");
+            $stmt->bind_param("i", $txID);
+            $stmt->execute();
+            $result = $stmt->get_result();
+            $tx = $result->fetch_assoc();
+            $stmt->close();
+            $conn->close();
+
+            $txUser = $tx['chat_id'];
+            $txAmount = $tx['amount'];
+
+            $textAmount = number_format($txAmount);
+
+            $redis = new Redis();
+            $redis->connect('127.0.0.1', 6379);
+            $redis->del("user:steps:" . $txUser);
+            $redis->close();
+            
+            // to user
+            $message = "❌ تراکنش شما جهت افزایش موجودی کیف پول رد شد.\n\n";
+            $message .= "💵 مبلغ تراکنش: $textAmount"
+            ;
+
+            $keyboard = [
+                'inline_keyboard' => [
+                    [
+                        ['text' => '👝 |  کیف پول', 'callback_data' => 'wallet']
+                    ],
+                    [
+                        ['text' => '🏡 | خانه', 'callback_data' => 'main_menu']
+                    ]
+                ]
+            ];
+
+            $tgResult = tg('sendMessage',[
+                'chat_id' => $txUser,
+                'text' => $message,
+                'reply_markup' => $keyboard
+            ]);
+
+            // to admin
+            $userName = getUser($txUser)['telegram_id'] ?? null; 
+            if ($userName) {
+                $userName = "@$userName";
+            } else {
+                $userName = "نامشخص";
+            }
+
+            $walletID = wallet('get', $txUser)['id'];
+
+            $message = "❌ شماره تراکنش $txID  رد شد.\n\n";
+            $message .= "👝 شماره کیف پول: $walletID\n";
+            $message .= "🔢 آیدی: <code>$txUser</code>\n";
+            $message .= "👤 نام کاربری: $userName\n";
+            $message .= "💵 مبلغ: $textAmount";
+            $keyboard = [
+                'inline_keyboard' => [
+                    [
+                        ['text' => '❌ | رد شده', 'callback_data' => 'not']
+                    ]
+                ]
+            ];
+
+            return ['caption' => $message, 'reply_markup' => $keyboard];
+
+    }
+}
+
+function wallet($action, $user = null, $amount = null) {
+    global $db_host, $db_user, $db_pass, $db_name;
     $conn = new mysqli($db_host, $db_user, $db_pass, $db_name);
     switch ($action) {
         case 'get':
@@ -224,6 +399,13 @@ function walletBalance($action, $user = null, $amount = null) {
             }
             return $walletData;
 
+        case 'create':
+            $stmt = $conn->prepare("INSERT INTO wallets (chat_id, balance, created_at) VALUES (?, ?, NOW())");
+            $stmt->bind_param("ii", $user, $amount);
+            $stmt->execute();
+            $stmt->close();
+            return true;
+
         case 'INCREASE':
         case 'DECREASE':
             // Get current wallet balance
@@ -238,6 +420,10 @@ function walletBalance($action, $user = null, $amount = null) {
             } else {
                 return null;
             }
+            //check amount type
+            if (!is_int($amount)) {
+                $amount = (int)$amount;
+            }
 
             $newBalance = match ($action) {
                 "INCREASE" => $balance + $amount,
@@ -249,15 +435,54 @@ function walletBalance($action, $user = null, $amount = null) {
             $stmt->bind_param("ii", $newBalance, $user);
             $stmt->execute();
             $stmt->close();
+            
+            return $walletID;
 
-            $status = "SUCCESS";
-            $stmt = $conn->prepare("INSERT INTO wallet_transactions (wallet_id, amount, type, chat_id, status, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
-            $stmt->bind_param("iisis", $walletID, $amount, $action, $user, $status);
-            $stmt->execute();
-            $stmt->close();
-            return true;
     }
     
+}
+
+function createWalletTransaction($transactionID = null, $status = null, $walletID = null, $amount = null, $operation = null, $chat_id = null, $type = null) {
+    global $db_host, $db_user, $db_pass, $db_name;
+    $conn = new mysqli($db_host, $db_user, $db_pass, $db_name);
+    if ($transactionID != null) {
+        $stmt = $conn->prepare("UPDATE wallet_transactions SET status = ? WHERE id = ?");
+        $stmt->bind_param("si", $status, $transactionID);
+        $result = $stmt->execute();
+    } elseif ($transactionID == null) {
+        $stmt = $conn->prepare("INSERT INTO wallet_transactions (wallet_id, amount, operation, chat_id, status, type, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())");
+        $stmt->bind_param("iisiss", $walletID, $amount, $operation, $chat_id, $status, $type);
+        $result = $stmt->execute();
+        $transactionID = $stmt->insert_id;
+    }
+
+    $stmt->close();
+    $conn->close();
+
+    if (!$result) {
+        return false;
+    }
+
+    return $transactionID;
+}
+
+function parseTransactionsType($type) {
+    return match ($type) {
+        "BUY" => "خرید",
+        "CARD_TO_CARD" => "کارت به کارت",
+        "DONE_BY_ADMIN" => "توسط ادمین",
+        default => "نامشخص",
+    };
+}
+
+function parseTransactionsStatus($status) {
+    return match ($status) {
+        "SUCCESS" => "موفق",
+        "PENDING" => "در انتظار",
+        "CANCLED_BY_USER" => "لغو شده توسط کاربر",
+        "REJECTED_BY_ADMIN" => "رد شده توسط ادمین",
+        default => "نامشخص",
+    };
 }
 
 function callBackCheck($callback_data) {
@@ -275,6 +500,7 @@ function callBackCheck($callback_data) {
         "payment" => paycheck($query),
         "app" => app($query),
         "guide" => guide($query),
+        "wallet" => walletReqs($query),
         default => null,
     };
 
@@ -611,8 +837,8 @@ function renew($info) {
                         ['text' => '💳 | کارت به کارت', 'callback_data' => "pay_card:$planPrice"]
                     ],
                     [
-                        // ['text' => '👝 | پرداخت با کیف پول', 'callback_data' => 'buy_pay:wallet'],
-                        ['text' => '🔜 | روش های دیگر به زودی...', 'callback_data' => 'not'],
+                        ['text' => '👝 | کیف پول ( موجودی ' . number_format(wallet('get', $uid)['balance']) . ' تومان)', 'callback_data' => "pay_wallet:$planPrice"],
+                        // ['text' => '🔜 | روش های دیگر به زودی...', 'callback_data' => 'not'],
                     ],
                     [
                         ['text' => '🏡 | خانه', 'callback_data' => 'main_menu'],
@@ -846,8 +1072,8 @@ function buy($info) {
                         ['text' => '💳 | کارت به کارت', 'callback_data' => "pay_card:$planPrice"]
                     ],
                     [
-                        // ['text' => '👝 | کسر از کیف پول', 'callback_data' => 'buy_pay:wallet'],
-                        ['text' => '🔜 | روش های دیگر به زودی...', 'callback_data' => 'not'],
+                        ['text' => '👝 | کیف پول ( موجودی ' . number_format(wallet('get', $uid)['balance']) . ' تومان)', 'callback_data' => "pay_wallet:$planPrice"],
+                        // ['text' => '🔜 | روش های دیگر به زودی...', 'callback_data' => 'not'],
                     ],
                     [
                         ['text' => '🏡 | خانه', 'callback_data' => 'main_menu'],
@@ -875,24 +1101,81 @@ function checkout($data) {
     $key = "user:steps:$uid";
     $redis->hmset($key, $planData);
     $redis->expire($key, 1800);
+    $planData = $redis->hgetall("user:steps:$uid");
     $redis->close();
 
-    $variables = [
-        'amount' => $amount
-    ];
-    $message = message('card', $variables);
-    $keyboard = json_encode([
-        'inline_keyboard' => [
-            [
-                ['text' => '❌ | انصراف', 'callback_data' => 'main_menu'],
-            ]
-        ]
-    ]);
+    switch ($method) {
+        case 'card':
+            $variables = [
+                'amount' => $amount
+            ];
+            $message = message('card', $variables);
+            $keyboard = json_encode([
+                'inline_keyboard' => [
+                    [
+                        ['text' => '❌ | انصراف', 'callback_data' => 'main_menu'],
+                    ]
+                ]
+            ]);
+        
+            return [
+                "text" => $message,
+                "reply_markup" => $keyboard
+            ];
 
-    return [
-        "text" => $message,
-        "reply_markup" => $keyboard
-    ];
+        case 'wallet':
+            //check wallet balance
+            $walletBalance = wallet('get', $uid);
+            $amountInt = str_replace(',', '', $amount);
+            if ($walletBalance['balance'] < $amountInt) {
+
+                $message = "❌ موجودی کیف پول شما کافی نیست!";
+                $message .= "\n\n💰 موجودی کیف پول شما: " . number_format($walletBalance['balance']) . " تومان";
+                $message .= "\n📦 قیمت پلن: " . number_format($amountInt) . " تومان";
+
+                $result = tg('answerCallbackQuery', [
+                    'callback_query_id' => CBID,
+                    'text' => $message,
+                    'show_alert' => true
+                ]);
+                
+                if (!($result = json_decode($result))->ok) {
+                    errorLog("Error in sending message to chat_id: $uid | Message: {$result->description}");
+                }
+                exit;
+            }
+
+            $plans = getSellerPlans("all-bot");
+            foreach ($plans as $plan) {
+                if ($plan['id'] == $planData['plan']) {
+                    $selectedPlan = $plan;
+                    break;
+                }
+            }
+
+            $isPaid = null;
+            $client_id = ($planData['acc'] == 'new') ? 'new' : getClientByUsername($planData['acc'])['id'];
+
+            // Save payment to database
+            $paymentId = savePayment( $client_id, $selectedPlan['id'], $selectedPlan['sell_price'], $isPaid, $planData['pay']);
+
+            // Decrement wallet balance
+            $walletBalance = wallet('DECREASE', $uid, $amountInt);
+            if (!$walletBalance) {
+                errorLog("Error in decrementing wallet balance for user_id: $uid");
+                exit();
+            }
+
+            // Delete last message
+            $result = tg('deleteMessage', [
+                'chat_id' => $uid,
+                'message_id' => CBMID
+            ]);
+
+            // Accept payment
+            paycheck("accept:$paymentId");
+
+    }
 }
 
 function getClientByUsername($username) {
@@ -909,116 +1192,169 @@ function getClientByUsername($username) {
     return $data['clients']['data'][0];
 }
 
-function payment($receipt) {
+function payment($receipt, $action) {
     try {
         $bot_config = file_get_contents('setup/bot_config.json');
         $admin_chat_id = json_decode($bot_config, true)['admin_id'];
-
         $uid = UID;
+        switch ($action) {
+            case 'buy':
+                $redis = new Redis();
+                $redis->connect('127.0.0.1', 6379);
+                $planData = $redis->hgetall("user:steps:$uid");
 
-        $redis = new Redis();
-        $redis->connect('127.0.0.1', 6379);
-        $planData = $redis->hgetall("user:steps:$uid");
+                $plans = getSellerPlans("all-bot");
+                foreach ($plans as $plan) {
+                    if ($plan['id'] == $planData['plan']) {
+                        $selectedPlan = $plan;
+                        break;
+                    }
+                }
 
-        $plans = getSellerPlans("all-bot");
-        foreach ($plans as $plan) {
-            if ($plan['id'] == $planData['plan']) {
-                $selectedPlan = $plan;
-                break;
-            }
+                $isPaid = null;
+                $client_id = ($planData['acc'] == 'new') ? 'new' : getClientByUsername($planData['acc'])['id'];
+
+                // Save payment to database
+                $paymentId = savePayment( $client_id, $selectedPlan['id'], $selectedPlan['sell_price'], $isPaid, $planData['pay']);
+                
+                $photo_id = end($receipt)['file_id'];
+                $planName = parsePlanTitle($selectedPlan['title'])['text'];
+                $planPice = $selectedPlan['sell_price'];
+
+                // Receipt received message
+                $result = tg('sendMessage',[
+                    'chat_id' => $uid,
+                    'text' => "✅ سند پرداخت شما با موفقیت دریافت شد.\n\n📦 پلن انتخابی شما:\n $planName\n\n⌛ لطفا منتظر تایید بمانید."
+                ]);
+
+                if (!($result = json_decode($result))->ok) {
+                    errorLog("Failed to send receipt error message to chat_id: $uid | Message: {$result->description}");
+                    exit;
+                }
+
+                //send image to admin
+                $result = tg('sendPhoto',[
+                    'chat_id' => $admin_chat_id,
+                    'photo' => $photo_id,
+                    'caption' => "📃 سند واریزی مورد تایید میباشد؟\n\n📦 پلن: $planName\n💵 مبلغ واریزی: $planPice",
+                    'reply_markup' => json_encode([
+                        'inline_keyboard' => [
+                            [
+                                ['text' => '✅ |  تایید', 'callback_data' => "payment_accept:$paymentId"],
+                                ['text' => '❌ |  لغو', 'callback_data' => "payment_reject:$paymentId"],
+                            ]
+                        ]
+                    ])
+                ]);
+
+                if (!($result = json_decode($result))->ok) {
+                    errorLog("Failed to send receipt error message to chat_id: $uid | Message: {$result->description}");
+                    exit;
+                }
+
+                $redis->del("user:steps:$uid");
+                $redis->close();
+                return true;
+
+            case 'wallet':
+                $redis = new Redis();
+                $redis->connect('127.0.0.1', 6379);
+                $walletData = $redis->hgetall("user:steps:$uid");
+                $txID = $walletData['txID'];
+                $amount = $walletData['amount'];
+                $textAmount = number_format($amount);
+
+
+                $photo_id = end($receipt)['file_id'];
+
+                // Receipt received message
+                $result = tg('sendMessage',[
+                    'chat_id' => $uid,
+                    'text' => "✅ سند پرداخت شما با موفقیت دریافت شد.\n\n💰 افزایش موجودی کیف پول:\n💵 مبلغ : $textAmount\n\n⌛ لطفا منتظر تایید بمانید."
+                ]);
+
+                if (!($result = json_decode($result))->ok) {
+                    errorLog("Failed to send receipt error message to chat_id: $uid | Message: {$result->description}");
+                    exit;
+                }
+
+                $user = getUser($uid);
+                $userID = $user['telegram_id'] ?? null;
+
+                if (!$userID) {
+                    $userID = "نامشخص";
+                }
+
+                //send image to admin
+                $result = tg('sendPhoto',[
+                    'chat_id' => $admin_chat_id,
+                    'photo' => $photo_id,
+                    'caption' => "📃 سند واریزی مورد تایید میباشد؟\n\n💰 افزایش موجودی کیف پول:\n🔢 آیدی: <code>$uid</code>\n👤 نام کاربری: @$userID\n💵 مبلغ : $textAmount",
+                    'parse_mode' => 'HTML',
+                    'reply_markup' => json_encode([
+                        'inline_keyboard' => [
+                            [
+                                ['text' => '✅ |  تایید', 'callback_data' => "wallet_accept:$txID"],
+                                ['text' => '❌ |  لغو', 'callback_data' => "wallet_reject:$txID"],
+                            ]
+                        ]
+                    ])
+                ]);
+
         }
-
-        $isPaid = null;
-        $client_id = ($planData['acc'] == 'new') ? 'new' : getClientByUsername($planData['acc'])['id'];
-
-        //Save payment to data base
-        global $db_host, $db_user, $db_pass, $db_name;
-        $conn = new mysqli($db_host, $db_user, $db_pass, $db_name);
-        if ($conn->connect_error) {
-            die("Connection failed: " . $conn->connect_error);
-        }
-
-        $stmt = $conn->prepare("INSERT INTO payments (chat_id, client_id, plan_id, price, is_paid, method, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())");
-        $stmt->bind_param("ssssss", $uid, $client_id, $selectedPlan['id'], $selectedPlan['sell_price'], $isPaid, $planData['pay']);
-        $result = $stmt->execute();
-        $paymentId = $conn->insert_id;
-        
-        //Today Date
-        $yy = date('y');
-        $mm = date('m');
-        $dd = date('d');
-        
-        //last order of the day
-        $prefix = "CX{$yy}{$mm}{$dd}";
-        $q = $conn->prepare("
-            SELECT COUNT(*) AS total 
-            FROM payments 
-            WHERE order_number LIKE CONCAT(?, '%')
-        ");
-        $q->bind_param("s", $prefix);
-        $q->execute();
-        $count = $q->get_result()->fetch_assoc()['total'] + 1;
-        $orderNumber = $prefix . str_pad($count, 2, '0', STR_PAD_LEFT);
-
-        // Submit order_number to database
-        $u = $conn->prepare("
-            UPDATE payments 
-            SET order_number = ? 
-            WHERE id = ?
-        ");
-        $u->bind_param("si", $orderNumber, $paymentId);
-        $u->execute();
-
-        $conn->commit();
-
-        $stmt->close();
-        $conn->close();
-
-        if (!$result) {
-            errorLog("Error in inserting payment: " . $conn->error);
-        }
-
-        $photo_id = end($receipt)['file_id'];
-        $planName = parsePlanTitle($selectedPlan['title'])['text'];
-        $planPice = $selectedPlan['sell_price'];
-
-        // Receipt received message
-        $result = tg('sendMessage',[
-            'chat_id' => $uid,
-            'text' => "✅ سند پرداخت شما با موفقیت دریافت شد.\n\n📦 پلن انتخابی شما:\n $planName\n\n⌛ لطفا منتظر تایید بمانید."
-        ]);
-
-        if (!($result = json_decode($result))->ok) {
-            errorLog("Failed to send receipt error message to chat_id: $uid | Message: {$result->description}");
-            exit;
-        }
-
-        //send image
-        $result = tg('sendPhoto',[
-            'chat_id' => $admin_chat_id,
-            'photo' => $photo_id,
-            'caption' => "📃 سند واریزی مورد تایید میباشد؟\n\n📦 پلن: $planName\n💵 مبلغ واریزی: $planPice",
-            'reply_markup' => json_encode([
-                'inline_keyboard' => [
-                    [
-                        ['text' => '✅ |  تایید', 'callback_data' => "payment_accept:$paymentId"],
-                        ['text' => '❌ |  لغو', 'callback_data' => "payment_reject:$paymentId"],
-                    ]
-                ]
-            ])
-        ]);
-
-        if (!($result = json_decode($result))->ok) {
-            errorLog("Failed to send receipt error message to chat_id: $uid | Message: {$result->description}");
-            exit;
-        }
-
-        $redis->del("user:steps:$uid");
-        $redis->close();
-        return true;
     } catch (Exception $e) {
         errorLog("Error: Database operation failed: " . $e->getMessage());
     }
+}
+
+function savePayment ($client_id, $plan_id, $price, $isPaid, $method) {
+    global $db_host, $db_user, $db_pass, $db_name;
+    $uid = UID;
+    $conn = new mysqli($db_host, $db_user, $db_pass, $db_name);
+    if ($conn->connect_error) {
+        die("Connection failed: " . $conn->connect_error);
+    }
+
+    $stmt = $conn->prepare("INSERT INTO payments (chat_id, client_id, plan_id, price, is_paid, method, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())");
+    $stmt->bind_param("ssssss", $uid, $client_id, $plan_id, $price, $isPaid, $method);
+    $result = $stmt->execute();
+    $paymentId = $conn->insert_id;
+    
+    //Today Date
+    $yy = date('y');
+    $mm = date('m');
+    $dd = date('d');
+    
+    //last order of the day
+    $prefix = "CX{$yy}{$mm}{$dd}";
+    $q = $conn->prepare("
+        SELECT COUNT(*) AS total 
+        FROM payments 
+        WHERE order_number LIKE CONCAT(?, '%')
+    ");
+    $q->bind_param("s", $prefix);
+    $q->execute();
+    $count = $q->get_result()->fetch_assoc()['total'] + 1;
+    $orderNumber = $prefix . str_pad($count, 2, '0', STR_PAD_LEFT);
+
+    // Submit order_number to database
+    $u = $conn->prepare("
+        UPDATE payments 
+        SET order_number = ? 
+        WHERE id = ?
+    ");
+    $u->bind_param("si", $orderNumber, $paymentId);
+    $u->execute();
+
+    $conn->commit();
+
+    $stmt->close();
+    $conn->close();
+
+    if (!$result) {
+        errorLog("Error in inserting payment: " . $conn->error);
+    } 
+    return $paymentId;
 }
 
 function paycheck($query) {
@@ -1876,15 +2212,30 @@ function keyboard($keyboard) {
                 $conn->close();
 
                 // include test button row only when user didn't get test account
-                $test = ($user['test'] == 0) ? [
+                $testBtn = ($user['test'] == 0) ? [
                     ['text' => '🎁 | دریافت اکانت تست', 'callback_data' => 'get_test']
                 ] : [
                     // ['text' => '🙋🏻 | همون همیشگی', 'callback_data' => 'always']
                 ];
+                
+                //panel link
+                if ((!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') 
+                    || (!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https')
+                    || (!empty($_SERVER['HTTP_X_FORWARDED_SSL']) && $_SERVER['HTTP_X_FORWARDED_SSL'] === 'on')) {
+                    $protocol = "https";
+                } else {
+                    $protocol = "http";
+                }
+
+                $current_url = $protocol . "://" . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
+                $full_url = str_replace("bot.php", "", $current_url);
+                $panelBtn = ($uid == $config['admin_id']) ? [
+                    ['text' => '👨🏻‍💻 | پنل مدیریت', 'url' => $full_url]
+                ] : [];
 
                 $keyboard = [
                     // test row (may be empty)
-                    $test,
+                    $testBtn,
                     [
                         ['text' => '📦 | اکانت های من', 'callback_data' => 'my_accounts'],
                         ['text' => '🛍️ | خرید / تمدید اکانت ', 'callback_data' => 'action:buy_or_renew_service']
@@ -1898,11 +2249,12 @@ function keyboard($keyboard) {
                         ['text' => '❓ | سوالات متداول', 'callback_data' => 'faq'],
                     ],
                     [
-                        ['text' => '📣 | اخبار و اطلاعیه ها', 'url' => "t.me/$channelTelegram"]
+                        ['text' => '👝 |  کیف پول', 'callback_data' => 'wallet']
                     ],
                     [
-                        ['text' => '👝 |  کیف پول', 'callback_data' => 'wallet']
-                    ]
+                        ['text' => '📣 | اخبار و اطلاعیه ها', 'url' => "t.me/$channelTelegram"]
+                    ],
+                    $panelBtn
                 ];
                 break;
 
@@ -2128,7 +2480,7 @@ function keyboard($keyboard) {
                 ];
                 break;
 
-            case 'guide':
+            case "guide":
                 $keyboard = [
                     [
                         ['text' => '📲 | آموزش استفاده از نرم افزار', 'callback_data' => 'guide_use']
@@ -2142,7 +2494,7 @@ function keyboard($keyboard) {
                 ];
                 break;
 
-            case 'faq':
+            case "faq":
                 $keyboard = [
                     [
                         ['text' => '↪️ | بازگشت', 'callback_data' => 'main_menu']
@@ -2150,7 +2502,7 @@ function keyboard($keyboard) {
                 ];
                 break;
 
-            case 'support':
+            case "support":
                 $keyboard = [
                     [
                         ['text' => '📩 |  پیام به پشتیبانی', 'url' => "t.me/$supportTelegram"]
@@ -2161,16 +2513,25 @@ function keyboard($keyboard) {
                 ];
                 break;
 
-            case 'wallet':
+            case "wallet":
                 $keyboard = [
                     [
-                        ['text' => '💰 | افزایش موجودی', 'callback_data' => '123']
+                        ['text' => '💰 | افزایش موجودی', 'callback_data' => 'wallet_increase:0']
                     ],
                     [
                         ['text' => '↪️ | بازگشت', 'callback_data' => 'main_menu']
                     ]
                 ];
                 break;
+
+            case "wallet_increase":
+                $keyboard = [
+                    [
+                        ['text' => '❌ | انصراف', 'callback_data' => 'wallet']
+                    ]
+                ];
+                break;
+                
             default:
                 return json_encode(['ok' => true]);
         }
@@ -2215,6 +2576,7 @@ function message($message, $variables = []) {
         "faq" => $faq,
         "support" => $supportMessage,
         "wallet" => "🤑 موجودی کیف پول شما: \n💵 " . $variables['walletBalance'] . " تومان\n\n👤 نام: " . $variables['userName'] . "\n🔢 آیدی عددی: " . UID,
+        "wallet_increase" => "💰 لطفا مبلغ مدنظر جهت افزایش موجودی کیف پول خود به (تومان) را وارد نمایید.\n حداقل مبلغ واریزی 10,000 تومان میباشد.",
         default => "پیام پیشفرض",
     };
     return $msg;

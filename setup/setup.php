@@ -384,9 +384,10 @@ function dbSetup()
     id INT AUTO_INCREMENT PRIMARY KEY,
     wallet_id INT,
     amount VARCHAR(255),
-    type VARCHAR(255),
+    operation VARCHAR(255),
     chat_id VARCHAR(255),
     status VARCHAR(255),
+    type VARCHAR(255),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (wallet_id) REFERENCES wallets(id) ON DELETE SET NULL
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
@@ -596,8 +597,8 @@ function dbSetup()
 
         $insertTransaction = $pdo->prepare("
             INSERT IGNORE INTO wallet_transactions 
-            (wallet_id, amount, type, chat_id, status, created_at) 
-            VALUES (?, ?, ?, ?, ?, ?)
+            (wallet_id, amount, operation, chat_id, status, type, created_at) 
+            VALUES (?, ?, ?, ?, ?, ?, ?)
         ");
 
         // New wallets counter
@@ -645,14 +646,19 @@ function dbSetup()
                     }
 
                     // دریافت تراکنش‌ها
-                    $detailUrl = "https://api.connectix.vip/v1/seller/telegram-wallets/{$walletId}?status=SUCCESS";
+                    $detailUrl = "https://api.connectix.vip/v1/seller/telegram-wallets/{$walletId}?status=All";
                     $detailResp = http_get_json($token, $detailUrl);
 
                     if (isset($detailResp['wallet']['transactions']) && is_array($detailResp['wallet']['transactions'])) {
                         foreach ($detailResp['wallet']['transactions'] as $tx) {
                             $txAmount = str_replace(',', '', $tx['amount'] ?? '0');
-                            $txType = $tx['type'] ?? 'UNKNOWN';
+                            $txOperation = $tx['type'] ?? 'UNKNOWN';
                             $txCreatedRaw = $tx['created_at'] ?? null;
+                            $txType = $tx['transaction_id'] ?? 'null';
+                            $txStatus = $tx['status'] ?? 'null';
+                            if ($txStatus == 'null' && $txOperation == 'DECREASE') {
+                                $txStatus = 'BUY';
+                            }
 
                             $txCreated = null;
                             if ($txCreatedRaw && strpos($txCreatedRaw, ' ') !== false) {
@@ -665,7 +671,7 @@ function dbSetup()
                             }
 
                             if ($walletDbId) {
-                                $insertTransaction->execute([$walletDbId, $txAmount, $txType, $chat_id, 'SUCCESS', $txCreated]);
+                                $insertTransaction->execute([$walletDbId, $txAmount, $txOperation, $chat_id, $txStatus, $txType, $txCreated]);
                                 $insertedTransactions++;
                             }
                         }

@@ -93,7 +93,7 @@ try {
                     break;
                 }
 
-                $payment = payment($photo);
+                $payment = payment($photo, 'buy');
 
                 if (!$payment) {
                     errorLog("Failed to send receipt error message to chat_id: $uid");
@@ -135,6 +135,110 @@ try {
                             exit;
                         }
                         break;
+                }
+            } elseif ($RedisData['action'] == 'wallet_increase') {
+                switch($RedisData['step']) {
+                    case 'get_amount':
+                        //check text for amount
+                        if (!is_numeric($text)) {
+                            $message = "🔢 لطفا مبلغ را به صورت عداد انگلیسی وارد کنید!";
+                            $result = tg('sendMessage',[
+                                'chat_id' => $uid,
+                                'text' => $message,
+                            ]);
+                                
+                            if (!($result = json_decode($result))->ok) {
+                                errorLog("Failed to send receipt error message to chat_id: $uid | Message: {$result->description}");
+                                exit;
+                            }
+                            break;
+                        }
+        
+                        $amount = (int)$text;
+                        if ($amount < 10000) {
+                            $message = "💲 حداقل مبلغ واریزی 10.000 تومان است!";
+                            $result = tg('sendMessage',[
+                                'chat_id' => $uid,
+                                'text' => $message,
+                            ]);
+                                
+                            if (!($result = json_decode($result))->ok) {
+                                errorLog("Failed to send receipt error message to chat_id: $uid | Message: {$result->description}");
+                                exit;
+                            }
+                            break;
+                        }
+        
+                        $redis = new Redis();
+                        $redis->connect('127.0.0.1', 6379);
+                        $key = "user:steps:" . UID;
+                        $redis->hmset($key, ['action' => 'wallet_increase', 'step' => 'get_receipt', 'amount' => $amount]);
+                        $redis->expire($key, 1800);
+                        $redis->close();
+        
+                        $variables = [
+                            'amount' => $amount
+                        ];
+        
+                        $result = tg('sendMessage',[
+                            'chat_id' => $uid,
+                            'text' => message('card', $variables),
+                            'reply_markup' => json_encode([
+                                    'inline_keyboard' => [
+                                        [
+                                            ['text' => '❌ | لغو', 'callback_data' => "wallet"],
+                                        ]
+                                    ]
+                            ])
+                        ]);
+                        if (!($result = json_decode($result))->ok) {
+                            errorLog("Failed to send receipt error message to chat_id: $uid | Message: {$result->description}");
+                            exit;
+                        }
+                        break;
+                    
+                    case 'get_receipt':
+                        // Check if send just image
+                        if ($photo == null) {
+                            $message = "🖼️ لطفا سند واریزی را به صورت تصویر ارسال کنید!";
+                            $result = tg('sendMessage',[
+                                'chat_id' => $uid,
+                                'text' => $message,
+                                'reply_markup' => json_encode([
+                                        'inline_keyboard' => [
+                                            [
+                                                ['text' => '❌ | انصراف', 'callback_data' => 'wallet'],
+                                            ]
+                                        ]
+                                    ])
+                                ]);
+                            if (!($result = json_decode($result))->ok) {
+                                errorLog("Failed to send receipt error message to chat_id: $uid | Message: {$result->description}");
+                                exit;
+                            }
+                            break;
+                        }
+
+                        $redis = new Redis();
+                        $redis->connect('127.0.0.1', 6379);
+                        $key = "user:steps:" . UID;
+                        $walletData = $redis->hgetall($key);
+                        $amount = $walletData['amount'];
+
+                        $walletID = wallet('get', $uid)['id'];
+                        $txID = createWalletTransaction(null, 'PENDING', $walletID, $amount, 'INCREASE', UID, 'CARD_TO_CARD');
+                        
+                        $redis->hmset($key, ['action' => 'wallet_increase', 'step' => 'pending', 'txID' => $txID]);
+                        $redis->expire($key, 1800);
+                        $redis->close();
+                        
+
+
+                        $payment = payment($photo, 'wallet');
+
+                        // if (!$payment) {
+                        //     errorLog("Failed to send receipt error message to chat_id: $uid");
+                        // }
                 }
             }
     }
@@ -254,7 +358,23 @@ try {
             ]);
             break;
         case 'wallet':
-            $walletBalance = walletBalance('get', $callback_chat_id)['balance'];
+            $redis = new Redis();
+            $redis->connect('127.0.0.1', 6379);
+            $redis->del("user:steps:" . UID);
+            $redis->close();
+
+            $walletBalance = wallet('get', $callback_chat_id)['balance'];
+
+            // check if user has wallet in database create it
+            if ($walletBalance == null) {
+                $createWallet = wallet('create', $callback_chat_id, '0');
+                if (!$createWallet) {
+                    errorLog("Error in creating wallet for user {$callback_chat_id}");
+                    die();
+                }
+                $walletBalance = '0';
+            }
+
             $user = getUser($callback_chat_id);
             $userName = $user['name'] 
                 ?? ($user['telegram_id'] ? '@' . $user['telegram_id'] : 'نامشخص');

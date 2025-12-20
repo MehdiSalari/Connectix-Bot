@@ -37,17 +37,19 @@ while ($row = $result->fetch_assoc()) {
 $stmt->close();
 $conn->close();
 
-$walletData = walletBalance('get', $user['chat_id']);
+$walletData = wallet('get', $user['chat_id']);
 
 if (isset($_POST['update_wallet'])) {
     $chat_id = $_POST['chat_id'];
     $amount = str_replace(',', '', $_POST['amount']); // remove commas
     $action = $_POST['action']; // 'increase' or 'decrease'
-    $result = walletBalance($action, $chat_id, $amount);
+    $walletID = wallet($action, $chat_id, $amount);
+
 
     $currentUrl = $_SERVER['PHP_SELF'];
     $queryString = $_SERVER['QUERY_STRING'];
-    if ($result) {
+    if ($walletID) {
+        createWalletTransaction(null, 'SUCCESS', $walletID, $amount, $action, $chat_id, 'DONE_BY_ADMIN');
         $status = 'success';
         $messageParam = 'wallet_updated=success';
     } else {
@@ -97,6 +99,12 @@ if (isset($_GET['wallet_updated'])) {
         .loading { opacity: 0.6; pointer-events: none; }
         .copyright { width: 100%; text-align: center; color: #777; font-size: 15px; direction: ltr; margin: 20px 0 10px; }
         .copyright a { color: #b500bbff; text-decoration: none; }
+        /* Mobile Width */
+        @media (max-width: 768px) {
+            .operation { width: 100vw; }
+            .type { width: 100vw; text-align: center; }
+            .status { text-align: left; }
+        }
     </style>
 </head>
 <body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen">
@@ -221,17 +229,17 @@ if (isset($_GET['wallet_updated'])) {
                 <div class="border-t-2 border-gray-200 pt-8">
                     <h4 class="text-xl font-bold text-gray-800 mb-6 text-center">تاریخچه تراکنش‌ها</h4>
                     <?php 
-                    $transactions = walletBalance('transactions', $user['chat_id']) ?? [];
+                    $transactions = wallet('transactions', $user['chat_id']) ?? [];
                     ?>
                     <?php if (empty($transactions)): ?>
                         <p class="text-center text-gray-500 py-8">هیچ تراکنشی ثبت نشده است.</p>
                     <?php else: ?>
                         <div class="space-y-4 max-h-96 overflow-y-auto">
                             <?php foreach ($transactions as $tx): ?>
-                                <div class="flex items-center justify-between p-4 rounded-xl <?= $tx['type'] === 'INCREASE' ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200' ?>">
-                                    <div class="flex-1">
-                                        <p class="font-semibold <?= $tx['type'] === 'INCREASE' ? 'text-green-700' : 'text-red-700' ?>">
-                                            <?= $tx['type'] === 'INCREASE' ? '+' : '-' ?> <?= number_format($tx['amount']) ?> تومان
+                                <div class="flex items-center justify-between p-4 rounded-xl <?= $tx['operation'] === 'INCREASE' ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200' ?>">
+                                    <div class="operation">
+                                        <p class="font-semibold <?= $tx['operation'] === 'INCREASE' ? 'text-green-700' : 'text-red-700' ?>">
+                                            <?= $tx['operation'] === 'INCREASE' ? '+' : '-' ?> <?= number_format($tx['amount']) ?> تومان
                                         </p>
                                         <p class="text-sm text-gray-600 mt-1">
                                             <?php
@@ -241,8 +249,13 @@ if (isset($_GET['wallet_updated'])) {
                                             ?>
                                         </p>
                                     </div>
-                                    <div class="text-sm font-medium <?= $tx['status'] === 'SUCCESS' ? 'text-green-600' : 'text-yellow-600' ?>">
-                                        <?= $tx['status'] === 'SUCCESS' ? 'موفق' : 'در انتظار' ?>
+                                    <div class="type">
+                                        <div class="text-sm font-medium text-gray-600">
+                                            <?= parseTransactionsType($tx['type']) ?>
+                                        </div>
+                                    </div>
+                                    <div class="status text-sm font-medium <?= $tx['status'] === 'SUCCESS' ? 'text-green-600' : 'text-red-600' ?>">
+                                        <?= parseTransactionsStatus($tx['status']) ?>
                                     </div>
                                 </div>
                             <?php endforeach; ?>
