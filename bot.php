@@ -253,6 +253,23 @@ try {
                 'reply_markup' => keyboard('support')
             ]);
             break;
+        case 'wallet':
+            $walletBalance = walletBalance('get', $callback_chat_id)['balance'];
+            $user = getUser($callback_chat_id);
+            $userName = $user['name'] 
+                ?? ($user['telegram_id'] ? '@' . $user['telegram_id'] : 'نامشخص');
+            $variables = [
+                'walletBalance' => number_format($walletBalance),
+                'userName' => $userName
+            ];
+            $result = tg('editMessageText',[
+                'chat_id' => $callback_chat_id,
+                'message_id' => $callback_message_id,
+                'text' => message('wallet', $variables),
+                'parse_mode' => 'html',
+                'reply_markup' => keyboard('wallet')
+            ]);
+            break;
         case 'not':
             //show notification that this btn is nothing
             $result = tg('answerCallbackQuery',[

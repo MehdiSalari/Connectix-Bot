@@ -15,7 +15,7 @@ if ($userId <= 0) die('کاربر یافت نشد.');
 $conn = new mysqli($db_host, $db_user, $db_pass, $db_name);
 if ($conn->connect_error) die("Connection failed: " . $conn->connect_error);
 
-// دریافت اطلاعات کاربر از دیتابیس
+// Retrieve user information from database
 $stmt = $conn->prepare("SELECT * FROM users WHERE id = ?");
 $stmt->bind_param("i", $userId);
 $stmt->execute();
@@ -25,7 +25,7 @@ $stmt->close();
 
 if (!$user) die('کاربر یافت نشد.');
 
-// دریافت لیست اکانت‌های متصل
+// Get list of connected accounts
 $clients = [];
 $stmt = $conn->prepare("SELECT id, username, password, count_of_devices, created_at FROM clients WHERE user_id = ? ORDER BY created_at DESC");
 $stmt->bind_param("i", $userId);
@@ -36,6 +36,43 @@ while ($row = $result->fetch_assoc()) {
 }
 $stmt->close();
 $conn->close();
+
+$walletData = walletBalance('get', $user['chat_id']);
+
+if (isset($_POST['update_wallet'])) {
+    $chat_id = $_POST['chat_id'];
+    $amount = str_replace(',', '', $_POST['amount']); // remove commas
+    $action = $_POST['action']; // 'increase' or 'decrease'
+    $result = walletBalance($action, $chat_id, $amount);
+
+    $currentUrl = $_SERVER['PHP_SELF'];
+    $queryString = $_SERVER['QUERY_STRING'];
+    if ($result) {
+        $status = 'success';
+        $messageParam = 'wallet_updated=success';
+    } else {
+        $status = 'error';
+        $messageParam = 'wallet_updated=error';
+    }
+
+    $separator = empty($queryString) ? '?' : '&';
+    header("Location: {$currentUrl}?{$queryString}{$separator}{$messageParam}");
+    exit();
+}
+
+
+$message = '';
+$messageType = '';
+
+if (isset($_GET['wallet_updated'])) {
+    if ($_GET['wallet_updated'] === 'success') {
+        $message = 'موجودی با موفقیت بروزرسانی شد!';
+        $messageType = 'success';
+    } elseif ($_GET['wallet_updated'] === 'error') {
+        $message = 'خطا در بروزرسانی موجودی!';
+        $messageType = 'error';
+    }
+}
 ?>
 
 <!DOCTYPE html>
@@ -63,9 +100,23 @@ $conn->close();
     </style>
 </head>
 <body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen">
+    <?php if ($message): ?>
+        <div class="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 px-6 py-4 rounded-xl shadow-2xl text-white font-bold <?= $messageType === 'success' ? 'bg-green-600' : 'bg-red-600' ?>">
+            <?= $message ?>
+        </div>
+
+        <script>
+            // پیام رو بعد از ۴ ثانیه محو کن
+            setTimeout(() => {
+                document.querySelector('.fixed.top-4').style.transition = 'opacity 0.5s';
+                document.querySelector('.fixed.top-4').style.opacity = '0';
+                setTimeout(() => document.querySelector('.fixed.top-4').remove(), 500);
+            }, 4000);
+        </script>
+    <?php endif; ?>
 <div class="container mx-auto px-4 py-8 max-w-7xl">
 
-    <!-- هدر -->
+    <!-- Header -->
     <div class="bg-white rounded-xl shadow-lg p-6 mb-8">
         <div class="grid md:grid-cols-2 gap-6 items-start">
             <div class="text-right">
@@ -80,26 +131,129 @@ $conn->close();
         </div>
     </div>
 
-    <!-- اطلاعات کاربر -->
+    <!-- User Details and Wallet -->
     <div class="bg-white rounded-xl shadow-xl p-8 mb-8">
-        <div class="flex flex-col md:flex-row items-center gap-8">
-            <div class="w-28 h-28 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center text-white text-5xl font-bold shadow-xl">
-                <?= mb_substr($user['name'] ?? 'U', 0, 1) ?>
+        <div class="flex flex-col md:flex-row items-center justify-between gap-8">
+            <!-- Avatar and Primary Information -->
+            <div class="flex flex-col md:flex-row items-center gap-8 flex-1">
+                <div class="w-28 h-28 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center text-white text-5xl font-bold shadow-xl">
+                    <?= mb_substr($user['name'] ?? 'U', 0, 1) ?>
+                </div>
+                <div class="text-center md:text-right">
+                    <h2 class="text-3xl font-bold text-gray-800"><?= htmlspecialchars($user['name'] ?? 'نامشخص') ?></h2>
+                    <div class="mt-3 space-y-2 text-gray-600">
+                        <p>آیدی عددی: <code class="bg-gray-100 px-3 py-1 rounded font-mono"><?= $user['chat_id'] ?></code></p>
+                        <?php if ($user['telegram_id']): ?>
+                            <p>یوزرنیم: <a href="https://t.me/<?= htmlspecialchars($user['telegram_id']) ?>" target="_blank" class="text-blue-600 hover:underline">@<?= htmlspecialchars($user['telegram_id']) ?></a></p>
+                        <?php endif; ?>
+                        <p class="text-sm">ثبت‌نام: <?= jdate($user['created_at'], true) ?></p>
+                    </div>
+                </div>
             </div>
+
+            <!-- Wallet Section -->
             <div class="text-center md:text-right">
-                <h2 class="text-3xl font-bold text-gray-800"><?= htmlspecialchars($user['name'] ?? 'نامشخص') ?></h2>
-                <div class="mt-3 space-y-2 text-gray-600">
-                    <p>آیدی عددی: <code class="bg-gray-100 px-3 py-1 rounded font-mono"><?= $user['chat_id'] ?></code></p>
-                    <?php if ($user['telegram_id']): ?>
-                        <p>یوزرنیم: <a href="https://t.me/<?= htmlspecialchars($user['telegram_id']) ?>" target="_blank" class="text-blue-600 hover:underline">@<?= htmlspecialchars($user['telegram_id']) ?></a></p>
+                <p class="text-lg text-gray-600 mb-2">موجودی کیف پول</p>
+                <p class="text-4xl font-bold text-indigo-600 mb-4">
+                    <?= number_format($walletData['balance'] ?? 0) ?> تومان
+                </p>
+                <button onclick="openWalletModal()" class="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-semibold py-3 px-6 rounded-xl shadow-lg transition transform hover:scale-105">
+                    مدیریت کیف پول
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Wallet Modal -->
+    <div id="walletModal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50 overflow-y-auto">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full mx-4 my-8 max-h-screen overflow-y-auto" style="max-height: 90vh">
+            <div class="p-8">
+                <h3 class="text-2xl font-bold text-gray-800 mb-6 text-center">مدیریت کیف پول کاربر</h3>
+                
+                <div class="text-center mb-8 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl p-6">
+                    <p class="text-gray-700">کاربر: <strong><?= htmlspecialchars($user['name'] ?? 'نامشخص') ?></strong></p>
+                    <p class="text-gray-700">آیدی عددی: <strong><?= htmlspecialchars($user['chat_id'] ?? 'نامشخص') ?></strong></p>
+                    <p class="text-3xl font-bold text-indigo-600 mt-4">
+                        موجودی فعلی: <?= number_format($walletData['balance'] ?? 0) ?> تومان
+                    </p>
+                </div>
+
+                <!-- Transaction Form -->
+                <form action="" method="post" class="space-y-6 mb-8">
+                    <input type="hidden" name="chat_id" value="<?= $user['chat_id'] ?>">
+
+                    <div>
+                        <label class="block text-gray-700 font-medium mb-2">مبلغ (به تومان)</label>
+                        <input type="text" name="amount" required placeholder="مثلاً 50,000" 
+                            class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-lg"
+                            oninput="this.value = this.value.replace(/[^0-9]/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, ',')">
+                    </div>
+
+                    <div>
+                        <label class="block text-gray-700 font-medium mb-3">نوع تراکنش</label>
+                        <div class="grid grid-cols-2 gap-4">
+                            <!-- INCREASE -->
+                            <label class="relative flex items-center justify-center py-4 px-6 rounded-xl cursor-pointer transition-all border-2 has-[:checked]:bg-green-600 has-[:checked]:border-green-600 has-[:checked]:text-white bg-green-50 border-green-200 text-green-700 font-semibold">
+                                <input type="radio" name="action" value="INCREASE" checked class="absolute opacity-0">
+                                <span>افزایش موجودی</span>
+                            </label>
+                            <!-- DECREASE -->
+                            <label class="relative flex items-center justify-center py-4 px-6 rounded-xl cursor-pointer transition-all border-2 has-[:checked]:bg-red-600 has-[:checked]:border-red-600 has-[:checked]:text-white bg-red-50 border-red-200 text-red-700 font-semibold">
+                                <input type="radio" name="action" value="DECREASE" class="absolute opacity-0">
+                                <span>کاهش موجودی</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="flex gap-4">
+                        <button type="submit" name="update_wallet" 
+                                class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl transition shadow-lg">
+                            اعمال تغییرات
+                        </button>
+                        <button type="button" onclick="closeWalletModal()" 
+                                class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-3 rounded-xl transition">
+                            انصراف
+                        </button>
+                    </div>
+                </form>
+
+                <!-- Transaction History -->
+                <div class="border-t-2 border-gray-200 pt-8">
+                    <h4 class="text-xl font-bold text-gray-800 mb-6 text-center">تاریخچه تراکنش‌ها</h4>
+                    <?php 
+                    $transactions = walletBalance('transactions', $user['chat_id']) ?? [];
+                    ?>
+                    <?php if (empty($transactions)): ?>
+                        <p class="text-center text-gray-500 py-8">هیچ تراکنشی ثبت نشده است.</p>
+                    <?php else: ?>
+                        <div class="space-y-4 max-h-96 overflow-y-auto">
+                            <?php foreach ($transactions as $tx): ?>
+                                <div class="flex items-center justify-between p-4 rounded-xl <?= $tx['type'] === 'INCREASE' ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200' ?>">
+                                    <div class="flex-1">
+                                        <p class="font-semibold <?= $tx['type'] === 'INCREASE' ? 'text-green-700' : 'text-red-700' ?>">
+                                            <?= $tx['type'] === 'INCREASE' ? '+' : '-' ?> <?= number_format($tx['amount']) ?> تومان
+                                        </p>
+                                        <p class="text-sm text-gray-600 mt-1">
+                                            <?php
+                                            $time = explode(' ', $tx['created_at'])[1];
+                                            $time = explode(':', $time)[0] . ':' . explode(':', $time)[1];
+                                                echo jdate($tx['created_at'], true) . ' ' . $time;
+                                            ?>
+                                        </p>
+                                    </div>
+                                    <div class="text-sm font-medium <?= $tx['status'] === 'SUCCESS' ? 'text-green-600' : 'text-yellow-600' ?>">
+                                        <?= $tx['status'] === 'SUCCESS' ? 'موفق' : 'در انتظار' ?>
+                                    </div>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
                     <?php endif; ?>
-                    <p class="text-sm">ثبت‌نام: <?= jdate($user['created_at'], true) ?></p>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- اکانت‌های متصل -->
+    <!-- Clients (Connected Accounts) -->
     <div class="bg-white rounded-xl shadow-xl overflow-hidden">
         <div class="p-6 border-b border-gray-200 bg-gradient-to-r from-indigo-50 to-purple-50">
             <h3 class="text-2xl font-bold text-gray-800 flex items-center gap-3">
@@ -267,12 +421,27 @@ document.addEventListener('click', function(e) {
     }
 });
 
-// بارگذاری اطلاعات همه اکانت‌ها بعد از لود صفحه
+// Load all account data after page load
 document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('[id^="client-"]').forEach(el => {
         const clientId = el.id.replace('client-', '');
         loadClientData(clientId, el);
     });
+});
+
+function openWalletModal() {
+    document.getElementById('walletModal').classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+}
+
+function closeWalletModal() {
+    document.getElementById('walletModal').classList.add('hidden');
+    document.body.style.overflow = 'auto';
+}
+
+// Close the modal with a click outside of it
+document.getElementById('walletModal').addEventListener('click', function(e) {
+    if (e.target === this) closeWalletModal();
 });
 </script>
 </body>

@@ -125,7 +125,7 @@ function getAdminById($id) {
 
 function errorLog($message) {
     // Add timestamp to the log entry
-    file_put_contents('debug/error_log.log', date('Y-m-d H:i:s') . " - " . $message . "\n", FILE_APPEND);
+    file_put_contents( __DIR__ .'/debug/error_log.log', date('Y-m-d H:i:s') . " - " . $message . "\n", FILE_APPEND);
 
     //send to telegram for admin
         //get admin chat id
@@ -184,6 +184,80 @@ function getDownloadLinks($platform = null) {
     };
 
     return $response;
+}
+
+function walletBalance($action, $user = null, $amount = null) {
+    global $panelToken , $db_host, $db_user, $db_pass, $db_name;
+    $conn = new mysqli($db_host, $db_user, $db_pass, $db_name);
+    switch ($action) {
+        case 'get':
+            if ($user) {
+                $stmt = $conn->prepare("SELECT * FROM wallets WHERE chat_id = ?");
+                $stmt->bind_param("i", $user);
+                $stmt->execute();
+                $result = $stmt->get_result();
+                if ($result->num_rows > 0) {
+                    $walletData = $result->fetch_assoc();
+                } else {
+                    return null;
+                }
+            } else {
+                $stmt = $conn->prepare("SELECT * FROM wallets");
+                $stmt->execute();
+                $result = $stmt->get_result();
+                $walletData = $result->fetch_all(MYSQLI_ASSOC);
+            }
+            return $walletData;
+
+        case 'transactions':
+            if ($user) {
+                $stmt = $conn->prepare("SELECT * FROM wallet_transactions WHERE chat_id = ? ORDER BY created_at DESC");
+                $stmt->bind_param("i", $user);
+                $stmt->execute();
+                $result = $stmt->get_result();
+                $walletData = $result->fetch_all(MYSQLI_ASSOC);
+            } else {
+                $stmt = $conn->prepare("SELECT * FROM wallet_transactions ORDER BY created_at DESC");
+                $stmt->execute();
+                $result = $stmt->get_result();
+                $walletData = $result->fetch_all(MYSQLI_ASSOC);
+            }
+            return $walletData;
+
+        case 'INCREASE':
+        case 'DECREASE':
+            // Get current wallet balance
+            $stmt = $conn->prepare("SELECT * FROM wallets WHERE chat_id = ?");
+            $stmt->bind_param("i", $user);
+            $stmt->execute();
+            $result = $stmt->get_result();
+            if ($result->num_rows > 0) {
+                $walletData = $result->fetch_assoc();
+                $walletID = $walletData['id'];
+                $balance = (int)$walletData['balance'];
+            } else {
+                return null;
+            }
+
+            $newBalance = match ($action) {
+                "INCREASE" => $balance + $amount,
+                "DECREASE" => $balance - $amount,
+            };
+            
+            // Update wallet balance
+            $stmt = $conn->prepare("UPDATE wallets SET balance = ? WHERE chat_id = ?");
+            $stmt->bind_param("ii", $newBalance, $user);
+            $stmt->execute();
+            $stmt->close();
+
+            $status = "SUCCESS";
+            $stmt = $conn->prepare("INSERT INTO wallet_transactions (wallet_id, amount, type, chat_id, status, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
+            $stmt->bind_param("iisis", $walletID, $amount, $action, $user, $status);
+            $stmt->execute();
+            $stmt->close();
+            return true;
+    }
+    
 }
 
 function callBackCheck($callback_data) {
@@ -1825,6 +1899,9 @@ function keyboard($keyboard) {
                     ],
                     [
                         ['text' => '📣 | اخبار و اطلاعیه ها', 'url' => "t.me/$channelTelegram"]
+                    ],
+                    [
+                        ['text' => '👝 |  کیف پول', 'callback_data' => 'wallet']
                     ]
                 ];
                 break;
@@ -2084,6 +2161,16 @@ function keyboard($keyboard) {
                 ];
                 break;
 
+            case 'wallet':
+                $keyboard = [
+                    [
+                        ['text' => '💰 | افزایش موجودی', 'callback_data' => '123']
+                    ],
+                    [
+                        ['text' => '↪️ | بازگشت', 'callback_data' => 'main_menu']
+                    ]
+                ];
+                break;
             default:
                 return json_encode(['ok' => true]);
         }
@@ -2127,6 +2214,7 @@ function message($message, $variables = []) {
         "guide" => "📖 لطفا نحوه آموزش را انتحاب کنید.",
         "faq" => $faq,
         "support" => $supportMessage,
+        "wallet" => "🤑 موجودی کیف پول شما: \n💵 " . $variables['walletBalance'] . " تومان\n\n👤 نام: " . $variables['userName'] . "\n🔢 آیدی عددی: " . UID,
         default => "پیام پیشفرض",
     };
     return $msg;
