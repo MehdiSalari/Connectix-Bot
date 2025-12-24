@@ -704,6 +704,106 @@ function getTransactions($page = 1, $itemsPerPage = 20, $search = null) {
     ];
 }
 
+function always($info) {
+    global $db_host, $db_user, $db_pass, $db_name;
+    $uid = UID;
+    $infoParts = explode(':', $info);
+    $step = $infoParts[0];
+    $data = $infoParts[1];
+    switch ($step) {
+        case 'select':
+            $conn = new mysqli($db_host, $db_user, $db_pass, $db_name);
+            $stmt = $conn->prepare("SELECT * FROM clients WHERE chat_id = ?");
+            $stmt->bind_param("s", $uid);
+            $stmt->execute();
+
+            if ($conn->connect_error || $stmt->error) {
+                errorLog("Error in connecting to DB or preparing statement: " . ($conn->connect_error ?? $stmt->error));
+            }
+
+            $result = $stmt->get_result();
+            $clients = $result->fetch_all(MYSQLI_ASSOC);
+            $stmt->close();
+            $conn->close();
+
+            $keyboard = [];
+
+            if (empty($clients)) {
+                $keyboard[] = [['text' => '🤷🏻 | اکانتی به تلگرام شما متصل نیست', 'callback_data' => 'not']];
+            } elseif (count($clients) == 1) {
+                $clientData = getClientData($clients[0]['id']);
+                $clientPlans = $clientData['plans'] ?? [];
+                break;
+            } else {
+                foreach (array_reverse($clients) as $client) {
+                    $clientData = getClientData($client['id']);
+                    $plans = $clientData['plans'] ?? [];
+
+                    // Find active and queued plans
+                    $activePlan = null;
+                    $queuedPlan = null;
+
+                    foreach ($plans as $plan) {
+                        if ($plan['is_active'] == 1) {
+                            $activePlan = $plan;
+                            break; // Found first active plan
+                        }
+                        if ($plan['is_in_queue'] && !$queuedPlan) {
+                            $queuedPlan = $plan; // Found first queued plan
+                        }
+                    }
+
+                    // If no active plan, use queued plan
+                    $currentPlan = $activePlan ?? $queuedPlan;
+
+                    if (!$currentPlan) {
+                        $status = "🔴 غیرفعال";
+                        $name = "بدون اشتراک";
+                    } else {
+                        $isActive = $currentPlan['is_active'] == 1;
+                        $status = $isActive ? "🟢 فعال" : "🔵 در صف";
+
+                        // Parse plan title
+                        $parsed = parsePlanTitle($currentPlan['name'], true);
+                        $name = $parsed['text'];
+                    }
+
+                    $keyboard[] = [
+                        ['text' => $name, 'callback_data' => 'always_acc:' . $client['username']],
+                        ['text' => $status . ' | ' . $client['username'], 'callback_data' => 'always_acc:' . $client['username']]
+                    ];
+                }
+            }
+            $keyboard[] = [
+                ['text' => '↪️ | بازگشت', 'callback_data' => 'main_menu']
+            ];
+
+            $keyboard = json_encode(['inline_keyboard' => $keyboard]);
+
+            $message = '📦 کدوم اکانت رو تمدید کنم؟';
+
+            return ['text' => $message, 'reply_markup' => $keyboard];
+
+        case 'acc':
+            $acc = $data;
+            renew("acc:$acc");
+            $clientData = getClientByUsername($acc);
+            // errorLog("renew acc: " . json_encode($clientData));
+            // exit;
+            $clientPlan = $clientData['plan_name'] ?? [];
+
+            return renew("plan:$clientPlan");
+    }
+
+    renew('acc:' . $clientData['username']);
+
+    // select last plan
+    $lastPlan = $clientPlans[0];
+
+    return renew('plan:' . $lastPlan['name']);
+
+}
+
 function callBackCheck($callback_data) {
     //check first part of data
     $data = explode('_', $callback_data);
@@ -721,6 +821,7 @@ function callBackCheck($callback_data) {
         "guide" => guide($query),
         "wallet" => walletReqs($query),
         "discount" => discount($query),
+        "always" => always($query),
         default => null,
     };
 
@@ -1821,6 +1922,7 @@ function getClientData($cid) {
     $data = json_decode($response, true);
     if (!$data || !isset($data['client'])) {
         errorLog("❌ اکانت یافت نشد یا خطا در ارتباط با سرور. | آیدی آکانت: $cid");
+        return false;
     }
 
     $client = $data['client'];
@@ -2015,7 +2117,10 @@ function getSellerPlans($type) {
             $validPlans = [];
             foreach ($data['seller_plan_group'] as $group) {
                 foreach ($group['seller_plans'] as $plan) {
-                    if ($plan['is_displayed_in_robot'] == true && $plan['id'] == $type) {
+                    if (
+                        // $plan['is_displayed_in_robot'] == false && 
+                        $plan['id'] == $type
+                        ) {
                         $validPlans[] = $plan;
                     }
                 }
@@ -2481,7 +2586,7 @@ function keyboard($keyboard) {
                 $testBtn = ($user['test'] == 0) ? [
                     ['text' => '🎁 | دریافت اکانت تست', 'callback_data' => 'get_test']
                 ] : [
-                    // ['text' => '🙋🏻 | همون همیشگی', 'callback_data' => 'always']
+                    ['text' => '🙋🏻 | همون همیشگی', 'callback_data' => 'always_select:0']
                 ];
                 
                 //panel link
