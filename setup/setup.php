@@ -24,6 +24,42 @@ if (empty($admin_password) || empty($admin_email)) {
     exit(1);
 }
 
+function checkRequirements(){
+    // Check PHP version
+    if (version_compare(PHP_VERSION, '8.0.0', '<')) {
+        logFlush("PHP version 8.0.0 or higher is required.");
+        exit(1);
+    }
+
+    // Check required extensions
+    if (!extension_loaded('curl')) {
+        logFlush("CURL extension is required. Please install it.");
+        exit(1);
+    }
+    if (!extension_loaded('json')) {
+        logFlush("JSON extension is required. Please install it.");
+        exit(1);
+    }
+
+    // Check Redis
+    if (!extension_loaded('redis')) {
+        logFlush("Redis extension is required. Please install it.");
+        exit(1);
+    }
+
+    $redis = new Redis();
+    $redis->connect('127.0.0.1', 6379);
+    // set tset key
+    $redis->set('test', 'test');
+
+    if ($redis->get('test') !== 'test') {
+        logFlush("Redis connection failed.");
+        exit(1);
+    }
+    $redis->del('test');
+    $redis->close();
+}
+
 function getPanelToken($panelEmail, $panelPassword) {
     $endpiont = 'https://api.connectix.vip/v1/seller/auth/login';
     $ch = curl_init();
@@ -717,8 +753,12 @@ function dbSetup()
 
 
 try {
-    // Step 1: Get Panel Token
+    // Step 0: Check requirements
     logFlush("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    logFlush("Checking requirements...");
+    checkRequirements();
+    logFlush("✓ Requirements met");
+    // Step 1: Get Panel Token
     logFlush("Step 1/6: Getting panel token...");
     $panelToken = getPanelToken(
         $panelEmail,
