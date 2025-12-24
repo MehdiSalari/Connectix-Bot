@@ -287,29 +287,59 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         <i class="fas fa-sign-out-alt"></i> خروج
                     </a>
 
-
                     <div class="flex flex-wrap gap-3 justify-end w-full">
+
                         <a href="setup"
                             class="bg-blue-500 hover:bg-blue-600 text-white px-5 py-3 rounded-lg font-semibold transition flex items-center gap-2 whitespace-nowrap">
                             <i class="fas fa-cloud-arrow-down"></i> تنظیمات اولیه
                         </a>
+
                         <a id="messagesBtn" href="#"
                             class="bg-blue-500 hover:bg-blue-600 text-white px-5 py-3 rounded-lg font-semibold transition flex items-center gap-2 whitespace-nowrap">
                             <i class="fas fa-cog"></i> تنظیمات بات
                         </a>
+
                         <a id="broadcastBtn" href="#"
                             class="bg-blue-500 hover:bg-blue-600 text-white px-5 py-3 rounded-lg font-semibold transition flex items-center gap-2 whitespace-nowrap">
                             <i class="fas fa-comments"></i> ارسال پیام همگانی
                         </a>
+
                         <a href="users"
                             class="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-5 py-3 rounded-lg font-semibold transition flex items-center gap-2 whitespace-nowrap shadow-md">
                             <i class="fas fa-users"></i> لیست کاربران
                         </a>
+
+                        <div class="relative inline-block text-left">
+                            <button type="button"
+                                class="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-5 py-3 rounded-lg font-semibold transition flex items-center gap-2 whitespace-nowrap shadow-md hover:from-indigo-700 hover:to-purple-700 focus:outline-none"
+                                id="transactionsDropdownBtn">
+                                <i class="fas fa-coins"></i> تراکنش‌ها
+                                <i class="fas fa-chevron-down ml-2 text-sm"></i>
+                            </button>
+
+                            <div id="transactionsDropdown"
+                                class="hidden absolute left-0 mt-2 w-64 rounded-lg shadow-xl bg-white ring-1 ring-black ring-opacity-5 z-50 overflow-hidden">
+                                <div class="py-1" role="menu">
+                                    <a href="transactions/transactions.php"
+                                        class="block px-5 py-3 text-sm font-medium text-gray-800 hover:bg-indigo-50 hover:text-indigo-600 transition flex items-center gap-3"
+                                        role="menuitem">
+                                        <i class="fas fa-credit-card text-indigo-600"></i>
+                                        تراکنش‌های سفارشات
+                                    </a>
+                                    <a href="transactions/wallet_transactions.php"
+                                        class="block px-5 py-3 text-sm font-medium text-gray-800 hover:bg-green-50 hover:text-green-600 transition flex items-center gap-3"
+                                        role="menuitem">
+                                        <i class="fas fa-wallet text-green-600"></i>
+                                        تراکنش‌های کیف پول
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+
                     </div>
                 </div>
             </div>
         </div>
-
         <!-- Bot Settings Form -->
         <div id="messageFormContainer" class="bg-white rounded-xl shadow-xl p-8 mb-8" style="display: none;">
             <h2 class="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-3">
@@ -792,6 +822,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     `;
                 }
             });
+        });
+
+
+
+        const dropdownBtn = document.getElementById('transactionsDropdownBtn');
+        const dropdownMenu = document.getElementById('transactionsDropdown');
+
+        // toggle on click on the transactions button
+        dropdownBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            dropdownMenu.classList.toggle('hidden');
+        });
+
+        // Close the dropdown when clicked outside of it
+        document.addEventListener('click', function(e) {
+            if (!dropdownBtn.contains(e.target) && !dropdownMenu.contains(e.target)) {
+                dropdownMenu.classList.add('hidden');
+            }
+        });
+
+        // Close with Escape key press
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                dropdownMenu.classList.add('hidden');
+            }
         });
     </script>
 </body>

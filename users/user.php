@@ -255,11 +255,11 @@ if (isset($_GET['wallet_updated'])) {
                                     </div>
                                     <div class="type">
                                         <div class="text-sm font-medium text-gray-600">
-                                            <?= parseTransactionsType($tx['type']) ?>
+                                            <?= parseWalletTransactionsType($tx['type']) ?>
                                         </div>
                                     </div>
                                     <div class="status text-sm font-medium <?= $tx['status'] === 'SUCCESS' ? 'text-green-600' : 'text-red-600' ?>">
-                                        <?= parseTransactionsStatus($tx['status']) ?>
+                                        <?= parseWalletTransactionsStatus($tx['status']) ?>
                                     </div>
                                 </div>
                             <?php endforeach; ?>

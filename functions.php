@@ -6,8 +6,6 @@ require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/gregorian_jalali.php';
 define('BOT_TOKEN', $botToken);  // Bot token for authentication with Telegram API
 define('TELEGRAM_URL', 'https://api.telegram.org/bot' . BOT_TOKEN . '/');  // Base URL for Telegram Bot API
-// // All tg() calls are tunneled through external proxy script
-// define('TELEGRAM_URL', 'https://mehdisalari.ir/bot/tgtunnel.php?bot_token=' . BOT_TOKEN . '&method=');
 
 function tg($method, $params = []) {
     if (!$params) {
@@ -472,7 +470,65 @@ function createWalletTransaction($transactionID = null, $status = null, $walletI
     return $transactionID;
 }
 
-function parseTransactionsType($type) {
+function getWalletTransactions($page = 1, $itemsPerPage = 20, $search = null) {
+    global $db_host, $db_user, $db_pass, $db_name;
+
+    $conn = new mysqli($db_host, $db_user, $db_pass, $db_name);
+    if ($conn->connect_error) {
+        die("Connection failed: " . $conn->connect_error);
+    }
+    $conn->set_charset("utf8mb4");
+
+    $offset = max(0, ($page - 1) * $itemsPerPage);
+    $transactions = [];
+    $total = 0;
+
+    $searchLike = $search ? "%" . $conn->real_escape_string($search) . "%" : null;
+
+    // Join with users table for name and telegram id
+    $baseQuery = "FROM wallet_transactions wt LEFT JOIN users u ON wt.chat_id = u.chat_id";
+
+    if ($search) {
+        $countStmt = $conn->prepare("SELECT COUNT(*) AS total $baseQuery 
+            WHERE wt.amount LIKE ? OR wt.operation LIKE ? OR wt.status LIKE ? OR wt.type LIKE ? OR wt.chat_id LIKE ? OR u.name LIKE ?");
+        $countStmt->bind_param("ssssss", $searchLike, $searchLike, $searchLike, $searchLike, $searchLike, $searchLike);
+        $countStmt->execute();
+        $countResult = $countStmt->get_result();
+        $totalRow = $countResult->fetch_assoc();
+        $total = $totalRow['total'];
+        $countStmt->close();
+
+        $stmt = $conn->prepare("SELECT wt.*, u.name AS user_name, u.telegram_id AS user_telegram 
+                                $baseQuery 
+                                WHERE wt.amount LIKE ? OR wt.operation LIKE ? OR wt.status LIKE ? OR wt.type LIKE ? OR wt.chat_id LIKE ? OR u.name LIKE ? 
+                                ORDER BY wt.created_at DESC LIMIT ?, ?");
+        $stmt->bind_param("ssssssii", $searchLike, $searchLike, $searchLike, $searchLike, $searchLike, $searchLike, $offset, $itemsPerPage);
+    } else {
+        $countResult = $conn->query("SELECT COUNT(*) AS total $baseQuery");
+        $totalRow = $countResult->fetch_assoc();
+        $total = $totalRow['total'];
+
+        $stmt = $conn->prepare("SELECT wt.*, u.name AS user_name, u.telegram_id AS user_telegram 
+                                $baseQuery 
+                                ORDER BY wt.created_at DESC LIMIT ?, ?");
+        $stmt->bind_param("ii", $offset, $itemsPerPage);
+    }
+
+    $stmt->execute();
+    $result = $stmt->get_result();
+    while ($row = $result->fetch_assoc()) {
+        $transactions[] = $row;
+    }
+    $stmt->close();
+    $conn->close();
+
+    return [
+        'transactions' => $transactions,
+        'total' => (int)$total
+    ];
+}
+
+function parseWalletTransactionsType($type) {
     return match ($type) {
         "BUY" => "خرید",
         "CARD_TO_CARD" => "کارت به کارت",
@@ -481,7 +537,7 @@ function parseTransactionsType($type) {
     };
 }
 
-function parseTransactionsStatus($status) {
+function parseWalletTransactionsStatus($status) {
     return match ($status) {
         "SUCCESS" => "موفق",
         "PENDING" => "در انتظار",
@@ -588,6 +644,64 @@ function discount($query, $coupon = null) {
             return $finalPrice;
 
     }
+}
+
+function getTransactions($page = 1, $itemsPerPage = 20, $search = null) {
+    global $db_host, $db_user, $db_pass, $db_name;
+
+    $conn = new mysqli($db_host, $db_user, $db_pass, $db_name);
+    if ($conn->connect_error) {
+        die("Connection failed: " . $conn->connect_error);
+    }
+    $conn->set_charset("utf8mb4");
+
+    $offset = max(0, ($page - 1) * $itemsPerPage);
+    $transactions = [];
+    $total = 0;
+
+    $searchLike = $search ? "%" . $conn->real_escape_string($search) . "%" : null;
+
+    // Only JOIN with users to get user name and telegram id (local database)
+    $baseQuery = "FROM payments p LEFT JOIN users u ON p.chat_id = u.chat_id";
+
+    if ($search) {
+        $countStmt = $conn->prepare("SELECT COUNT(*) AS total $baseQuery 
+            WHERE p.order_number LIKE ? OR p.chat_id LIKE ? OR p.price LIKE ? OR p.coupon LIKE ? OR p.client_id LIKE ? OR p.plan_id LIKE ? OR u.name LIKE ?");
+        $countStmt->bind_param("sssssss", $searchLike, $searchLike, $searchLike, $searchLike, $searchLike, $searchLike, $searchLike);
+        $countStmt->execute();
+        $countResult = $countStmt->get_result();
+        $totalRow = $countResult->fetch_assoc();
+        $total = $totalRow['total'];
+        $countStmt->close();
+
+        $stmt = $conn->prepare("SELECT p.*, u.name AS user_name, u.telegram_id AS user_telegram 
+                                $baseQuery 
+                                WHERE p.order_number LIKE ? OR p.chat_id LIKE ? OR p.price LIKE ? OR p.coupon LIKE ? OR p.client_id LIKE ? OR p.plan_id LIKE ? OR u.name LIKE ? 
+                                ORDER BY p.created_at DESC LIMIT ?, ?");
+        $stmt->bind_param("sssssssii", $searchLike, $searchLike, $searchLike, $searchLike, $searchLike, $searchLike, $searchLike, $offset, $itemsPerPage);
+    } else {
+        $countResult = $conn->query("SELECT COUNT(*) AS total $baseQuery");
+        $totalRow = $countResult->fetch_assoc();
+        $total = $totalRow['total'];
+
+        $stmt = $conn->prepare("SELECT p.*, u.name AS user_name, u.telegram_id AS user_telegram 
+                                $baseQuery 
+                                ORDER BY p.created_at DESC LIMIT ?, ?");
+        $stmt->bind_param("ii", $offset, $itemsPerPage);
+    }
+
+    $stmt->execute();
+    $result = $stmt->get_result();
+    while ($row = $result->fetch_assoc()) {
+        $transactions[] = $row;
+    }
+    $stmt->close();
+    $conn->close();
+
+    return [
+        'transactions' => $transactions,
+        'total' => (int)$total
+    ];
 }
 
 function callBackCheck($callback_data) {
@@ -1905,6 +2019,10 @@ function getSellerPlans($type) {
                         $validPlans[] = $plan;
                     }
                 }
+            }
+            
+            if (empty($validPlans)) {
+                return false;
             }
             return $validPlans[0];
     }

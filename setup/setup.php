@@ -693,8 +693,8 @@ function dbSetup()
                             $txCreatedRaw = $tx['created_at'] ?? null;
                             $txType = $tx['transaction_id'] ?? 'null';
                             $txStatus = $tx['status'] ?? 'null';
-                            if ($txStatus == 'null' && $txOperation == 'DECREASE') {
-                                $txStatus = 'BUY';
+                            if ($txType == 'null' && $txOperation == 'DECREASE') {
+                                $txType = 'BUY';
                             }
 
                             $txCreated = null;
