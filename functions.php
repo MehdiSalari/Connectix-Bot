@@ -6,6 +6,8 @@ require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/gregorian_jalali.php';
 define('BOT_TOKEN', $botToken);  // Bot token for authentication with Telegram API
 define('TELEGRAM_URL', 'https://api.telegram.org/bot' . BOT_TOKEN . '/');  // Base URL for Telegram Bot API
+// // All tg() calls are tunneled through external proxy script
+// define('TELEGRAM_URL', 'https://mehdisalari.ir/bot/tgtunnel.php?bot_token=' . BOT_TOKEN . '&method=');
 
 function tg($method, $params = []) {
     if (!$params) {
@@ -67,34 +69,38 @@ function getUser($chat_id) {
 }
 
 function userInfo($chat_id, $user_id, $user_name) {
-    // Delete Redis key if exists
-    $redis = new Redis();
-    $redis->connect('127.0.0.1', 6379);
-    $redis->del("user:steps:$chat_id");
-    $redis->close();
+    try {
+        // Delete Redis key if exists
+        $redis = new Redis();
+        $redis->connect('127.0.0.1', 6379);
+        $redis->del("user:steps:$chat_id");
+        $redis->close();
 
-    // Update user info in the database
-    global $db_host, $db_user, $db_pass, $db_name;
-    $conn = new mysqli($db_host, $db_user, $db_pass, $db_name);
-            if ($conn->connect_error) {
-                errorLog("Connection failed: " . $conn->connect_error);
-            }
-            $stmt = $conn->prepare("SELECT * FROM users WHERE chat_id = ?");
-            $stmt->bind_param("i", $chat_id);
-            $stmt->execute();
-            $result = $stmt->get_result();
-            $user = $result->fetch_assoc();
-            if ($user) {
-                $stmt = $conn->prepare("UPDATE users SET telegram_id = ?, name = ? WHERE chat_id = ?");
-                $stmt->bind_param("ssi", $user_id, $user_name, $chat_id);
-                $result = $stmt->execute();
-            } else {
-                $stmt = $conn->prepare("INSERT INTO users (chat_id, telegram_id, name, created_at) VALUES (?, ?, ?, NOW())");
-                $stmt->bind_param("ssi", $chat_id, $user_id, $user_name);
-                $result = $stmt->execute();
-            }
-            $stmt->close();
-            $conn->close();
+        // Update user info in the database
+        global $db_host, $db_user, $db_pass, $db_name;
+        $conn = new mysqli($db_host, $db_user, $db_pass, $db_name);
+        if ($conn->connect_error) {
+            errorLog("Connection failed: " . $conn->connect_error);
+        }
+        $stmt = $conn->prepare("SELECT * FROM users WHERE chat_id = ?");
+        $stmt->bind_param("i", $chat_id);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $user = $result->fetch_assoc();
+        if ($user) {
+            $stmt = $conn->prepare("UPDATE users SET telegram_id = ?, name = ? WHERE chat_id = ?");
+            $stmt->bind_param("ssi", $user_id, $user_name, $chat_id);
+            $result = $stmt->execute();
+        } else {
+            $stmt = $conn->prepare("INSERT INTO users (chat_id, telegram_id, name, created_at) VALUES (?, ?, ?, NOW())");
+            $stmt->bind_param("ssi", $chat_id, $user_id, $user_name);
+            $result = $stmt->execute();
+        }
+        $stmt->close();
+        $conn->close();
+    } catch (Exception $e) {
+        errorLog("Exception: " . $e->getMessage());
+    }
 }
 
 function jdate($timestamp, $str) {
@@ -485,6 +491,105 @@ function parseTransactionsStatus($status) {
     };
 }
 
+function checkCoupon($couponCode) {
+    global $panelToken;
+    $endpoint = "https://api.connectix.vip/v1/seller/seller-plans/coupons";
+
+    $ch = curl_init($endpoint);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, ['Authorization: Bearer ' . $panelToken]);
+    $response = curl_exec($ch);
+    curl_close($ch);
+
+    $data = json_decode($response, true);
+    $couponsData = array_filter($data['coupons'], function ($item) use ($couponCode) {
+        return $item['coupon_code'] === $couponCode;
+    });
+    foreach ($couponsData as $couponData) {
+        return $couponData;
+    }
+}
+
+function discount($query, $coupon = null) {
+    $uid = UID;
+    $action = explode(":", $query)[0];
+    $data = explode(":", $query)[1];
+    $redis = new Redis();
+    $redis->connect('127.0.0.1', 6379);
+    $key = "user:steps:$uid";
+    $RedisData = $redis->hgetall($key);
+    switch ($action) {
+        case "set":
+            $price = $RedisData['price'];
+            $redis->hmset($key, ['action' => 'discount']);
+            $redis->expire($key, 1800);
+            $redis->close();
+
+            $message = "🎟 کد تخفیف خود را وارد کنید:";
+            $keyboard = json_encode([
+                'inline_keyboard' => [
+                    [
+                        ['text' => '❌ | انصراف', 'callback_data' => "pay_card:$price"],
+                    ]
+                ]
+            ]);
+            return ['text' => $message, 'reply_markup' => $keyboard];
+        case 'apply':
+            // Check for dicount type
+            $isPercent = !empty($coupon['per_cent']) && is_numeric($coupon['per_cent']);
+            $isAmount  = !empty($coupon['amount']) && is_numeric($coupon['amount']);
+
+            $originalPrice = str_replace(',', '', $RedisData['price']);
+            $finalPrice    = $originalPrice;
+
+            if ($isPercent) {
+                $percentValue = (int)$coupon['per_cent'];
+
+                $discountAmount = ($originalPrice * $percentValue) / 100;
+                $finalPrice = $originalPrice - $discountAmount;
+
+                // errorLog("coupon: {$coupon['code']} applied - {$percentValue}% discount ({$discountAmount} off) - original: {$originalPrice} → final: {$finalPrice}");
+            } elseif ($isAmount) {
+                $amountValue = (int)$coupon['amount'];
+                $discountAmount = $amountValue;
+
+                $finalPrice = $originalPrice - $amountValue;
+
+                if ($finalPrice < 0) {
+                    $finalPrice = 0;
+                }
+
+                // errorLog("coupon: {$coupon['code']} applied - {$amountValue} amount discount - original: {$originalPrice} → final: {$finalPrice}");
+            } else {
+                errorLog("coupon: {$coupon['code']} has no valid discount value!");
+                return false;
+            }
+
+            // $key = "user:steps:" . UID;
+            $redis->hmset($key, [
+                'coupon_code' => $coupon['coupon_code'],
+                'original_price' => $originalPrice,
+                'final_price' => $finalPrice,
+            ]);
+            $redis->hdel($key, 'action');
+            $redis->expire($key, 1800);
+            $redis->close();
+
+            $discountAmountText = number_format($discountAmount);
+            $tgResult = tg('sendMessage', [
+                'chat_id' => $uid,
+                'text' => "🎟 کد تخفیف با موفقیت اعمال شد 🎉\n💰 مبلغ $discountAmountText تومان از فاکتور کسر گردید.",
+                ]);
+
+            if (!($tgResult = json_decode($tgResult))->ok) {
+                errorLog("Failed to send discount message to chat_id: $uid | Message: {$tgResult->description}");
+                exit;
+            }
+            return $finalPrice;
+
+    }
+}
+
 function callBackCheck($callback_data) {
     //check first part of data
     $data = explode('_', $callback_data);
@@ -501,6 +606,7 @@ function callBackCheck($callback_data) {
         "app" => app($query),
         "guide" => guide($query),
         "wallet" => walletReqs($query),
+        "discount" => discount($query),
         default => null,
     };
 
@@ -712,6 +818,7 @@ function renew($info) {
     $infoParts = explode(':', $info);
     $step = $infoParts[0];
     $data = $infoParts[1];
+    $back = $infoParts[2] ?? 'renew';
     $uid = UID;
 
     switch ($step) {
@@ -764,7 +871,7 @@ function renew($info) {
                 ],
                 [
                     ['text' => '🏡 | خانه', 'callback_data' => 'main_menu'],
-                    ['text' => '↪️ | بازگشت', 'callback_data' => 'renew']
+                    ['text' => '↪️ | بازگشت', 'callback_data' => $back]
                 ]
             ];
 
@@ -819,6 +926,7 @@ function renew($info) {
                 'acc'   => $planData['acc'],
                 'group' => $planData['group'],
                 'plan'  => $planId,
+                'price' => $planPrice,
                 'pay'   => null
             ];
             // Save in Hash foramt
@@ -838,7 +946,6 @@ function renew($info) {
                     ],
                     [
                         ['text' => '👝 | کیف پول ( موجودی ' . number_format(wallet('get', $uid)['balance']) . ' تومان)', 'callback_data' => "pay_wallet:$planPrice"],
-                        // ['text' => '🔜 | روش های دیگر به زودی...', 'callback_data' => 'not'],
                     ],
                     [
                         ['text' => '🏡 | خانه', 'callback_data' => 'main_menu'],
@@ -1038,10 +1145,19 @@ function buy($info) {
 
             $planGroup = $planData['group'];
 
+            //get plan price 
+            $plans = getSellerPlans($planGroup);
+            foreach ($plans as $plan) {
+                if ($plan['id'] == $planId) {
+                    $planPrice = $plan['sell_price'];
+                }
+            }
+
             $planData = [
                 'acc'   => $planAcc,
                 'group' => $planGroup,
                 'plan'  => $planId,
+                'price' => $planPrice,
                 'pay'   => null
             ];
             // Save in Hash foramt
@@ -1094,6 +1210,7 @@ function checkout($data) {
     $parts = explode(':', $data);
     $method = $parts[0];
     $amount = $parts[1];
+
     $redis = new Redis();
     $redis->connect('127.0.0.1', 6379);
     $planData = $redis->hgetall("user:steps:$uid");
@@ -1102,6 +1219,9 @@ function checkout($data) {
     $redis->hmset($key, $planData);
     $redis->expire($key, 1800);
     $planData = $redis->hgetall("user:steps:$uid");
+    if ($planData['action'] == 'discount') {
+        $redis->hdel($key, 'action');
+    }
     $redis->close();
 
     switch ($method) {
@@ -1112,6 +1232,9 @@ function checkout($data) {
             $message = message('card', $variables);
             $keyboard = json_encode([
                 'inline_keyboard' => [
+                    [
+                        ['text' => '🎟 | وارد کردن کد تخفیف', 'callback_data' => "discount_set:$amount"],
+                    ],
                     [
                         ['text' => '❌ | انصراف', 'callback_data' => 'main_menu'],
                     ]
@@ -1201,25 +1324,28 @@ function payment($receipt, $action) {
             case 'buy':
                 $redis = new Redis();
                 $redis->connect('127.0.0.1', 6379);
-                $planData = $redis->hgetall("user:steps:$uid");
+                $RedisData = $redis->hgetall("user:steps:$uid");
 
                 $plans = getSellerPlans("all-bot");
                 foreach ($plans as $plan) {
-                    if ($plan['id'] == $planData['plan']) {
+                    if ($plan['id'] == $RedisData['plan']) {
                         $selectedPlan = $plan;
                         break;
                     }
                 }
 
                 $isPaid = null;
-                $client_id = ($planData['acc'] == 'new') ? 'new' : getClientByUsername($planData['acc'])['id'];
+                $client_id = ($RedisData['acc'] == 'new') ? 'new' : getClientByUsername($RedisData['acc'])['id'];
+                
+                $planPice = number_format($RedisData['final_price']) ?? $selectedPlan['sell_price'];
 
+                $coupon = $RedisData['coupon_code'] ?? null;
+                
                 // Save payment to database
-                $paymentId = savePayment( $client_id, $selectedPlan['id'], $selectedPlan['sell_price'], $isPaid, $planData['pay']);
+                $paymentId = savePayment( $client_id, $selectedPlan['id'], $planPice, $isPaid, $RedisData['pay'], $coupon);
                 
                 $photo_id = end($receipt)['file_id'];
                 $planName = parsePlanTitle($selectedPlan['title'])['text'];
-                $planPice = $selectedPlan['sell_price'];
 
                 // Receipt received message
                 $result = tg('sendMessage',[
@@ -1232,11 +1358,18 @@ function payment($receipt, $action) {
                     exit;
                 }
 
+                $caption = "📃 سند واریزی مورد تایید میباشد؟";
+                $caption .= "\n\n📦 پلن: $planName";
+                $caption .= "\n💸 مبلغ واریزی: $planPice";
+                if ($RedisData['coupon_code']) {
+                    $caption .= "\n💵 مبلغ اصلی: " . number_format($RedisData['original_price']);
+                    $caption .= "\n🎁 کد تخفیف استفاده شده: " . $RedisData['coupon_code'];
+                }
                 //send image to admin
                 $result = tg('sendPhoto',[
                     'chat_id' => $admin_chat_id,
                     'photo' => $photo_id,
-                    'caption' => "📃 سند واریزی مورد تایید میباشد؟\n\n📦 پلن: $planName\n💵 مبلغ واریزی: $planPice",
+                    'caption' => $caption,
                     'reply_markup' => json_encode([
                         'inline_keyboard' => [
                             [
@@ -1307,7 +1440,7 @@ function payment($receipt, $action) {
     }
 }
 
-function savePayment ($client_id, $plan_id, $price, $isPaid, $method) {
+function savePayment ($client_id, $plan_id, $price, $isPaid, $method, $coupon = null) {
     global $db_host, $db_user, $db_pass, $db_name;
     $uid = UID;
     $conn = new mysqli($db_host, $db_user, $db_pass, $db_name);
@@ -1315,8 +1448,8 @@ function savePayment ($client_id, $plan_id, $price, $isPaid, $method) {
         die("Connection failed: " . $conn->connect_error);
     }
 
-    $stmt = $conn->prepare("INSERT INTO payments (chat_id, client_id, plan_id, price, is_paid, method, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())");
-    $stmt->bind_param("ssssss", $uid, $client_id, $plan_id, $price, $isPaid, $method);
+    $stmt = $conn->prepare("INSERT INTO payments (chat_id, client_id, plan_id, price, coupon, is_paid, method, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())");
+    $stmt->bind_param("sssssss", $uid, $client_id, $plan_id, $price, $coupon, $isPaid, $method);
     $result = $stmt->execute();
     $paymentId = $conn->insert_id;
     
@@ -1376,6 +1509,12 @@ function paycheck($query) {
     $chat_id = $payment['chat_id'];
     $stmt->close();
 
+    $redis = new Redis();
+    $redis->connect('127.0.0.1', 6379);
+    $key = "user:steps:" . UID;
+    $redisData = $redis->hgetall($key);
+    $redis->close();
+
     switch ($paymentStatus) {
         case "accept":
             // Create or Update Account plan
@@ -1399,6 +1538,7 @@ function paycheck($query) {
                     $clientPassword = $client['password'] ?? '';
                     $clientSublink = $client['subscription_link'] ?? null;
                     $clientCOD = $client['count_of_devices'] ?? 0;
+
                     // Create Cleint in DB
                     $stmt = $conn->prepare("INSERT INTO clients (id, count_of_devices, username, password, chat_id, user_id, created_at) VALUES (?, ?, ?, ?, ?, ?, NOW())");
                     $stmt->bind_param("sissii", $client_id, $clientCOD, $clientUsername, $clientPassword, $chat_id, $user_id);
@@ -1406,6 +1546,15 @@ function paycheck($query) {
                     $stmt->close();
                     if (!$result) {
                         errorLog("Error in inserting client: " . $conn->error);
+                    }
+
+                    //Update Client ID in Payment
+                    $stmt = $conn->prepare("UPDATE payments SET client_id = ? WHERE id = ?");
+                    $stmt->bind_param("si", $client_id, $paymentId);
+                    $result = $stmt->execute();
+                    $stmt->close();
+                    if (!$result) {
+                        errorLog("Error in updating payment: " . $conn->error);
                     }
 
                     // Send account data to user
@@ -1418,7 +1567,7 @@ function paycheck($query) {
                     $keyboard = [
                         'inline_keyboard' => [
                             [
-                                ['text' => '📦 | اکانت های من', 'callback_data' => 'my_accounts']
+                                ['text' => '📦 | اکانت های من', 'callback_data' => 'accounts']
                             ],
                             [
                                 ['text' => '↪️ | بازگشت', 'callback_data' => 'main_menu']
@@ -1452,7 +1601,7 @@ function paycheck($query) {
                     $keyboard = [
                         'inline_keyboard' => [
                             [
-                                ['text' => '📦 | اکانت های من', 'callback_data' => 'my_accounts']
+                                ['text' => '📦 | اکانت های من', 'callback_data' => 'accounts']
                             ],
                             [
                                 ['text' => '↪️ | بازگشت', 'callback_data' => 'main_menu']
@@ -1480,8 +1629,7 @@ function paycheck($query) {
 
             $plan = getSellerPlans($payment['plan_id']);
             $planName = parsePlanTitle($plan['title'])['text'];
-            $planPrice = $plan['sell_price'] ?? null;
-
+            $planPrice = $redisData['final_price'] ?? $plan['sell_price'] ?? null;
             // Update paycheck message for admin
             $caption = "✅ سفارش شماره <code>$orderNumber</code> با موفقیت تایید شد\n\n👤 نام کاربری: <code>$clientUsername</code>\n📦 پلن:\n $planName\n💵 مبلغ: $planPrice";
             $keyboard = [
@@ -1507,7 +1655,7 @@ function paycheck($query) {
 
             $plan = getSellerPlans($payment['plan_id']);
             $planName = parsePlanTitle($plan['title'])['text'];
-            $planPrice = $plan['sell_price'] ?? null;
+            $planPrice = $redisData['final_price'] ?? $plan['sell_price'] ?? null;
 
             tg('sendMessage',[
                 'chat_id' => $chat_id,
@@ -1516,7 +1664,7 @@ function paycheck($query) {
                 'reply_markup' => json_encode([
                     'inline_keyboard' => [
                         [
-                            ['text' => '🏡 | خانه', 'callback_data' => 'main_menu']
+                            ['text' => '🏡 | خانه', 'callback_data' => 'new_menu']
                         ]
                     ]
                 ])
@@ -1631,15 +1779,15 @@ function showClient($cid) {
     
     // choose action label depending on whether client has an active plan
     $actionButton = $activePlan
-        ? ['text' => '📆 | رزرو اشتراک جدید برای این اکانت', 'callback_data' => "renew_acc:" . $client['username']]
-        : ['text' => '🛒 | خرید اشتراک برای این اکانت', 'callback_data' => "renew_acc:" . $client['username']];
+        ? ['text' => '📆 | رزرو اشتراک جدید برای این اکانت', 'callback_data' => "renew_acc:" . $client['username'] . ":accounts"]
+        : ['text' => '🛒 | خرید اشتراک برای این اکانت', 'callback_data' => "renew_acc:" . $client['username'] . ":accounts"];
 
     $keyboard = [
         'inline_keyboard' => [
             [ $actionButton ],
             [
                 ['text' => '🏡 | خانه', 'callback_data' => 'main_menu'],
-                ['text' => '↪️ | بازگشت', 'callback_data' => 'my_accounts']
+                ['text' => '↪️ | بازگشت', 'callback_data' => 'accounts']
             ]
         ]
     ];
@@ -1931,7 +2079,7 @@ function getTest($type) {
         $keyboard = [
             'inline_keyboard' => [
                 [
-                    ['text' => '📦 | اکانت های من', 'callback_data' => 'my_accounts']
+                    ['text' => '📦 | اکانت های من', 'callback_data' => 'accounts']
                 ],
                 [
                     ['text' => '↪️ | بازگشت', 'callback_data' => 'main_menu']
@@ -2237,7 +2385,7 @@ function keyboard($keyboard) {
                     // test row (may be empty)
                     $testBtn,
                     [
-                        ['text' => '📦 | اکانت های من', 'callback_data' => 'my_accounts'],
+                        ['text' => '📦 | اکانت های من', 'callback_data' => 'accounts'],
                         ['text' => '🛍️ | خرید / تمدید اکانت ', 'callback_data' => 'action:buy_or_renew_service']
                     ],
                     [
@@ -2258,7 +2406,7 @@ function keyboard($keyboard) {
                 ];
                 break;
 
-            case "my_accounts":
+            case "accounts":
                 $conn = new mysqli($db_host, $db_user, $db_pass, $db_name);
                 $stmt = $conn->prepare("SELECT * FROM clients WHERE chat_id = ?");
                 $stmt->bind_param("s", $uid);
@@ -2456,7 +2604,7 @@ function keyboard($keyboard) {
                 $keyboard = [
                     [
                         ['text' => '🏡 | خانه', 'callback_data' => 'main_menu'],
-                        ['text' => '↪️ | بازگشت', 'callback_data' => 'my_accounts']
+                        ['text' => '↪️ | بازگشت', 'callback_data' => 'accounts']
                     ]
                 ];
                 break;
@@ -2563,13 +2711,13 @@ function message($message, $variables = []) {
 
     $msg = match ($message) {
         "welcome_message" => $welcomeMessage,
-        "my_accounts" => "📦 اکانت های متصل یه حساب تلگرام شما:\n\n* در صورت عدم مشاهده اکانت خود، آن را اضافه کنید.",
+        "accounts" => "📦 اکانت های متصل یه حساب تلگرام شما:\n\n* در صورت عدم مشاهده اکانت خود، آن را اضافه کنید.",
         "get_test" => "🎁 لطفا نوع اکانت تست را انتخاب کنید:\n\n<b>📱 ویژه(پیشنهاد میشود):</b>\nدریافت نام کاربری و رمز عبور جهت ورود به نرم افزار Connectix و استفاده از 4 پروتکل و بیش از 10 کشور برای اتصال.\n\n<b>🔗 سابسکریبشن:</b>\nدریافت لینک سابسکریپشن جهت استفاده در نرم افزار هایی که از سرویس V2Ray پشتیبانی میکنند (مثل V2RayNG و V2Box)",
         "count" => "$typeEmoji نوع سرویس $groupName انتخاب شد.\n\n🔢 این اکانت را برای چند کاربر (دستگاه) قابل استفاده باشد؟",
         "buy" => "با تشکر از اعتماد و حسن انتخاب شما در خرید سرویس فیلترشکن {$appName} .\nلطفا نوع خرید خود را انتخاب کنید:\n\n<b>🔄️ تمدید اکانت فعلی:</b>\nاین دکمه برای خرید اشتراک برای اکانت قبلی استفاده میشود.\n\n<b>🛍️ خرید اکانت جدید:</b>\nاین دکمه برای خرید اکانت جدید استفاده میشود.",
         "group" => "لطفاً ابتدا نوع سرویس مدنظر را انتخاب کنید: 👇\n\n<b>📱 ویژه (پیشنهاد میشود):</b>\nدریافت نام کاربری و رمز عبور جهت ورود به نرم افزار Connectix و استفاده از 4 پروتکل و بیش از 10 کشور برای اتصال.\n\n<b>🔗 سابسکریبشن:</b>\nدریافت لینک سابسکریپشن جهت استفاده در نرم افزار هایی که از سرویس V2Ray پشتیبانی میکنند (مثل V2RayNG و V2Box)\n\n<b>📍 آی‌پی ثابت:</b>\nدریافت نام کاربری و رمز عبور جهت ورود به نرم افزار Connectix و استفاده از آیپی ثابت.",
         "renew" => "📦 لطفا اکانت مدنظر خود را جهت تمدید اشتراک انتخاب کنید:",
-        "card" => "\n\n💴  لطفاً مبلغ «" . $variables['amount'] . " تومان» را به شماره کارت زیر واریز و سپس سند پرداخت را به صورت تصویری در ادامه ارسال کنید:\n\n💳 شماره کارت: " . $config['card_number'] . "\n👤 به نام: " . $config['card_name'] . "\n",
+        "card" => "💸  لطفاً مبلغ لازمه را به شماره کارت زیر واریز و سپس سند پرداخت را به صورت تصویری در ادامه ارسال کنید:\n\n💴 مبلغ: " . $variables['amount'] . "\n💳 شماره کارت: " . $config['card_number'] . "\n👤 به نام: " . $config['card_name'] . "\n",
         "add_account" => "🔗 شما در حال متصل کردن اکانت قبلی به حساب تلگرام خود هستید.\n\n👤 لطفا نام کاربری اکانت را وارد نمایید:",
         "apps" => "⚙ لطفا سیستم عامل مدنظر خود را انتخاب کنید:",
         "guide" => "📖 لطفا نحوه آموزش را انتحاب کنید.",

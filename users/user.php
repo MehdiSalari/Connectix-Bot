@@ -1,4 +1,8 @@
 <?php
+//check php version
+if (version_compare(PHP_VERSION, '8.0.0', '<')) {
+    die('PHP version 8.0.0 or higher is required.');
+}
 session_start();
 if (!isset($_SESSION['admin_id'])) {
     header('Location: ../login.php');

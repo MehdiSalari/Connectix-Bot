@@ -364,6 +364,7 @@ function dbSetup()
     client_id VARCHAR(255),
     plan_id VARCHAR(255),
     price VARCHAR(255),
+    coupon VARCHAR(255),
     is_paid TINYINT(1) NULL,
     method VARCHAR(255),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP

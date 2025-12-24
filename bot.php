@@ -71,7 +71,7 @@ try {
             $RedisData = $redis->hgetall("user:steps:$uid");
             $redis->close();
 
-            if ($RedisData['pay']) {
+            if ($RedisData['pay'] && $RedisData['action'] != 'discount') {
                 // Check if send just image
                 if ($photo == null) {
                     $message = "🖼️ لطفا سند واریزی را به صورت تصویر ارسال کنید!";
@@ -240,6 +240,95 @@ try {
                         //     errorLog("Failed to send receipt error message to chat_id: $uid");
                         // }
                 }
+            } elseif ($RedisData['action'] == 'discount') {
+                $couponCode = $text;
+                $coupon = checkCoupon($couponCode);
+
+                // errorLog("coupon: " . json_encode($coupon));
+
+                //check is valid
+                if ($coupon) {
+                    // Check if active
+                    if ($coupon['is_active'] == true) {
+                        $dt = new DateTime('now', new DateTimeZone('Asia/Tehran'));
+                        $now = $dt->format('Y-m-d\TH:i:s.u\Z');  // UTC-formatted string for comparison
+
+                        $couponStart = $coupon['start_date_text'] ?? null;
+                        $couponEnd = $coupon['end_date_text'] ?? null;
+
+                        // New logic: 
+                        // - If start_date_text exists, check $now >= $couponStart (coupon has started)
+                        // - If end_date_text exists, check $now <= $couponEnd (not yet expired)
+                        // - If either is null, skip that check (treat as always true for that part)
+                        $hasStarted = is_null($couponStart) || ($now >= $couponStart);
+                        $notExpired = is_null($couponEnd) || ($now <= $couponEnd);
+
+                        if ($hasStarted && $notExpired) {
+                            // Check for plans
+                            if ($coupon['is_applied_to_all_plans'] == true) {
+                                // Accept
+                                $discountResult = discount("apply:null", $coupon);
+                            } else {
+                                $planID = $RedisData['plan'];
+                                $couponPlans = $coupon['plans_ids'];
+                                if (in_array($planID, $couponPlans)) {
+                                    // Accept
+                                    $discountResult = discount("apply:null", $coupon);
+                                } else {
+                                    $errorMessage = "🚫 کد تخفیف وارد شده برای پلن انتخابی شما نمیباشد!🚫";
+                                }
+                            }
+                        } else {
+                            $errorMessage = "🚫 کد تخفیف وارد شده منقضی شده یا هنوز فعال نشده است!🚫";
+                        }
+                    } else {
+                        $errorMessage = "🚫 کد تخفیف وارد شده غیرفعال است!🚫";
+                    }
+                } else {
+                    $errorMessage = "🚫 کد تخفیف وارد شده صحیح نمی باشد!🚫";
+                }
+                    
+                if ($errorMessage) {
+                    $result = tg('sendMessage',[
+                        'chat_id' => $uid,
+                        'text' => $errorMessage,
+                        'reply_markup' => json_encode([
+                                'inline_keyboard' => [
+                                    [
+                                        ['text' => '❌ | انصراف', 'callback_data' => 'pay_card:' . $RedisData['price']],
+                                    ]
+                                ]
+                            ])
+                        ]);
+                    if (!($result = json_decode($result))->ok) {
+                        errorLog("Failed to send receipt error message to chat_id: $uid | Message: {$result->description}");
+                    }
+                    exit;
+                }
+
+                if ($discountResult) {
+                    $variables = [
+                        'amount' => $discountResult
+                    ];
+                    $messsage = message('card', $variables);
+                    $keyboard = json_encode([
+                        'inline_keyboard' => [
+                            [
+                                ['text' => "🎟 | کد تخفیف « $couponCode » اعمال شد", 'callback_data' => 'not'],
+                            ],
+                            [
+                                ['text' => '❌ | انصراف', 'callback_data' => 'main_menu'],
+                            ]
+                        ]
+                    ]);
+                    $tgResult = tg('sendMessage',[
+                        'chat_id' => $uid,
+                        'text' => $messsage,
+                        'reply_markup' => $keyboard
+                    ]);
+                }
+                
+                break;
             }
     }
 
@@ -255,6 +344,15 @@ try {
                 'reply_markup' => keyboard('main_menu')
             ]);
             break;
+        case 'new_menu':
+            userInfo($uid, $callback_user_id, $callback_user_name);
+
+            $result = tg('sendMessage',[
+                'chat_id' => $callback_chat_id,
+                'text' => message('welcome_message'),
+                'reply_markup' => keyboard('main_menu')
+            ]);
+            break;
         case 'get_test':
             $result = tg('editMessageText',[
                 'chat_id' => $callback_chat_id,
@@ -264,12 +362,12 @@ try {
                 'reply_markup' => keyboard('get_test')
             ]);
             break;
-        case 'my_accounts':
+        case 'accounts':
             $result = tg('editMessageText',[
                 'chat_id' => $callback_chat_id,
                 'message_id' => $callback_message_id,
-                'text' => message('my_accounts'),
-                'reply_markup' => keyboard('my_accounts')
+                'text' => message('accounts'),
+                'reply_markup' => keyboard('accounts')
             ]);
             break;
         case 'add_account':
