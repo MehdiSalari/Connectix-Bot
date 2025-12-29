@@ -54,6 +54,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $supportMessage = $_POST['support_message'] ?? '';
     $faqMessage = $_POST['faq_message'] ?? '';
     $freeTrialMessage = $_POST['free_trial_message'] ?? '';
+    $autoPayment = $_POST['auto_payment'] ?? null;
+    $bank = $autoPayment == '1' ? ($_POST['bank'] ?? null) : null;
+    $botNotice = isset($_POST['bot_notice']) && $_POST['bot_notice'] == '1' && $bank ? true : false;
 
     // update config file
     $botConfig = [
@@ -68,11 +71,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'contact_support' => $supportMessage,
             'questions_and_answers' => $faqMessage,
             'free_test_account_created' => $freeTrialMessage
+        ],
+        'bank' => [
+            'name' => $bank,
+            'bot_notice' => $botNotice
         ]
     ];
 
     $config = json_encode($botConfig, JSON_PRETTY_PRINT);
     file_put_contents('setup/bot_config.json', $config);
+
+    if (!empty($bank)) {
+        // Check for sms_payments table in DB
+        $conn = new mysqli($db_host, $db_user, $db_pass, $db_name);
+        if ($conn->connect_error)
+            die("Connection failed: {$conn->connect_error}");
+
+        $result = $conn->query("SHOW TABLES LIKE 'sms_payments'");
+        if ($result->num_rows === 0) {
+            // Create sms_payments table
+            $sql = "CREATE TABLE IF NOT EXISTS sms_payments (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                message TEXT NOT NULL,
+                amount INT DEFAULT 0,
+                bank VARCHAR(255) DEFAULT NULL,
+                payment_id VARCHAR(255) DEFAULT NULL,
+                payment_type VARCHAR(255) DEFAULT NULL,
+                expired_at TIMESTAMP NULL DEFAULT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )";
+            if (!$conn->query($sql))
+                die("Failed to create sms table: {$conn->error}");
+        }
+        $conn->close();
+    }
 
     //update config in main panel
     //get data from api
@@ -152,6 +184,48 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if ($http_code != 200) {
             $errorMsg = "خطا در ارتباط با پنل مدیریت. کد خطا: $http_code";
+            echo "<script>alert('$errorMsg')</script>";
+            exit();
+        }
+
+        // Set bot webhook again after updating config with 2 seconds delay
+        sleep(2);
+        
+        if ((!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') 
+            || (!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https')
+            || (!empty($_SERVER['HTTP_X_FORWARDED_SSL']) && $_SERVER['HTTP_X_FORWARDED_SSL'] === 'on')) {
+            $protocol = "https";
+        } else {
+            $protocol = "http";
+        }
+
+        $current_url = $protocol . "://" . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
+        $full_url = str_replace("index.php", "bot.php", $current_url);
+
+        // If it's HTTP, throw an error and stop (Telegram only accepts HTTPS)
+        if ($protocol !== 'https') {
+            $errorMsg = "خطا: وب‌هوک فقط با HTTPS کار می‌کند. لطفاً SSL را فعال کنید.";
+            echo "<script>alert('$errorMsg')</script>";
+            exit();
+        }
+
+        $url = "https://api.telegram.org/bot{$botToken}/setWebhook?url={$full_url}";
+
+        $ch = curl_init();
+        curl_setopt_array($ch, [
+            CURLOPT_URL => $url,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => 30,
+        ]);
+
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $result = json_decode($response, true);
+        curl_close($ch);
+
+        if ($httpCode !== 200 || empty($result['ok'])) {
+            $error = $result['description'] ?? 'Unknown error';
+            $errorMsg = "خطا در تنظیم وب‌هوک: $error";
             echo "<script>alert('$errorMsg')</script>";
             exit();
         }
@@ -266,6 +340,122 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             color: #b500bbff;
             text-decoration: none;
         }
+
+        .toggler {
+            padding-bottom: 10px;
+            margin-right: 10px;
+        }
+
+        .toggler input {
+            display: none;
+        }
+
+        .toggler label {
+            display: block;
+            position: relative;
+            width: 72px;
+            height: 36px;
+            border: 1px solid #d6d6d6;
+            border-radius: 36px;
+            background: #e4e8e8;
+            cursor: pointer;
+        }
+
+        .toggler label::after {
+            display: block;
+            border-radius: 100%;
+            background-color: #d7062a;
+            content: '';
+            animation-name: toggler-size;
+            animation-duration: 0.15s;
+            animation-timing-function: ease-out;
+            animation-direction: forwards;
+            animation-iteration-count: 1;
+            animation-play-state: running;
+        }
+
+        .toggler label::after, .toggler label .toggler-on, .toggler label .toggler-off {
+            position: absolute;
+            top: 50%;
+            left: 25%;
+            width: 26px;
+            height: 26px;
+            transform: translateY(-50%) translateX(-50%);
+            transition: left 0.15s ease-in-out, background-color 0.2s ease-out, width 0.15s ease-in-out, height 0.15s ease-in-out, opacity 0.15s ease-in-out;
+        }
+
+        .toggler input:checked + label::after, .toggler input:checked + label .toggler-on, .toggler input:checked + label .toggler-off {
+            left: 75%;
+        }
+
+        .toggler input:checked + label::after {
+            background-color: #50ac5d;
+            animation-name: toggler-size2;
+        }
+
+        .toggler .toggler-on, .toggler .toggler-off {
+            opacity: 1;
+            z-index: 2;
+        }
+
+        .toggler input:checked + label .toggler-off, .toggler input:not(:checked) + label .toggler-on {
+            width: 0;
+            height: 0;
+            opacity: 0;
+        }
+
+        .toggler .path {
+            fill: none;
+            stroke: #fefefe;
+            stroke-width: 7px;
+            stroke-linecap: round;
+            stroke-miterlimit: 10;
+        }
+
+        @keyframes toggler-size {
+            0%, 100% {
+                width: 26px;
+                height: 26px;
+            }
+
+            50% {
+                width: 20px;
+                height: 20px;
+            }
+        }
+
+        @keyframes toggler-size2 {
+            0%, 100% {
+                width: 26px;
+                height: 26px;
+            }
+
+            50% {
+                width: 20px;
+                height: 20px;
+            }
+        }
+        
+        pre {
+            background-color: #232323ff;
+            padding: 10px;
+            color: #f8f8f2ff;
+            border-radius: 8px;
+            overflow-x: auto;
+            font-weight: 500;
+        }
+
+        select {
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid #d1d5dbff;
+            font-size: 16px;
+            width: 100%;
+            background-color: #f8f8f8ff;
+            color: #333333ff;
+            font-weight: 500;
+            margin-top: 8px;
+        }
     </style>
 </head>
 
@@ -364,6 +554,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $faqMessage = $config['messages']['questions_and_answers'] ?? '';
                 $freeTrialMessage = $config['messages']['free_test_account_created'] ?? '';
 
+                $bank = $config['bank']['name'] ?? null;
+                $botNotice = $config['bank']['bot_notice'] ?? false;
+
+                $banksFile = @file_get_contents('https://raw.githubusercontent.com/MehdiSalari/Connectix-Bot/main/bank/banks.json');
+                if ($banksFile === false) {
+                    $banksFile = file_get_contents('bank/banks.json');
+                }
+                $banks = json_decode($banksFile, true)['banks'] ?? [];
+                
                 // Videos path
                 $videos = $config['videos'] ?? [
                     'use' => '',
@@ -508,6 +707,98 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-4 focus:ring-blue-200 focus:border-blue-500 outline-none transition"
                         placeholder="متن پیام خوش آمد گویی را اینجا بنویسید..."><?= htmlspecialchars($freeTrialMessage) ?>
                         </textarea>
+                </div>
+
+                <!-- Auto Payment -->
+                <div class="border-t-2 border-gray-200 pt-8"></div>
+                <h3 class="text-xl font-bold text-gray-800 mb-6 flex items-center gap-3">
+                    <i class="fas fa-credit-card text-green-600"></i>
+                    تنظیمات تایید خودکار پرداخت
+                </h3>
+                
+                <p class="text-gray-600 mb-4">تایید خودکار پرداخت از طریق بررسی پیامک واریزی</p>
+                <div class="flex items-center gap-2">
+                    <div class="toggler">
+                        <input id="toggler-1" name="auto_payment" type="checkbox" value="<?= $bank ? '1' : '0' ?>" <?= $bank ? 'checked' : '' ?>>
+                        <label for="toggler-1">
+                            <svg class="toggler-on" version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 130.2 130.2">
+                                <polyline class="path check" points="100.2,40.2 51.5,88.8 29.8,67.5"></polyline>
+                            </svg>
+                            <svg class="toggler-off" version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 130.2 130.2">
+                                <line class="path line" x1="34.4" y1="34.4" x2="95.8" y2="95.8"></line>
+                                <line class="path line" x1="95.8" y1="34.4" x2="34.4" y2="95.8"></line>
+                            </svg>
+                        </label>
+                    </div>
+                    <label class="block text-gray-700 font-semibold mb-2">فعال سازی تایید خودکار پرداخت</label>
+                </div>
+
+                <!-- Auto Payment Container -->
+                <div style="margin-top: 5px;" id="autoPaymentContainer" style="display: none;">
+
+                    <div class="flex items-center gap-2 mb-2">
+                        <div class="toggler">
+                            <input id="toggler-2" name="bot_notice" type="checkbox" value="<?= $bank ? '1' : '0' ?>" <?= $bank ? 'checked' : '' ?>>
+                            <label for="toggler-2">
+                                <svg class="toggler-on" version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 130.2 130.2">
+                                    <polyline class="path check" points="100.2,40.2 51.5,88.8 29.8,67.5"></polyline>
+                                </svg>
+                                <svg class="toggler-off" version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 130.2 130.2">
+                                    <line class="path line" x1="34.4" y1="34.4" x2="95.8" y2="95.8"></line>
+                                    <line class="path line" x1="95.8" y1="34.4" x2="34.4" y2="95.8"></line>
+                                </svg>
+                            </label>
+                        </div>
+                        <label class="block text-gray-700 font-semibold mb-2">دریافت پیامک واریزی از طریق ربات</label>
+                    </div>
+
+                    <div class="bg-gray-100 p-4 mb-4 rounded-lg">
+                        <p class="text-gray-700">بانک خود را انتخاب کنید:</p>
+                        <select name="bank" id="bank" style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 8px; margin-top: 8px;">
+                            <option value="">انتخاب کنید</option>
+                            <?php foreach ($banks as $b): ?> <!-- Load avaliable banks -->
+                            <option <?= $bank === $b['name'] ? 'selected' : '' ?> value="<?= htmlspecialchars($b['name']) ?>"><?= htmlspecialchars($b['title']) ?></option>
+                            <?php endforeach ?>
+                        </select>
+                    </div>
+
+                    <div class="bg-gray-100 p-4 mb-4 rounded-lg">
+                        <p class="text-gray-700">نرم افزار مورد نیاز جهت فروارد پیامک های دریافتی:</p>
+                        <p style="display: flex; justify-content: center;" class="text-gray-600 mb-2"><strong>SMS Forwarder</strong></p>
+                        <p style="display: flex; justify-content: center;" class="text-gray-600 mb-2">
+                            <!-- Google Play -->
+                            <a href="https://play.google.com/store/apps/details?id=com.frzinapps.smsforward" target="_blank" class="text-blue-600 underline">
+                                <img src="https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png" style="width: 200px;">
+                            </a>
+                            <!-- App Store -->
+                            <a href="https://apps.apple.com/pk/app/sms-forwarder-forward-sms/id6693285061" target="_blank" class="text-blue-600 underline px-4 pt-3">
+                                <img src="https://developer.apple.com/assets/elements/badges/download-on-the-app-store.svg" style="height: 55px;">
+                            </a>
+                            <!-- farsroid -->
+                            <a href="https://www.farsroid.com/sms-forwarder-android/" target="_blank" class="text-blue-600 underline">
+                                <img src="assets/images/components/farsroid.png" alt="" style="width: 200px;">
+                            </a>
+                        </p>
+                    </div>
+
+                    <div class="bg-gray-100 p-4 mb-4 rounded-lg">
+                        <p class="text-gray-700">آدرس API جهت ارسال متن پیامک:</p>
+                        <p dir="ltr" class="text-gray-600 mb-2"><strong>Method:</strong> POST</p>
+                        <pre dir="ltr" style="display: flex;">
+                            <code>https://<?= $_SERVER['HTTP_HOST'] . dirname($_SERVER['REQUEST_URI']) ?>/bank/sms.php</code>
+                        </pre>
+                    </div>
+
+                    <div class="bg-gray-100 p-4 mb-4 rounded-lg">
+                        <p class="text-gray-700">پارامتر مورد نیاز:</p>
+                        <pre dir="ltr" style="display: flex;">
+                            <span>
+                                {
+                                    "msg" : "متن پیامک دریافتی از بانک"
+                                }
+                            </span>
+                        </pre>
+                    </div>
                 </div>
 
                 <!-- Buttons -->
@@ -848,6 +1139,52 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 dropdownMenu.classList.add('hidden');
             }
         });
+
+        document.addEventListener('DOMContentLoaded', function () {
+
+            const hasBank = <?= (!empty($bank)) ? 'true' : 'false' ?>;
+            const botNotice = <?= (!empty($botNotice)) ? 'true' : 'false' ?>
+
+            const toggler1 = document.getElementById('toggler-1');
+            const toggler2 = document.getElementById('toggler-2');
+            const container = document.getElementById('autoPaymentContainer');
+            const bankSelector = document.getElementById('bank');
+
+            if (!hasBank) {
+                // bank خالی یا null
+                toggler1.checked = false;
+                toggler1.value = '0';
+                container.style.display = 'none';
+            } else {
+                // bank وجود دارد
+                toggler1.checked = true;
+                toggler1.value = '1';
+                container.style.display = 'block';
+            }
+
+            if (bank && botNotice) {
+                toggler2.checked = true;
+                toggler2.value = '1';
+            } else {
+                toggler2.checked = false;
+                toggler2.value = '0';
+            }
+
+            // on change toggler1
+            toggler1.addEventListener('change', function () {
+                this.value = this.checked ? '1' : '0';
+                container.style.display = this.checked ? 'block' : 'none';
+                // if checked selector required
+                bankSelector.required = this.checked;
+            });
+
+            // on change toggler2
+            toggler2.addEventListener('change', function () {
+                this.value = this.checked ? '1' : '0';
+            });
+
+        });
+
     </script>
 </body>
 

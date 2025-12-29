@@ -1,6 +1,13 @@
 <?php
 require 'functions.php';
 
+// Check for request method
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    header('location: index.php');
+    exit;
+}
+
+// Get the content of the request
 $content = file_get_contents('php://input');
 
 // Save the content to a file for debugging
@@ -332,6 +339,7 @@ try {
             }
     }
 
+    $result = null;
     //Handle Callbacks
     switch ($callback_data) {
         case 'main_menu':

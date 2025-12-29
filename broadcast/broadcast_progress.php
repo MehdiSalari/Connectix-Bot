@@ -21,11 +21,6 @@ if (!$isTest) {
     while ($row = $result->fetch_assoc()) $userIds[] = $row['chat_id'];
 }
 
-//for test use a chat id in userIds
-$userIds = ['85023428',
-            '123456789'
-];
-
 foreach ($userIds as $index => $chatId) {
     if (!$isTest && file_get_contents('broadcast_done.txt') > $index) continue;
 
@@ -46,6 +41,9 @@ foreach ($userIds as $index => $chatId) {
         $params[$method === 'sendPhoto' ? 'photo' : ($method === 'sendVideo' ? 'video' : ($method === 'sendAnimation' ? 'animation' : ($method === 'sendVoice' ? 'voice' : 'document')))] = new CURLFile($mediaPath);
         if ($message) $params['caption'] = $message;
     }
+
+    $params['parse_mode'] = 'HTML';
+    $params['reply_markup'] = json_encode(['remove_keyboard' => true]);
 
     $res = tg($method, $params);
 

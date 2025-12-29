@@ -210,7 +210,10 @@ function fetchBotConfig($panelToken) {
                     'questions_and_answers' => $faqMessage,
                     'free_test_account_created' => $freeTrialMessage
                 ],
-                'selected_bank' => null
+                'bank' => [
+                    'name' => null,
+                    'bot_notice' => false
+                ]
             ];
 
             $botConfigJson = json_encode($botConfig, JSON_PRETTY_PRINT);

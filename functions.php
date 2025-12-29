@@ -5,7 +5,8 @@ if (!file_exists(__DIR__ . '/config.php')) {
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/gregorian_jalali.php';
 define('BOT_TOKEN', $botToken);  // Bot token for authentication with Telegram API
-define('TELEGRAM_URL', 'https://api.telegram.org/bot' . BOT_TOKEN . '/');  // Base URL for Telegram Bot API
+// define('TELEGRAM_URL', 'https://api.telegram.org/bot' . BOT_TOKEN . '/');  // Base URL for Telegram Bot API
+define('TELEGRAM_URL', 'https://mehdisalari.ir/bot/tgtunnel.php?bot_token=' . BOT_TOKEN . '&method=');
 
 function tg($method, $params = []) {
     if (!$params) {
@@ -801,7 +802,107 @@ function always($info) {
     $lastPlan = $clientPlans[0];
 
     return renew('plan:' . $lastPlan['name']);
+}
 
+function smsPayment($action, $data) {
+    global $db_host, $db_user, $db_pass, $db_name;
+    $conn = new mysqli($db_host, $db_user, $db_pass, $db_name);
+    
+    if ($conn->connect_error) {
+        header("Content-Type: application/json");
+        http_response_code(500); // Internal Server Error
+        echo json_encode([
+            'status' => 'error',
+            'message' => 'Database connection failed'
+        ]);
+        errorLog("Error: DB Connection Error: {$conn->connect_error}");
+        return false;
+    }
+
+    //check for db table existence
+    $tableCheckResult = $conn->query("SHOW TABLES LIKE 'sms_payments'");
+    if ($tableCheckResult->num_rows === 0) {
+        header("Content-Type: application/json");
+        http_response_code(500); // Internal Server Error
+        echo json_encode([
+            'status' => 'error',
+            'message' => 'Error: Database table [sms_payments] not found, please configure bank settings in admin panel.'
+        ]);
+        errorLog("Database table 'sms_payments' not found");
+        return false;
+    }
+
+    //delete rows that are expired and payment_id is null
+    $conn->query("DELETE FROM sms_payments WHERE expired_at < NOW() AND payment_id IS NULL");
+
+    // Perform actions based on the provided action
+    switch ($action) {
+        case 'save':
+            $message = $data['message'];
+            $amount = (int)$data['amount'];
+            $adminBank = $data['bank'];
+
+            $stmt = $conn->prepare("INSERT INTO sms_payments (message, amount, bank, expired_at) VALUES (?, ?, ?, DATE_ADD(NOW(), INTERVAL 5 MINUTE))");
+            $stmt->bind_param("sis", $message, $amount, $adminBank);
+            $dbResult = $stmt->execute();
+            $stmt->close();
+            $conn->close();
+
+            if (!$dbResult) {
+                header("Content-Type: application/json");
+                http_response_code(500); // Internal Server Error
+                echo json_encode([
+                    'status' => 'error',
+                    'message' => 'Failed to save SMS payment data'
+                ]);
+                errorLog("Failed to insert SMS payment data: {$conn->error}");
+                return false;
+            }
+
+            return true;
+            
+        case 'check':
+            $amount = $data;
+            $stmt = $conn->prepare("SELECT * FROM sms_payments WHERE amount = ? AND payment_id IS NULL AND expired_at > NOW() AND created_at <= NOW()");
+            $stmt->bind_param("s", $amount);
+            $stmt->execute();
+            $result = $stmt->get_result();
+            $payments = $result->fetch_all(MYSQLI_ASSOC);
+            $stmt->close();
+            $conn->close();
+
+            if (count($payments) > 1) {
+                return false;
+            }
+
+            $smsID = $payments[0]['id'] ?? null;
+
+            return $smsID ?? false;
+
+        case 'pay':
+            $smsID = $data['sms_id'];
+            $paymentID = $data['payment_id'];
+            $paymentType = $data['payment_type'];
+
+            $stmt = $conn->prepare("UPDATE sms_payments SET payment_id = ?, payment_type = ? WHERE id = ?");
+            $stmt->bind_param("ssi", $paymentID, $paymentType, $smsID);
+            $dbResult = $stmt->execute();
+            $stmt->close();
+            $conn->close();
+
+            if (!$dbResult) {
+                header("Content-Type: application/json");
+                http_response_code(500); // Internal Server Error
+                echo json_encode([
+                    'status' => 'error',
+                    'message' => 'Failed to update SMS payment data'
+                ]);
+                errorLog("Failed to update SMS payment data: {$conn->error}");
+                return false;
+            }
+
+            return true;
+        }
 }
 
 function callBackCheck($callback_data) {
@@ -1532,8 +1633,9 @@ function getClientByUsername($username) {
 
 function payment($receipt, $action) {
     try {
-        $bot_config = file_get_contents('setup/bot_config.json');
-        $admin_chat_id = json_decode($bot_config, true)['admin_id'];
+        $bot_config = json_decode(file_get_contents('setup/bot_config.json'));
+        $autoPayment = $bot_config->bank->name ? true : false;
+        $admin_chat_id = $bot_config->admin_id ?? null;
         $uid = UID;
         switch ($action) {
             case 'buy':
@@ -1552,12 +1654,32 @@ function payment($receipt, $action) {
                 $isPaid = null;
                 $client_id = ($RedisData['acc'] == 'new') ? 'new' : getClientByUsername($RedisData['acc'])['id'];
                 
-                $planPice = number_format($RedisData['final_price']) ?? $selectedPlan['sell_price'];
+                $planPice = isset($RedisData['final_price']) ? number_format($RedisData['final_price']) : $selectedPlan['sell_price'];
 
                 $coupon = $RedisData['coupon_code'] ?? null;
                 
                 // Save payment to database
                 $paymentId = savePayment( $client_id, $selectedPlan['id'], $planPice, $isPaid, $RedisData['pay'], $coupon);
+
+                // Check autopayment setting
+                if ($autoPayment) {
+                    $amount = str_replace(',', '', $planPice);
+                    $smsCheck = smsPayment('check', $amount);
+                    if ($smsCheck != false) {
+                        $smsID = $smsCheck;
+
+                        // Increase wallet balance
+                        paycheck("accept:$paymentId");
+
+                        $data = [
+                            'sms_id' => $smsID,
+                            'payment_id' => $paymentId,
+                            'payment_type' => 'buy',
+                        ];
+                        smsPayment('pay', $data);
+                        exit;
+                    }
+                }
                 
                 $photo_id = end($receipt)['file_id'];
                 $planName = parsePlanTitle($selectedPlan['title'])['text'];
@@ -1612,6 +1734,24 @@ function payment($receipt, $action) {
                 $amount = $walletData['amount'];
                 $textAmount = number_format($amount);
 
+                // Check autopayment setting
+                if ($autoPayment) {
+                    $smsCheck = smsPayment('check', $amount);
+                    if ($smsCheck != false) {
+                        $smsID = $smsCheck;
+
+                        // Increase wallet balance
+                        walletReqs("accept:$txID");
+
+                        $data = [
+                            'sms_id' => $smsID,
+                            'payment_id' => $txID,
+                            'payment_type' => 'wallet',
+                        ];
+                        smsPayment('pay', $data);
+                        exit;
+                    }
+                }
 
                 $photo_id = end($receipt)['file_id'];
 
@@ -1785,7 +1925,7 @@ function paycheck($query) {
                                 ['text' => '📦 | اکانت های من', 'callback_data' => 'accounts']
                             ],
                             [
-                                ['text' => '↪️ | بازگشت', 'callback_data' => 'main_menu']
+                                ['text' => '↪️ | بازگشت', 'callback_data' => 'new_menu']
                             ]
                         ]
                     ];
@@ -2305,7 +2445,7 @@ function getTest($type) {
                     ['text' => '📦 | اکانت های من', 'callback_data' => 'accounts']
                 ],
                 [
-                    ['text' => '↪️ | بازگشت', 'callback_data' => 'main_menu']
+                    ['text' => '↪️ | بازگشت', 'callback_data' => 'new_menu']
                 ]
             ]
         ];
