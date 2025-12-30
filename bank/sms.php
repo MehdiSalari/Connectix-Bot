@@ -84,7 +84,7 @@ if ($amount === -1) {
         'message' => 'Amount not found in message',
         'bank' => $adminBank
     ]);
-    errorLog("Failed to extract amount from message: $message | For bank: $adminBank");
+    errorLog("Failed to extract amount from message: $message | For bank: $adminBank", "sms.php", 87);
     exit;
 }
 
@@ -120,7 +120,7 @@ if ($botNotice) {
     ]);
 
     if ($tgResult && !($result = json_decode($tgResult))->ok) {
-        errorLog("Error in sending message to chat_id: $adminID | Message: {$result->description}");
+        errorLog("Error in sending message to chat_id: $adminID | Message: {$result->description}", "sms.php", 123);
         exit;
     }
 }

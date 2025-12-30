@@ -64,7 +64,7 @@ try {
                 // 'reply_markup' => json_encode(['remove_keyboard' => true])
             ]);
             if (!($result = json_decode($result))->ok) {
-                errorLog("Failed to send /start message to chat_id: $uid | Message: {$result->description}");
+                errorLog("Failed to send /start message to chat_id: $uid | Message: {$result->description}", "bot.php", 67);
                 exit;
             }
             break;
@@ -94,7 +94,7 @@ try {
                             ])
                         ]);
                     if (!($result = json_decode($result))->ok) {
-                        errorLog("Failed to send receipt error message to chat_id: $uid | Message: {$result->description}");
+                        errorLog("Failed to send receipt error message to chat_id: $uid | Message: {$result->description}", "bot.php", 97);
                         exit;
                     }
                     break;
@@ -103,7 +103,7 @@ try {
                 $payment = payment($photo, 'buy');
 
                 if (!$payment) {
-                    errorLog("Failed to send receipt error message to chat_id: $uid");
+                    errorLog("Failed to send receipt error message to chat_id: $uid", "bot.php", 106);
                 }
                 break;
             }
@@ -119,7 +119,7 @@ try {
                             'text' => "نام کاربری واردشده: $username\nلطفا رمزعبور حساب را وارد نمایید",
                         ]);
                         if (!($result = json_decode($result))->ok) {
-                            errorLog("Failed to send receipt error message to chat_id: $uid | Message: {$result->description}");
+                            errorLog("Failed to send receipt error message to chat_id: $uid | Message: {$result->description}", "bot.php", 122);
                             exit;
                         }
                         break;
@@ -138,7 +138,7 @@ try {
                             ])
                         ]);
                         if (!($result = json_decode($result))->ok) {
-                            errorLog("Failed to send receipt error message to chat_id: $uid | Message: {$result->description}");
+                            errorLog("Failed to send receipt error message to chat_id: $uid | Message: {$result->description}", "bot.php", 141);
                             exit;
                         }
                         break;
@@ -155,7 +155,7 @@ try {
                             ]);
                                 
                             if (!($result = json_decode($result))->ok) {
-                                errorLog("Failed to send receipt error message to chat_id: $uid | Message: {$result->description}");
+                                errorLog("Failed to send receipt error message to chat_id: $uid | Message: {$result->description}", "bot.php", 158);
                                 exit;
                             }
                             break;
@@ -170,7 +170,7 @@ try {
                             ]);
                                 
                             if (!($result = json_decode($result))->ok) {
-                                errorLog("Failed to send receipt error message to chat_id: $uid | Message: {$result->description}");
+                                errorLog("Failed to send receipt error message to chat_id: $uid | Message: {$result->description}", "bot.php", 173);
                                 exit;
                             }
                             break;
@@ -199,7 +199,7 @@ try {
                             ])
                         ]);
                         if (!($result = json_decode($result))->ok) {
-                            errorLog("Failed to send receipt error message to chat_id: $uid | Message: {$result->description}");
+                            errorLog("Failed to send receipt error message to chat_id: $uid | Message: {$result->description}", "bot.php", 202);
                             exit;
                         }
                         break;
@@ -220,7 +220,7 @@ try {
                                     ])
                                 ]);
                             if (!($result = json_decode($result))->ok) {
-                                errorLog("Failed to send receipt error message to chat_id: $uid | Message: {$result->description}");
+                                errorLog("Failed to send receipt error message to chat_id: $uid | Message: {$result->description}", "bot.php", 223);
                                 exit;
                             }
                             break;
@@ -244,14 +244,12 @@ try {
                         $payment = payment($photo, 'wallet');
 
                         // if (!$payment) {
-                        //     errorLog("Failed to send receipt error message to chat_id: $uid");
+                        //     errorLog("Failed to send receipt error message to chat_id: $uid", "bot.php", 247);
                         // }
                 }
             } elseif ($RedisData['action'] == 'discount') {
                 $couponCode = $text;
                 $coupon = checkCoupon($couponCode);
-
-                // errorLog("coupon: " . json_encode($coupon));
 
                 //check is valid
                 if ($coupon) {
@@ -308,7 +306,7 @@ try {
                             ])
                         ]);
                     if (!($result = json_decode($result))->ok) {
-                        errorLog("Failed to send receipt error message to chat_id: $uid | Message: {$result->description}");
+                        errorLog("Failed to send receipt error message to chat_id: $uid | Message: {$result->description}", "bot.php", 309);
                     }
                     exit;
                 }
@@ -475,7 +473,7 @@ try {
             if ($walletBalance == null) {
                 $createWallet = wallet('create', $callback_chat_id, '0');
                 if (!$createWallet) {
-                    errorLog("Error in creating wallet for user {$callback_chat_id}");
+                    errorLog("Error in creating wallet for user {$callback_chat_id}", "bot.php", 476);
                     die();
                 }
                 $walletBalance = '0';
@@ -519,7 +517,7 @@ try {
                 ], $params));
 
                 if (!($result = json_decode($result))->ok) {
-                    errorLog("Error in sending message to chat_id: $uid | Message: {$result->description}");
+                    errorLog("Error in sending message to chat_id: $uid | Message: {$result->description}", "bot.php", 520);
                     exit;
                 }
             }
@@ -527,11 +525,11 @@ try {
             break;
     }
     if ($result && !($result = json_decode($result))->ok) {
-        errorLog("Error in sending message to chat_id: $uid | Message: {$result->description}");
+        errorLog("Error in sending message to chat_id: $uid | Message: {$result->description}", "bot.php", 528);
         exit;
     }
 } catch (Exception $e) {
     // Log any exceptions for debugging
-    errorLog($e->getMessage() . " | " . $e->getTraceAsString());
+    errorLog($e->getMessage() . " | " . $e->getTraceAsString(), "bot.php", 533);
 }
 

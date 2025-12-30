@@ -56,7 +56,7 @@ function getUser($chat_id) {
     global $db_host, $db_user, $db_pass, $db_name;
     $conn = new mysqli($db_host, $db_user, $db_pass, $db_name);
     if ($conn->connect_error) {
-        errorLog("Connection failed: " . $conn->connect_error);
+        errorLog("Connection failed: " . $conn->connect_error, "functions.php", 59);
     }
     $stmt = $conn->prepare("SELECT * FROM users WHERE chat_id = ?");
     $stmt->bind_param("i", $chat_id);
@@ -79,7 +79,7 @@ function userInfo($chat_id, $user_id, $user_name) {
         global $db_host, $db_user, $db_pass, $db_name;
         $conn = new mysqli($db_host, $db_user, $db_pass, $db_name);
         if ($conn->connect_error) {
-            errorLog("Connection failed: " . $conn->connect_error);
+            errorLog("Connection failed: " . $conn->connect_error, "functions.php", 82);
         }
         $stmt = $conn->prepare("SELECT * FROM users WHERE chat_id = ?");
         $stmt->bind_param("i", $chat_id);
@@ -98,7 +98,7 @@ function userInfo($chat_id, $user_id, $user_name) {
         $stmt->close();
         $conn->close();
     } catch (Exception $e) {
-        errorLog("Exception: " . $e->getMessage());
+        errorLog("Exception: " . $e->getMessage(), "functions.php", 101);
     }
 }
 
@@ -126,9 +126,9 @@ function getAdminById($id) {
     return $admin;
 }
 
-function errorLog($message) {
+function errorLog($message, $file, $line) {
     // Add timestamp to the log entry
-    file_put_contents( __DIR__ .'/debug/error_log.log', date('Y-m-d H:i:s') . " - " . $message . "\n", FILE_APPEND);
+    file_put_contents( __DIR__ .'/debug/error_log.log', date('Y-m-d H:i:s') . " - " . $message . " | in file: " . $file . " | at line: " . $line . "\n", FILE_APPEND);
 
     //send to telegram for admin
         //get admin chat id
@@ -142,7 +142,7 @@ function errorLog($message) {
         $chat_id = $row['chat_id'];
         tg('sendMessage',[
             'chat_id' => $chat_id,
-            'text' => $message
+            'text' => $message . " in file: " . $file . " at line: " . $line
         ]);
     }
     $stmt->close();
@@ -605,7 +605,7 @@ function discount($query, $coupon = null) {
                 $discountAmount = ($originalPrice * $percentValue) / 100;
                 $finalPrice = $originalPrice - $discountAmount;
 
-                // errorLog("coupon: {$coupon['code']} applied - {$percentValue}% discount ({$discountAmount} off) - original: {$originalPrice} → final: {$finalPrice}");
+                // errorLog("coupon: {$coupon['code']} applied - {$percentValue}% discount ({$discountAmount} off) - original: {$originalPrice} → final: {$finalPrice}", "functions.php", 608);
             } elseif ($isAmount) {
                 $amountValue = (int)$coupon['amount'];
                 $discountAmount = $amountValue;
@@ -616,9 +616,9 @@ function discount($query, $coupon = null) {
                     $finalPrice = 0;
                 }
 
-                // errorLog("coupon: {$coupon['code']} applied - {$amountValue} amount discount - original: {$originalPrice} → final: {$finalPrice}");
+                // errorLog("coupon: {$coupon['code']} applied - {$amountValue} amount discount - original: {$originalPrice} → final: {$finalPrice}", "functions.php", 619);
             } else {
-                errorLog("coupon: {$coupon['code']} has no valid discount value!");
+                errorLog("coupon: {$coupon['code']} has no valid discount value!", "functions.php", 621);
                 return false;
             }
 
@@ -639,7 +639,7 @@ function discount($query, $coupon = null) {
                 ]);
 
             if (!($tgResult = json_decode($tgResult))->ok) {
-                errorLog("Failed to send discount message to chat_id: $uid | Message: {$tgResult->description}");
+                errorLog("Failed to send discount message to chat_id: $uid | Message: {$tgResult->description}", "functions.php", 642);
                 exit;
             }
             return $finalPrice;
@@ -719,7 +719,7 @@ function always($info) {
             $stmt->execute();
 
             if ($conn->connect_error || $stmt->error) {
-                errorLog("Error in connecting to DB or preparing statement: " . ($conn->connect_error ?? $stmt->error));
+                errorLog("Error in connecting to DB or preparing statement: " . ($conn->connect_error ?? $stmt->error), "functions.php", 722);
             }
 
             $result = $stmt->get_result();
@@ -789,8 +789,7 @@ function always($info) {
             $acc = $data;
             renew("acc:$acc");
             $clientData = getClientByUsername($acc);
-            // errorLog("renew acc: " . json_encode($clientData));
-            // exit;
+
             $clientPlan = $clientData['plan_name'] ?? [];
 
             return renew("plan:$clientPlan");
@@ -815,7 +814,7 @@ function smsPayment($action, $data) {
             'status' => 'error',
             'message' => 'Database connection failed'
         ]);
-        errorLog("Error: DB Connection Error: {$conn->connect_error}");
+        errorLog("Error: DB Connection Error: {$conn->connect_error}", "functions.php", 817);
         return false;
     }
 
@@ -828,7 +827,7 @@ function smsPayment($action, $data) {
             'status' => 'error',
             'message' => 'Error: Database table [sms_payments] not found, please configure bank settings in admin panel.'
         ]);
-        errorLog("Database table 'sms_payments' not found");
+        errorLog("Database table 'sms_payments' not found", "functions.php", 830);
         return false;
     }
 
@@ -855,7 +854,7 @@ function smsPayment($action, $data) {
                     'status' => 'error',
                     'message' => 'Failed to save SMS payment data'
                 ]);
-                errorLog("Failed to insert SMS payment data: {$conn->error}");
+                errorLog("Failed to insert SMS payment data: {$conn->error}", "functions.php", 857);
                 return false;
             }
 
@@ -897,7 +896,7 @@ function smsPayment($action, $data) {
                     'status' => 'error',
                     'message' => 'Failed to update SMS payment data'
                 ]);
-                errorLog("Failed to update SMS payment data: {$conn->error}");
+                errorLog("Failed to update SMS payment data: {$conn->error}", "functions.php", 899);
                 return false;
             }
 
@@ -963,7 +962,7 @@ function guide($action) {
             ]);
 
             if (!($result = json_decode($result))->ok) {
-                errorLog("Error in sending message to chat_id: $uid | Message: {$result->description}");
+                errorLog("Error in sending message to chat_id: $uid | Message: {$result->description}", "functions.php", 965);
                 exit;
             }
             exit();
@@ -1018,7 +1017,7 @@ function guide($action) {
             ]);
 
             if (!($result = json_decode($result))->ok) {
-                errorLog("Error in sending message to chat_id: $uid | Message: {$result->description}");
+                errorLog("Error in sending message to chat_id: $uid | Message: {$result->description}", "functions.php", 1020);
                 exit;
             }
             exit();
@@ -1579,7 +1578,7 @@ function checkout($data) {
                 ]);
                 
                 if (!($result = json_decode($result))->ok) {
-                    errorLog("Error in sending message to chat_id: $uid | Message: {$result->description}");
+                    errorLog("Error in sending message to chat_id: $uid | Message: {$result->description}", "functions.php", 1581);
                 }
                 exit;
             }
@@ -1601,7 +1600,7 @@ function checkout($data) {
             // Decrement wallet balance
             $walletBalance = wallet('DECREASE', $uid, $amountInt);
             if (!$walletBalance) {
-                errorLog("Error in decrementing wallet balance for user_id: $uid");
+                errorLog("Error in decrementing wallet balance for user_id: $uid", "functions.php", 1603);
                 exit();
             }
 
@@ -1691,7 +1690,7 @@ function payment($receipt, $action) {
                 ]);
 
                 if (!($result = json_decode($result))->ok) {
-                    errorLog("Failed to send receipt error message to chat_id: $uid | Message: {$result->description}");
+                    errorLog("Failed to send receipt error message to chat_id: $uid | Message: {$result->description}", "functions.php", 1693);
                     exit;
                 }
 
@@ -1718,7 +1717,7 @@ function payment($receipt, $action) {
                 ]);
 
                 if (!($result = json_decode($result))->ok) {
-                    errorLog("Failed to send receipt error message to chat_id: $uid | Message: {$result->description}");
+                    errorLog("Failed to send receipt error message to chat_id: $uid | Message: {$result->description}", "functions.php", 1720);
                     exit;
                 }
 
@@ -1762,7 +1761,7 @@ function payment($receipt, $action) {
                 ]);
 
                 if (!($result = json_decode($result))->ok) {
-                    errorLog("Failed to send receipt error message to chat_id: $uid | Message: {$result->description}");
+                    errorLog("Failed to send receipt error message to chat_id: $uid | Message: {$result->description}", "functions.php", 1764);
                     exit;
                 }
 
@@ -1791,7 +1790,7 @@ function payment($receipt, $action) {
 
         }
     } catch (Exception $e) {
-        errorLog("Error: Database operation failed: " . $e->getMessage());
+        errorLog("Error: Database operation failed: " . $e->getMessage(), "functions.php", 1793);
     }
 }
 
@@ -1840,7 +1839,7 @@ function savePayment ($client_id, $plan_id, $price, $isPaid, $method, $coupon = 
     $conn->close();
 
     if (!$result) {
-        errorLog("Error in inserting payment: " . $conn->error);
+        errorLog("Error in inserting payment: " . $conn->error, "functions.php", 1842);
     } 
     return $paymentId;
 }
@@ -1882,7 +1881,7 @@ function paycheck($query) {
                     $user_id = $user['id'];
                     $response = createClient($name, $chat_id, $telegram_id, $payment['plan_id']);
                     if ($response === false) {
-                        errorLog("Error in creating client: " . $conn->error);
+                        errorLog("Error in creating client: " . $conn->error, "functions.php", 1884);
                         break 2;
                     }
                     $client_id = json_decode($response, true)['client_id'];
@@ -1900,7 +1899,7 @@ function paycheck($query) {
                     $result = $stmt->execute();
                     $stmt->close();
                     if (!$result) {
-                        errorLog("Error in inserting client: " . $conn->error);
+                        errorLog("Error in inserting client: " . $conn->error, "functions.php", 1902);
                     }
 
                     //Update Client ID in Payment
@@ -1909,7 +1908,7 @@ function paycheck($query) {
                     $result = $stmt->execute();
                     $stmt->close();
                     if (!$result) {
-                        errorLog("Error in updating payment: " . $conn->error);
+                        errorLog("Error in updating payment: " . $conn->error, "functions.php", 1911);
                     }
 
                     // Send account data to user
@@ -1940,7 +1939,7 @@ function paycheck($query) {
                 default: // Update Account
                     $response = updateClient($payment['client_id'], $payment['plan_id']);
                     if ($response === false) {
-                        errorLog("Error in updating client: " . $conn->error);
+                        errorLog("Error in updating client: " . $conn->error, "functions.php", 1942);
                         break 2;
                     }
                     $client_id = $payment['client_id'];
@@ -1979,7 +1978,7 @@ function paycheck($query) {
             $stmt->close();
             $conn->close();
             if (!$result) {
-                errorLog("Error in updating payment: " . $conn->error);
+                errorLog("Error in updating payment: " . $conn->error, "functions.php", 1981);
             }
 
             $plan = getSellerPlans($payment['plan_id']);
@@ -2005,7 +2004,7 @@ function paycheck($query) {
             $result = $stmt->execute();
             $stmt->close();
             if (!$result) {
-                errorLog("Error in updating payment: " . $conn->error);
+                errorLog("Error in updating payment: " . $conn->error, "functions.php", 2007);
             }
 
             $plan = getSellerPlans($payment['plan_id']);
@@ -2061,7 +2060,7 @@ function getClientData($cid) {
 
     $data = json_decode($response, true);
     if (!$data || !isset($data['client'])) {
-        errorLog("❌ اکانت یافت نشد یا خطا در ارتباط با سرور. | آیدی آکانت: $cid");
+        errorLog("❌ اکانت یافت نشد یا خطا در ارتباط با سرور. | آیدی آکانت: $cid", "functions.php", 2063);
         return false;
     }
 
@@ -2280,7 +2279,7 @@ function getTest($type) {
         if ($plans === null) {
             $plans = getSellerPlans("free");
             if ($plans === false) {
-                errorLog("Error: Failed to retrieve seller plans");
+                errorLog("Error: Failed to retrieve seller plans", "functions.php", 2282);
                 $message = "خطا در دریافت لیست پلن‌ها از سرور";
                 return ['text' => $message, 'reply_markup' => []];
             }
@@ -2309,7 +2308,7 @@ function getTest($type) {
         }
     
         if (!$selectedPlan) {
-            errorLog("Error: No suitable plan found for type: $type");
+            errorLog("Error: No suitable plan found for type: $type", "functions.php", 2311);
             $message = "پلن مناسب برای نوع درخواستی ($type) یافت نشد.";
             return ['text' => $message, 'reply_markup' => []];
         }
@@ -2319,13 +2318,13 @@ function getTest($type) {
         $uid = UID;
         $conn = new mysqli($db_host, $db_user, $db_pass, $db_name);
         if ($conn->connect_error) {
-            errorLog("Error: Database connection failed: " . $conn->connect_error);
+            errorLog("Error: Database connection failed: " . $conn->connect_error, "functions.php", 2321);
             return ['text' => 'خطا در اتصال به دیتابیس', 'reply_markup' => []];
         }
         
         $stmt = $conn->prepare("SELECT * FROM users WHERE chat_id = ?");
         if (!$stmt) {
-            errorLog("Error: Prepare failed: " . $conn->error);
+            errorLog("Error: Prepare failed: " . $conn->error, "functions.php", 2327);
             $conn->close();
             return ['text' => 'خطا در دریافت اطلاعات کاربر', 'reply_markup' => []];
         }
@@ -2337,7 +2336,7 @@ function getTest($type) {
         $stmt->close();
         
         if (!$user) {
-            errorLog("Error: User not found for chat_id: $uid");
+            errorLog("Error: User not found for chat_id: $uid", "functions.php", 2339);
             $conn->close();
             return ['text' => 'کاربر یافت نشد', 'reply_markup' => []];
         }
@@ -2368,7 +2367,7 @@ function getTest($type) {
 
         $result = json_decode($response, true);
         if (!isset($result['client_id'])) {
-            errorLog("Error: Failed to create client on panel. Response: " . print_r($result, true));
+            errorLog("Error: Failed to create client on panel. Response: " . print_r($result, true), "functions.php", 2370);
             $conn->close();
             return ['text' => 'خطا در ایجاد اکانت', 'reply_markup' => []];
         }
@@ -2417,7 +2416,7 @@ function getTest($type) {
             
             $conn->close();
         } catch (Exception $e) {
-            errorLog("Error: Database operation failed: " . $e->getMessage());
+            errorLog("Error: Database operation failed: " . $e->getMessage(), "functions.php", 2419);
             $conn->close();
             return ['text' => 'خطا در ذخیره اطلاعات اکانت', 'reply_markup' => []];
         }
@@ -2450,11 +2449,10 @@ function getTest($type) {
             ]
         ];
         
-        // errorLog("Success: Test account created successfully for chat_id: $uid, client_id: $client_id");
         return ['text' => $message, 'reply_markup' => $keyboard];
             
     } catch (Exception $e) {
-        errorLog("Error: Create test account exception: " . $e->getMessage());
+        errorLog("Error: Create test account exception: " . $e->getMessage(), "functions.php", 2455);
         return ['text' => 'خطا: ' . $e->getMessage(), 'reply_markup' => []];
     }
 }
@@ -2521,7 +2519,7 @@ function createClient($name, $uid, $telegram_id, $planId) {
     ]);
     $response = curl_exec($ch);
     if ($response === false) {
-        errorLog("Error: cURL failed to create client: " . curl_error($ch));
+        errorLog("Error: cURL failed to create client: " . curl_error($ch), "functions.php", 2522);
     }
     curl_close($ch);
     return $response;
@@ -2554,7 +2552,7 @@ function updateClient($client_id, $plan_id) {
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         $curlErr  = curl_error($ch);
 
-        errorLog("Error: cURL updateClient failed | HTTP: {$httpCode} | cURL: {$curlErr} | Response: {$response} | Client ID: $client_id | Plan ID: $plan_id");
+        errorLog("Error: cURL updateClient failed | HTTP: {$httpCode} | cURL: {$curlErr} | Response: {$response} | Client ID: $client_id | Plan ID: $plan_id", "functions.php", 2555);
 
         return false;
     }
@@ -2715,7 +2713,7 @@ function keyboard($keyboard) {
                 $stmt->execute();
                 //handle error
                 if ($conn->connect_error || $stmt->error) {
-                    errorLog("Error in connecting to DB or preparing statement: " . ($conn->connect_error ?? $stmt->error));
+                    errorLog("Error in connecting to DB or preparing statement: " . ($conn->connect_error ?? $stmt->error), "functions.php", 2716);
                 }
                 $result = $stmt->get_result();
                 $user = $result->fetch_assoc();
@@ -2776,7 +2774,7 @@ function keyboard($keyboard) {
                 $stmt->execute();
 
                 if ($conn->connect_error || $stmt->error) {
-                    errorLog("Error in connecting to DB or preparing statement: " . ($conn->connect_error ?? $stmt->error));
+                    errorLog("Error in connecting to DB or preparing statement: " . ($conn->connect_error ?? $stmt->error), "functions.php", 2777);
                 }
 
                 $result = $stmt->get_result();
@@ -2906,7 +2904,7 @@ function keyboard($keyboard) {
                 $stmt->execute();
 
                 if ($conn->connect_error || $stmt->error) {
-                    errorLog("Error in connecting to DB or preparing statement: " . ($conn->connect_error ?? $stmt->error));
+                    errorLog("Error in connecting to DB or preparing statement: " . ($conn->connect_error ?? $stmt->error), "functions.php", 2907);
                 }
 
                 $result = $stmt->get_result();
@@ -3048,7 +3046,7 @@ function keyboard($keyboard) {
         }
         return json_encode(['inline_keyboard' => $keyboard]);
     } catch (Exception $e) {
-        errorLog("Error in keyboard function: " . $e->getMessage());
+        errorLog("Error in keyboard function: " . $e->getMessage(), "functions.php", 3049);
     }
 }
 

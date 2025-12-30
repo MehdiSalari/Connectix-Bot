@@ -219,35 +219,6 @@ function fetchBotConfig($panelToken) {
             $botConfigJson = json_encode($botConfig, JSON_PRETTY_PRINT);
             file_put_contents(__DIR__ . '/bot_config.json', $botConfigJson);
 
-            //create banks json flie for auto accept payments
-            $bankJson = [
-                    'blu' => ['name' => 'بلو','code' => 'blu'],
-                    'mellat' => ['name' => 'ملت','code' => 'mellat'],
-                    'sepah' => ['name' => 'سپه','code' => 'sepah'],
-                    'saderat' => ['name' => 'صادرات','code' => 'saderat'],
-                    'parsian' => ['name' => 'پارسیان','code' => 'parsian'],
-                    'melli' => ['name' => 'ملی','code' => 'melli'],
-                    'tose' => ['name' => 'توسعه','code' => 'tose'],
-                    'tejarat' => ['name' => 'تجارت','code' => 'tejarat'],
-                    'refah' => ['name' => 'رفاه','code' => 'refah'],
-                    'maskan' => ['name' => 'مسکن','code' => 'maskan'],
-                    'keshavarzi' => ['name' => 'کشاورزی','code' => 'keshavarzi'],
-                    'sanat' => ['name' => 'صنعت و معدن','code' => 'sanat'],
-                    'saman' => ['name' => 'سامان','code' => 'saman'],
-                    'shahr' => ['name' => 'شهر','code' => 'shahr'],
-                    'mehr' => ['name' => 'مهر','code' => 'mehr'],
-                    'day' => ['name' => 'دی','code' => 'day'],
-                    'post' => ['name' => 'پست','code' => 'post'],
-                    'sarmaye' => ['name' => 'سرمایه','code' => 'sarmaye'],
-                    'resalat' => ['name' => 'رسالت','code' => 'resalat'],
-                    'gardeshgari' => ['name' => 'گردشگری','code' => 'gardeshgari'],
-                    
-                ];
-
-            $bankJson = json_encode($bankJson, JSON_PRETTY_PRINT);
-            file_put_contents(__DIR__ . '/banks.json', $bankJson);
-
-
         } catch (Exception $e) {
             logFlush("Error: couldn't get messages from panel API → " . $e->getMessage());
             return;
