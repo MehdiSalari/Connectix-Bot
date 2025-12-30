@@ -40,6 +40,10 @@ $totalUsers = $conn->query("SELECT COUNT(*) as cnt FROM users")->fetch_assoc()['
 $adminChatId = $admin['chat_id'] ?? null; // chat_id ادمین
 $conn->close();
 
+
+$updateMessage = '';
+$updateStatus = '';
+
 if (isset($_GET['updated'])) {
     switch ($_GET['updated']) {
         case 'true':
