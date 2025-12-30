@@ -40,6 +40,18 @@ $totalUsers = $conn->query("SELECT COUNT(*) as cnt FROM users")->fetch_assoc()['
 $adminChatId = $admin['chat_id'] ?? null; // chat_id ادمین
 $conn->close();
 
+if (isset($_GET['updated'])) {
+    switch ($_GET['updated']) {
+        case 'true':
+            $updateMessage = "بروزرسانی با موفقیت انجام شد.";
+            $updateStatus = "success";
+            break;
+        default:
+            $updateMessage = "بروزرسانی با خطا مواجه شد.";
+            $updateStatus = "error";
+            break;
+    }
+}
 
 // Handle Configuration Form Submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -460,6 +472,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 </head>
 
 <body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen scroll-smooth">
+    <?php if ($updateMessage): ?>
+        <div class="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 px-6 py-4 rounded-xl shadow-2xl text-white font-bold <?= $updateStatus === 'success' ? 'bg-green-600' : 'bg-red-600' ?>">
+            <?= $updateMessage ?>
+        </div>
+
+        <script>
+            // Fade message after 4 seconds
+            setTimeout(() => {
+                document.querySelector('.fixed.top-4').style.transition = 'opacity 0.5s';
+                document.querySelector('.fixed.top-4').style.opacity = '0';
+                setTimeout(() => document.querySelector('.fixed.top-4').remove(), 500);
+            }, 4000);
+
+            //remove "?updated=true" from url
+            setTimeout(() => {
+                window.history.replaceState({}, document.title, window.location.pathname);
+            }, 5000);
+        </script>
+    <?php endif; ?>
     <div class="container mx-auto px-4 py-8 max-w-4xl">
         <!-- Header -->
         <div class="bg-white rounded-xl shadow-lg p-6 mb-8">
@@ -472,10 +503,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 <div class="flex flex-col gap-5 items-end">
 
-                    <a href="logout.php"
-                        class="bg-red-500 hover:bg-red-600 text-white px-6 py-3 rounded-lg font-semibold transition flex items-center gap-2 w-fit">
-                        <i class="fas fa-sign-out-alt"></i> خروج
-                    </a>
+                    <div class="flex flex-row gap-5">
+                        <a href="update/update.php?ok=true"
+                            class="bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-lg font-semibold transition flex items-center gap-2 w-fit">
+                            <i class="fas fa-sync"></i> بروزرسانی ربات
+                        </a>
+
+                        <a href="logout.php"
+                            class="bg-red-500 hover:bg-red-600 text-white px-6 py-3 rounded-lg font-semibold transition flex items-center gap-2 w-fit">
+                            <i class="fas fa-sign-out-alt"></i> خروج
+                        </a>
+                    </div>
 
                     <div class="flex flex-wrap gap-3 justify-end w-full">
 

@@ -118,12 +118,17 @@ if (isset($_GET['wallet_updated'])) {
         </div>
 
         <script>
-            // پیام رو بعد از ۴ ثانیه محو کن
+           // Fade message after 4 seconds
             setTimeout(() => {
                 document.querySelector('.fixed.top-4').style.transition = 'opacity 0.5s';
                 document.querySelector('.fixed.top-4').style.opacity = '0';
                 setTimeout(() => document.querySelector('.fixed.top-4').remove(), 500);
             }, 4000);
+
+            // Remove "?wallet_updated=***" from url
+            setTimeout(() => {
+                window.history.replaceState({}, document.title, window.location.pathname);
+            }, 5000);
         </script>
     <?php endif; ?>
 <div class="container mx-auto px-4 py-8 max-w-7xl">
