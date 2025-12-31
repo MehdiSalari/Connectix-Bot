@@ -227,7 +227,6 @@ function walletReqs($query) {
             ]);
             break;
         case 'accept':
-            $txID = createWalletTransaction($txID, 'SUCCESS');
             $conn = new mysqli($db_host, $db_user, $db_pass, $db_name);
             $stmt = $conn->prepare("SELECT * FROM wallet_transactions WHERE id = ?");
             $stmt->bind_param("i", $txID);
@@ -237,66 +236,94 @@ function walletReqs($query) {
             $stmt->close();
             $conn->close();
 
-            $txUser = $tx['chat_id'];
-            $txAmount = $tx['amount'];
+            if ($tx['status'] == 'PENDING') {
 
-            $textAmount = number_format($txAmount);
-            $walletID = wallet('INCREASE', $txUser, $txAmount);
-            
-            $redis = new Redis();
-            $redis->connect('127.0.0.1', 6379);
-            $redis->del("user:steps:" . $txUser);
-            $redis->close();
+                $txID = createWalletTransaction($txID, 'SUCCESS');
+                
+                $txUser = $tx['chat_id'];
+                $txAmount = $tx['amount'];
 
-            $walletBalance = wallet('get', $txUser)['balance'];
+                $textAmount = number_format($txAmount);
+                $walletID = wallet('INCREASE', $txUser, $txAmount);
+                
+                $redis = new Redis();
+                $redis->connect('127.0.0.1', 6379);
+                $redis->del("user:steps:" . $txUser);
+                $redis->close();
 
-            //to user
-            $message = "✅ تراکنش شما جهت افزایش موجودی کیف پول تایید شد.\n\n";
-            $message .= "💵 مبلغ تراکنش: $textAmount\n";
-            $message .= "💰 موجودی کیف پول: $walletBalance";
+                $walletBalance = wallet('get', $txUser)['balance'];
 
-            $keyboard = [
-                'inline_keyboard' => [
-                    [
-                        ['text' => '👝 |  کیف پول', 'callback_data' => 'wallet']
-                    ],
-                    [
-                        ['text' => '🏡 | خانه', 'callback_data' => 'main_menu']
+                //to user
+                $message = "✅ تراکنش شما جهت افزایش موجودی کیف پول تایید شد.\n\n";
+                $message .= "💵 مبلغ تراکنش: $textAmount\n";
+                $message .= "💰 موجودی کیف پول: $walletBalance";
+
+                $keyboard = [
+                    'inline_keyboard' => [
+                        [
+                            ['text' => '👝 |  کیف پول', 'callback_data' => 'wallet']
+                        ],
+                        [
+                            ['text' => '🏡 | خانه', 'callback_data' => 'main_menu']
+                        ]
                     ]
-                ]
-            ];
+                ];
 
-            $tgResult = tg('sendMessage',[
-                'chat_id' => $txUser,
-                'text' => $message,
-                'reply_markup' => $keyboard
-            ]);
+                $tgResult = tg('sendMessage',[
+                    'chat_id' => $txUser,
+                    'text' => $message,
+                    'reply_markup' => $keyboard
+                ]);
 
-            // to admin
-            $userName = getUser($txUser)['telegram_id'] ?? null; 
-            if ($userName) {
-                $userName = "@$userName";
+                // to admin
+                $userName = getUser($txUser)['telegram_id'] ?? null; 
+                if ($userName) {
+                    $userName = "@$userName";
+                } else {
+                    $userName = "نامشخص";
+                }
+
+                $message = "✅ شماره تراکنش $txID با موفقیت تایید شد.\n\n";
+                $message .= "👝 شماره کیف پول: $walletID\n";
+                $message .= "🔢 آیدی: <code>$txUser</code>\n";
+                $message .= "👤 نام کاربری: $userName\n";
+                $message .= "💵 مبلغ: $textAmount";
+                $keyboard = [
+                    'inline_keyboard' => [
+                        [
+                            ['text' => '✅ | تایید شده', 'callback_data' => 'not']
+                        ]
+                    ]
+                ];
+
+                return ['caption' => $message, 'reply_markup' => $keyboard];
             } else {
-                $userName = "نامشخص";
-            }
-
-            $message = "✅ شماره تراکنش $txID با موفقیت تایید شد.\n\n";
-            $message .= "👝 شماره کیف پول: $walletID\n";
-            $message .= "🔢 آیدی: <code>$txUser</code>\n";
-            $message .= "👤 نام کاربری: $userName\n";
-            $message .= "💵 مبلغ: $textAmount";
-            $keyboard = [
-                'inline_keyboard' => [
-                    [
-                        ['text' => '✅ | تایید شده', 'callback_data' => 'not']
+                $statusText = match ($tx['status']) {
+                    "SUCCESS" => "تایید شده",
+                    "PENDING" => "در انتظار",
+                    "CANCLED_BY_USER" => "لغو شده",
+                    "REJECTED_BY_ADMIN" => "رد شده",
+                    default => "نامشخص",
+                };
+                $statusIcon = match ($tx['status']) {
+                    "SUCCESS" => "✅",
+                    "PENDING" => "⏳",
+                    "CANCLED_BY_USER" => "🚫",
+                    "REJECTED_BY_ADMIN" => "❌",
+                    default => "⚠️",
+                };
+                $message = "⚠️ تراکنش شماره $txID در وضعیت $statusText است.";
+                $keyboard = [
+                    'inline_keyboard' => [
+                        [
+                            ['text' => "$statusIcon | $statusText", 'callback_data' => 'not']
+                        ]
                     ]
-                ]
-            ];
-
-            return ['caption' => $message, 'reply_markup' => $keyboard];
+                ];
+                return ['caption' => $message, 'reply_markup' => $keyboard];
+            }
 
         case 'reject':
-            createWalletTransaction($txID, 'REJECTED_BY_ADMIN');
             $conn = new mysqli($db_host, $db_user, $db_pass, $db_name);
             $stmt = $conn->prepare("SELECT * FROM wallet_transactions WHERE id = ?");
             $stmt->bind_param("i", $txID);
@@ -305,63 +332,92 @@ function walletReqs($query) {
             $tx = $result->fetch_assoc();
             $stmt->close();
             $conn->close();
-
-            $txUser = $tx['chat_id'];
-            $txAmount = $tx['amount'];
-
-            $textAmount = number_format($txAmount);
-
-            $redis = new Redis();
-            $redis->connect('127.0.0.1', 6379);
-            $redis->del("user:steps:" . $txUser);
-            $redis->close();
             
-            // to user
-            $message = "❌ تراکنش شما جهت افزایش موجودی کیف پول رد شد.\n\n";
-            $message .= "💵 مبلغ تراکنش: $textAmount"
-            ;
+            if ($tx['status'] == 'PENDING') {
 
-            $keyboard = [
-                'inline_keyboard' => [
-                    [
-                        ['text' => '👝 |  کیف پول', 'callback_data' => 'wallet']
-                    ],
-                    [
-                        ['text' => '🏡 | خانه', 'callback_data' => 'main_menu']
+                createWalletTransaction($txID, 'REJECTED_BY_ADMIN');
+                
+                $txUser = $tx['chat_id'];
+                $txAmount = $tx['amount'];
+
+                $textAmount = number_format($txAmount);
+
+                $redis = new Redis();
+                $redis->connect('127.0.0.1', 6379);
+                $redis->del("user:steps:" . $txUser);
+                $redis->close();
+                
+                // to user
+                $message = "❌ تراکنش شما جهت افزایش موجودی کیف پول رد شد.\n\n";
+                $message .= "💵 مبلغ تراکنش: $textAmount"
+                ;
+
+                $keyboard = [
+                    'inline_keyboard' => [
+                        [
+                            ['text' => '👝 |  کیف پول', 'callback_data' => 'wallet']
+                        ],
+                        [
+                            ['text' => '🏡 | خانه', 'callback_data' => 'main_menu']
+                        ]
                     ]
-                ]
-            ];
+                ];
 
-            $tgResult = tg('sendMessage',[
-                'chat_id' => $txUser,
-                'text' => $message,
-                'reply_markup' => $keyboard
-            ]);
+                $tgResult = tg('sendMessage',[
+                    'chat_id' => $txUser,
+                    'text' => $message,
+                    'reply_markup' => $keyboard
+                ]);
 
-            // to admin
-            $userName = getUser($txUser)['telegram_id'] ?? null; 
-            if ($userName) {
-                $userName = "@$userName";
+                // to admin
+                $userName = getUser($txUser)['telegram_id'] ?? null; 
+                if ($userName) {
+                    $userName = "@$userName";
+                } else {
+                    $userName = "نامشخص";
+                }
+
+                $walletID = wallet('get', $txUser)['id'];
+
+                $message = "❌ شماره تراکنش $txID  رد شد.\n\n";
+                $message .= "👝 شماره کیف پول: $walletID\n";
+                $message .= "🔢 آیدی: <code>$txUser</code>\n";
+                $message .= "👤 نام کاربری: $userName\n";
+                $message .= "💵 مبلغ: $textAmount";
+                $keyboard = [
+                    'inline_keyboard' => [
+                        [
+                            ['text' => '❌ | رد شده', 'callback_data' => 'not']
+                        ]
+                    ]
+                ];
+
+                return ['caption' => $message, 'reply_markup' => $keyboard];
             } else {
-                $userName = "نامشخص";
-            }
-
-            $walletID = wallet('get', $txUser)['id'];
-
-            $message = "❌ شماره تراکنش $txID  رد شد.\n\n";
-            $message .= "👝 شماره کیف پول: $walletID\n";
-            $message .= "🔢 آیدی: <code>$txUser</code>\n";
-            $message .= "👤 نام کاربری: $userName\n";
-            $message .= "💵 مبلغ: $textAmount";
-            $keyboard = [
-                'inline_keyboard' => [
-                    [
-                        ['text' => '❌ | رد شده', 'callback_data' => 'not']
+                $statusText = match ($tx['status']) {
+                    "SUCCESS" => "تایید شده",
+                    "PENDING" => "در انتظار",
+                    "CANCLED_BY_USER" => "لغو شده",
+                    "REJECTED_BY_ADMIN" => "رد شده",
+                    default => "نامشخص",
+                };
+                $statusIcon = match ($tx['status']) {
+                    "SUCCESS" => "✅",
+                    "PENDING" => "⏳",
+                    "CANCLED_BY_USER" => "🚫",
+                    "REJECTED_BY_ADMIN" => "❌",
+                    default => "⚠️",
+                };
+                $message = "⚠️ تراکنش شماره $txID در وضعیت $statusText است.";
+                $keyboard = [
+                    'inline_keyboard' => [
+                        [
+                            ['text' => "$statusIcon | $statusText", 'callback_data' => 'not']
+                        ]
                     ]
-                ]
-            ];
-
-            return ['caption' => $message, 'reply_markup' => $keyboard];
+                ];
+                return ['caption' => $message, 'reply_markup' => $keyboard];
+            }
 
     }
 }
@@ -605,7 +661,7 @@ function discount($query, $coupon = null) {
                 $discountAmount = ($originalPrice * $percentValue) / 100;
                 $finalPrice = $originalPrice - $discountAmount;
 
-                // errorLog("coupon: {$coupon['code']} applied - {$percentValue}% discount ({$discountAmount} off) - original: {$originalPrice} → final: {$finalPrice}", "functions.php", 608);
+                // errorLog("coupon: {$coupon['code']} applied - {$percentValue}% discount ({$discountAmount} off) - original: {$originalPrice} → final: {$finalPrice}", "functions.php", 664);
             } elseif ($isAmount) {
                 $amountValue = (int)$coupon['amount'];
                 $discountAmount = $amountValue;
@@ -616,9 +672,9 @@ function discount($query, $coupon = null) {
                     $finalPrice = 0;
                 }
 
-                // errorLog("coupon: {$coupon['code']} applied - {$amountValue} amount discount - original: {$originalPrice} → final: {$finalPrice}", "functions.php", 619);
+                // errorLog("coupon: {$coupon['code']} applied - {$amountValue} amount discount - original: {$originalPrice} → final: {$finalPrice}", "functions.php", 675);
             } else {
-                errorLog("coupon: {$coupon['code']} has no valid discount value!", "functions.php", 621);
+                errorLog("coupon: {$coupon['code']} has no valid discount value!", "functions.php", 677);
                 return false;
             }
 
@@ -639,7 +695,7 @@ function discount($query, $coupon = null) {
                 ]);
 
             if (!($tgResult = json_decode($tgResult))->ok) {
-                errorLog("Failed to send discount message to chat_id: $uid | Message: {$tgResult->description}", "functions.php", 642);
+                errorLog("Failed to send discount message to chat_id: $uid | Message: {$tgResult->description}", "functions.php", 698);
                 exit;
             }
             return $finalPrice;
@@ -719,7 +775,7 @@ function always($info) {
             $stmt->execute();
 
             if ($conn->connect_error || $stmt->error) {
-                errorLog("Error in connecting to DB or preparing statement: " . ($conn->connect_error ?? $stmt->error), "functions.php", 722);
+                errorLog("Error in connecting to DB or preparing statement: " . ($conn->connect_error ?? $stmt->error), "functions.php", 778);
             }
 
             $result = $stmt->get_result();
@@ -814,7 +870,7 @@ function smsPayment($action, $data) {
             'status' => 'error',
             'message' => 'Database connection failed'
         ]);
-        errorLog("Error: DB Connection Error: {$conn->connect_error}", "functions.php", 817);
+        errorLog("Error: DB Connection Error: {$conn->connect_error}", "functions.php", 873);
         return false;
     }
 
@@ -827,7 +883,7 @@ function smsPayment($action, $data) {
             'status' => 'error',
             'message' => 'Error: Database table [sms_payments] not found, please configure bank settings in admin panel.'
         ]);
-        errorLog("Database table 'sms_payments' not found", "functions.php", 830);
+        errorLog("Database table 'sms_payments' not found", "functions.php", 886);
         return false;
     }
 
@@ -854,7 +910,7 @@ function smsPayment($action, $data) {
                     'status' => 'error',
                     'message' => 'Failed to save SMS payment data'
                 ]);
-                errorLog("Failed to insert SMS payment data: {$conn->error}", "functions.php", 857);
+                errorLog("Failed to insert SMS payment data: {$conn->error}", "functions.php", 913);
                 return false;
             }
 
@@ -896,7 +952,7 @@ function smsPayment($action, $data) {
                     'status' => 'error',
                     'message' => 'Failed to update SMS payment data'
                 ]);
-                errorLog("Failed to update SMS payment data: {$conn->error}", "functions.php", 899);
+                errorLog("Failed to update SMS payment data: {$conn->error}", "functions.php", 955);
                 return false;
             }
 
@@ -962,7 +1018,7 @@ function guide($action) {
             ]);
 
             if (!($result = json_decode($result))->ok) {
-                errorLog("Error in sending message to chat_id: $uid | Message: {$result->description}", "functions.php", 965);
+                errorLog("Error in sending message to chat_id: $uid | Message: {$result->description}", "functions.php", 1021);
                 exit;
             }
             exit();
@@ -1017,7 +1073,7 @@ function guide($action) {
             ]);
 
             if (!($result = json_decode($result))->ok) {
-                errorLog("Error in sending message to chat_id: $uid | Message: {$result->description}", "functions.php", 1020);
+                errorLog("Error in sending message to chat_id: $uid | Message: {$result->description}", "functions.php", 1076);
                 exit;
             }
             exit();
@@ -1578,7 +1634,7 @@ function checkout($data) {
                 ]);
                 
                 if (!($result = json_decode($result))->ok) {
-                    errorLog("Error in sending message to chat_id: $uid | Message: {$result->description}", "functions.php", 1581);
+                    errorLog("Error in sending message to chat_id: $uid | Message: {$result->description}", "functions.php", 1637);
                 }
                 exit;
             }
@@ -1600,7 +1656,7 @@ function checkout($data) {
             // Decrement wallet balance
             $walletBalance = wallet('DECREASE', $uid, $amountInt);
             if (!$walletBalance) {
-                errorLog("Error in decrementing wallet balance for user_id: $uid", "functions.php", 1603);
+                errorLog("Error in decrementing wallet balance for user_id: $uid", "functions.php", 1659);
                 exit();
             }
 
@@ -1635,6 +1691,9 @@ function payment($receipt, $action) {
         $bot_config = json_decode(file_get_contents('setup/bot_config.json'));
         $autoPayment = $bot_config->bank->name ? true : false;
         $admin_chat_id = $bot_config->admin_id ?? null;
+        $admin_chat_id2 = $bot_config->admin_id_2 ?? null;
+        $admin_chat_id3 = $bot_config->admin_id_3 ?? null;
+        $admins =array_filter([$admin_chat_id, $admin_chat_id2, $admin_chat_id3], fn($value) => $value !== null);
         $uid = UID;
         switch ($action) {
             case 'buy':
@@ -1690,7 +1749,7 @@ function payment($receipt, $action) {
                 ]);
 
                 if (!($result = json_decode($result))->ok) {
-                    errorLog("Failed to send receipt error message to chat_id: $uid | Message: {$result->description}", "functions.php", 1693);
+                    errorLog("Failed to send receipt error message to chat_id: $uid | Message: {$result->description}", "functions.php", 1752);
                     exit;
                 }
 
@@ -1701,24 +1760,27 @@ function payment($receipt, $action) {
                     $caption .= "\n💵 مبلغ اصلی: " . number_format($RedisData['original_price']);
                     $caption .= "\n🎁 کد تخفیف استفاده شده: " . $RedisData['coupon_code'];
                 }
-                //send image to admin
-                $result = tg('sendPhoto',[
-                    'chat_id' => $admin_chat_id,
-                    'photo' => $photo_id,
-                    'caption' => $caption,
-                    'reply_markup' => json_encode([
-                        'inline_keyboard' => [
-                            [
-                                ['text' => '✅ |  تایید', 'callback_data' => "payment_accept:$paymentId"],
-                                ['text' => '❌ |  لغو', 'callback_data' => "payment_reject:$paymentId"],
+                
+                //send receipt image to admin(s)
+                foreach ($admins as $admin) {
+                    $result = tg('sendPhoto',[
+                        'chat_id' => $admin,
+                        'photo' => $photo_id,
+                        'caption' => $caption,
+                        'reply_markup' => json_encode([
+                            'inline_keyboard' => [
+                                [
+                                    ['text' => '✅ |  تایید', 'callback_data' => "payment_accept:$paymentId"],
+                                    ['text' => '❌ |  لغو', 'callback_data' => "payment_reject:$paymentId"],
+                                ]
                             ]
-                        ]
-                    ])
-                ]);
-
-                if (!($result = json_decode($result))->ok) {
-                    errorLog("Failed to send receipt error message to chat_id: $uid | Message: {$result->description}", "functions.php", 1720);
-                    exit;
+                        ])
+                    ]);
+    
+                    if (!($result = json_decode($result))->ok) {
+                        errorLog("Failed to send receipt error message to chat_id: $uid | Message: {$result->description}", "functions.php", 1781);
+                        exit;
+                    }
                 }
 
                 $redis->del("user:steps:$uid");
@@ -1761,7 +1823,7 @@ function payment($receipt, $action) {
                 ]);
 
                 if (!($result = json_decode($result))->ok) {
-                    errorLog("Failed to send receipt error message to chat_id: $uid | Message: {$result->description}", "functions.php", 1764);
+                    errorLog("Failed to send receipt error message to chat_id: $uid | Message: {$result->description}", "functions.php", 1826);
                     exit;
                 }
 
@@ -1772,25 +1834,32 @@ function payment($receipt, $action) {
                     $userID = "نامشخص";
                 }
 
-                //send image to admin
-                $result = tg('sendPhoto',[
-                    'chat_id' => $admin_chat_id,
-                    'photo' => $photo_id,
-                    'caption' => "📃 سند واریزی مورد تایید میباشد؟\n\n💰 افزایش موجودی کیف پول:\n🔢 آیدی: <code>$uid</code>\n👤 نام کاربری: @$userID\n💵 مبلغ : $textAmount",
-                    'parse_mode' => 'HTML',
-                    'reply_markup' => json_encode([
-                        'inline_keyboard' => [
-                            [
-                                ['text' => '✅ |  تایید', 'callback_data' => "wallet_accept:$txID"],
-                                ['text' => '❌ |  لغو', 'callback_data' => "wallet_reject:$txID"],
+                //send receipt image to admin(s)
+                foreach ($admins as $admin) {
+                    $result = tg('sendPhoto',[
+                        'chat_id' => $admin,
+                        'photo' => $photo_id,
+                        'caption' => "📃 سند واریزی مورد تایید میباشد؟\n\n💰 افزایش موجودی کیف پول:\n🔢 آیدی: <code>$uid</code>\n👤 نام کاربری: @$userID\n💵 مبلغ : $textAmount",
+                        'parse_mode' => 'HTML',
+                        'reply_markup' => json_encode([
+                            'inline_keyboard' => [
+                                [
+                                    ['text' => '✅ |  تایید', 'callback_data' => "wallet_accept:$txID"],
+                                    ['text' => '❌ |  لغو', 'callback_data' => "wallet_reject:$txID"],
+                                ]
                             ]
-                        ]
-                    ])
-                ]);
+                        ])
+                    ]);
+
+                    if (!($result = json_decode($result))->ok) {
+                        errorLog("Failed to send receipt error message to chat_id: $uid | Message: {$result->description}", "functions.php", 1855);
+                        exit;
+                    }
+                }
 
         }
     } catch (Exception $e) {
-        errorLog("Error: Database operation failed: " . $e->getMessage(), "functions.php", 1793);
+        errorLog("Error: Database operation failed: " . $e->getMessage(), "functions.php", 1862);
     }
 }
 
@@ -1839,7 +1908,7 @@ function savePayment ($client_id, $plan_id, $price, $isPaid, $method, $coupon = 
     $conn->close();
 
     if (!$result) {
-        errorLog("Error in inserting payment: " . $conn->error, "functions.php", 1842);
+        errorLog("Error in inserting payment: " . $conn->error, "functions.php", 1911);
     } 
     return $paymentId;
 }
@@ -1861,6 +1930,7 @@ function paycheck($query) {
     $payment = $result->fetch_assoc();
     $orderNumber = $payment['order_number'];
     $chat_id = $payment['chat_id'];
+    $paidStatus = $payment['is_paid'];
     $stmt->close();
 
     $redis = new Redis();
@@ -1871,6 +1941,29 @@ function paycheck($query) {
 
     switch ($paymentStatus) {
         case "accept":
+
+            if ($paidStatus != null) {
+
+                $paidStatusName = match ($paidStatus) {
+                    "0" => 'رد شده',
+                    "1" => 'تایید شده'
+                };
+                $paidStatusIcon = match ($paidStatus) {
+                    "0" => '❌',
+                    "1" => '✅'
+                };
+                $caption = "⚠️ سفارش شماره <code>$orderNumber</code> در وضعیت $paidStatusName است. ";
+                $keyboard = [
+                    'inline_keyboard' => [
+                        [
+                            ['text' => "$paidStatusIcon | $paidStatusName", 'callback_data' => 'not']
+                        ]
+                    ]
+                ];
+
+                return ['caption' => $caption, 'reply_markup' => $keyboard];
+
+            }
             // Create or Update Account plan
             switch ($payment['client_id']) {
                 // Create New Account
@@ -1881,7 +1974,7 @@ function paycheck($query) {
                     $user_id = $user['id'];
                     $response = createClient($name, $chat_id, $telegram_id, $payment['plan_id']);
                     if ($response === false) {
-                        errorLog("Error in creating client: " . $conn->error, "functions.php", 1884);
+                        errorLog("Error in creating client: " . $conn->error, "functions.php", 1977);
                         break 2;
                     }
                     $client_id = json_decode($response, true)['client_id'];
@@ -1899,7 +1992,7 @@ function paycheck($query) {
                     $result = $stmt->execute();
                     $stmt->close();
                     if (!$result) {
-                        errorLog("Error in inserting client: " . $conn->error, "functions.php", 1902);
+                        errorLog("Error in inserting client: " . $conn->error, "functions.php", 1995);
                     }
 
                     //Update Client ID in Payment
@@ -1908,7 +2001,7 @@ function paycheck($query) {
                     $result = $stmt->execute();
                     $stmt->close();
                     if (!$result) {
-                        errorLog("Error in updating payment: " . $conn->error, "functions.php", 1911);
+                        errorLog("Error in updating payment: " . $conn->error, "functions.php", 2004);
                     }
 
                     // Send account data to user
@@ -1939,7 +2032,7 @@ function paycheck($query) {
                 default: // Update Account
                     $response = updateClient($payment['client_id'], $payment['plan_id']);
                     if ($response === false) {
-                        errorLog("Error in updating client: " . $conn->error, "functions.php", 1942);
+                        errorLog("Error in updating client: " . $conn->error, "functions.php", 2035);
                         break 2;
                     }
                     $client_id = $payment['client_id'];
@@ -1978,7 +2071,7 @@ function paycheck($query) {
             $stmt->close();
             $conn->close();
             if (!$result) {
-                errorLog("Error in updating payment: " . $conn->error, "functions.php", 1981);
+                errorLog("Error in updating payment: " . $conn->error, "functions.php", 2074);
             }
 
             $plan = getSellerPlans($payment['plan_id']);
@@ -1998,13 +2091,36 @@ function paycheck($query) {
 
 
         case "reject":
+            if ($paidStatus != null) {
+
+                $paidStatusName = match ($paidStatus) {
+                    "0" => 'رد شده',
+                    "1" => 'تایید شده'
+                };
+                $paidStatusIcon = match ($paidStatus) {
+                    "0" => '❌',
+                    "1" => '✅'
+                };
+                $caption = "⚠️ سفارش شماره <code>$orderNumber</code> در وضعیت $paidStatusName است. ";
+                $keyboard = [
+                    'inline_keyboard' => [
+                        [
+                            ['text' => "$paidStatusIcon | $paidStatusName", 'callback_data' => 'not']
+                        ]
+                    ]
+                ];
+
+                return ['caption' => $caption, 'reply_markup' => $keyboard];
+                
+            }
+
             // Update paid status to false
             $stmt = $conn->prepare("UPDATE payments SET is_paid = 0 WHERE id = ?");
             $stmt->bind_param("i", $paymentId);
             $result = $stmt->execute();
             $stmt->close();
             if (!$result) {
-                errorLog("Error in updating payment: " . $conn->error, "functions.php", 2007);
+                errorLog("Error in updating payment: " . $conn->error, "functions.php", 2123);
             }
 
             $plan = getSellerPlans($payment['plan_id']);
@@ -2060,7 +2176,7 @@ function getClientData($cid) {
 
     $data = json_decode($response, true);
     if (!$data || !isset($data['client'])) {
-        errorLog("❌ اکانت یافت نشد یا خطا در ارتباط با سرور. | آیدی آکانت: $cid", "functions.php", 2063);
+        errorLog("❌ اکانت یافت نشد یا خطا در ارتباط با سرور. | آیدی آکانت: $cid", "functions.php", 2179);
         return false;
     }
 
@@ -2279,7 +2395,7 @@ function getTest($type) {
         if ($plans === null) {
             $plans = getSellerPlans("free");
             if ($plans === false) {
-                errorLog("Error: Failed to retrieve seller plans", "functions.php", 2282);
+                errorLog("Error: Failed to retrieve seller plans", "functions.php", 2398);
                 $message = "خطا در دریافت لیست پلن‌ها از سرور";
                 return ['text' => $message, 'reply_markup' => []];
             }
@@ -2308,7 +2424,7 @@ function getTest($type) {
         }
     
         if (!$selectedPlan) {
-            errorLog("Error: No suitable plan found for type: $type", "functions.php", 2311);
+            errorLog("Error: No suitable plan found for type: $type", "functions.php", 2427);
             $message = "پلن مناسب برای نوع درخواستی ($type) یافت نشد.";
             return ['text' => $message, 'reply_markup' => []];
         }
@@ -2318,13 +2434,13 @@ function getTest($type) {
         $uid = UID;
         $conn = new mysqli($db_host, $db_user, $db_pass, $db_name);
         if ($conn->connect_error) {
-            errorLog("Error: Database connection failed: " . $conn->connect_error, "functions.php", 2321);
+            errorLog("Error: Database connection failed: " . $conn->connect_error, "functions.php", 2437);
             return ['text' => 'خطا در اتصال به دیتابیس', 'reply_markup' => []];
         }
         
         $stmt = $conn->prepare("SELECT * FROM users WHERE chat_id = ?");
         if (!$stmt) {
-            errorLog("Error: Prepare failed: " . $conn->error, "functions.php", 2327);
+            errorLog("Error: Prepare failed: " . $conn->error, "functions.php", 2443);
             $conn->close();
             return ['text' => 'خطا در دریافت اطلاعات کاربر', 'reply_markup' => []];
         }
@@ -2336,7 +2452,7 @@ function getTest($type) {
         $stmt->close();
         
         if (!$user) {
-            errorLog("Error: User not found for chat_id: $uid", "functions.php", 2339);
+            errorLog("Error: User not found for chat_id: $uid", "functions.php", 2455);
             $conn->close();
             return ['text' => 'کاربر یافت نشد', 'reply_markup' => []];
         }
@@ -2367,7 +2483,7 @@ function getTest($type) {
 
         $result = json_decode($response, true);
         if (!isset($result['client_id'])) {
-            errorLog("Error: Failed to create client on panel. Response: " . print_r($result, true), "functions.php", 2370);
+            errorLog("Error: Failed to create client on panel. Response: " . print_r($result, true), "functions.php", 2486);
             $conn->close();
             return ['text' => 'خطا در ایجاد اکانت', 'reply_markup' => []];
         }
@@ -2416,7 +2532,7 @@ function getTest($type) {
             
             $conn->close();
         } catch (Exception $e) {
-            errorLog("Error: Database operation failed: " . $e->getMessage(), "functions.php", 2419);
+            errorLog("Error: Database operation failed: " . $e->getMessage(), "functions.php", 2535);
             $conn->close();
             return ['text' => 'خطا در ذخیره اطلاعات اکانت', 'reply_markup' => []];
         }
@@ -2452,7 +2568,7 @@ function getTest($type) {
         return ['text' => $message, 'reply_markup' => $keyboard];
             
     } catch (Exception $e) {
-        errorLog("Error: Create test account exception: " . $e->getMessage(), "functions.php", 2455);
+        errorLog("Error: Create test account exception: " . $e->getMessage(), "functions.php", 2571);
         return ['text' => 'خطا: ' . $e->getMessage(), 'reply_markup' => []];
     }
 }
@@ -2519,7 +2635,7 @@ function createClient($name, $uid, $telegram_id, $planId) {
     ]);
     $response = curl_exec($ch);
     if ($response === false) {
-        errorLog("Error: cURL failed to create client: " . curl_error($ch), "functions.php", 2522);
+        errorLog("Error: cURL failed to create client: " . curl_error($ch), "functions.php", 2638);
     }
     curl_close($ch);
     return $response;
@@ -2552,7 +2668,7 @@ function updateClient($client_id, $plan_id) {
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         $curlErr  = curl_error($ch);
 
-        errorLog("Error: cURL updateClient failed | HTTP: {$httpCode} | cURL: {$curlErr} | Response: {$response} | Client ID: $client_id | Plan ID: $plan_id", "functions.php", 2555);
+        errorLog("Error: cURL updateClient failed | HTTP: {$httpCode} | cURL: {$curlErr} | Response: {$response} | Client ID: $client_id | Plan ID: $plan_id", "functions.php", 2671);
 
         return false;
     }
@@ -2713,7 +2829,7 @@ function keyboard($keyboard) {
                 $stmt->execute();
                 //handle error
                 if ($conn->connect_error || $stmt->error) {
-                    errorLog("Error in connecting to DB or preparing statement: " . ($conn->connect_error ?? $stmt->error), "functions.php", 2716);
+                    errorLog("Error in connecting to DB or preparing statement: " . ($conn->connect_error ?? $stmt->error), "functions.php", 2832);
                 }
                 $result = $stmt->get_result();
                 $user = $result->fetch_assoc();
@@ -2774,7 +2890,7 @@ function keyboard($keyboard) {
                 $stmt->execute();
 
                 if ($conn->connect_error || $stmt->error) {
-                    errorLog("Error in connecting to DB or preparing statement: " . ($conn->connect_error ?? $stmt->error), "functions.php", 2777);
+                    errorLog("Error in connecting to DB or preparing statement: " . ($conn->connect_error ?? $stmt->error), "functions.php", 2893);
                 }
 
                 $result = $stmt->get_result();
@@ -2904,7 +3020,7 @@ function keyboard($keyboard) {
                 $stmt->execute();
 
                 if ($conn->connect_error || $stmt->error) {
-                    errorLog("Error in connecting to DB or preparing statement: " . ($conn->connect_error ?? $stmt->error), "functions.php", 2907);
+                    errorLog("Error in connecting to DB or preparing statement: " . ($conn->connect_error ?? $stmt->error), "functions.php", 3023);
                 }
 
                 $result = $stmt->get_result();
@@ -3046,7 +3162,7 @@ function keyboard($keyboard) {
         }
         return json_encode(['inline_keyboard' => $keyboard]);
     } catch (Exception $e) {
-        errorLog("Error in keyboard function: " . $e->getMessage(), "functions.php", 3049);
+        errorLog("Error in keyboard function: " . $e->getMessage(), "functions.php", 3165);
     }
 }
 

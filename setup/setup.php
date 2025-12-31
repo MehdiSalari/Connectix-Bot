@@ -174,6 +174,8 @@ function fetchBotConfig($panelToken) {
             if ($data && isset($data['bot']['app_name']) && !empty($data['bot']['app_name'])) {
                 $appName = $data['bot']['app_name'] ?? null;
                 $adminId = $data['bot']['admin_id'] ?? null;
+                $adminId2 = $data['bot']['admin_id_2'] ?? null;
+                $adminId3 = $data['bot']['admin_id_3'] ?? null;
                 $telegramSupport = $data['bot']['support_telegram'] ?? null;
                 $telegramChannel = $data['bot']['channel_telegram'] ?? null;
                 $cardNumber = $data['bot']['card_number'] ?? null;
@@ -200,6 +202,8 @@ function fetchBotConfig($panelToken) {
             $botConfig = [
                 'app_name' => $appName,
                 'admin_id' => $adminId,
+                'admin_id_2' => $adminId2,
+                'admin_id_3' => $adminId3,
                 'support_telegram' => $telegramSupport,
                 'channel_telegram' => $telegramChannel,
                 'card_number' => $cardNumber,
@@ -404,7 +408,7 @@ function dbSetup()
     plan_id VARCHAR(255),
     price VARCHAR(255),
     coupon VARCHAR(255),
-    is_paid TINYINT(1) NULL,
+    is_paid VARCHAR(50) DEFAULT NULL,
     method VARCHAR(255),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

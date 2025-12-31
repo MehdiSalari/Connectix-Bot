@@ -62,6 +62,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // get data from request
     $appName = $_POST['app_name'] ?? '';
     $adminId = $_POST['admin_id'] ?? '';
+    $adminId2 = $_POST['admin_id_2'] ?? '';
+    $adminId3 = $_POST['admin_id_3'] ?? '';
     $telegramSupport = $_POST['telegram_support'] ?? '';
     $telegramChannel = $_POST['telegram_channel'] ?? '';
     $cardNumber = $_POST['card_number'] ?? '';
@@ -78,6 +80,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $botConfig = [
         'app_name' => $appName,
         'admin_id' => $adminId,
+        'admin_id_2' => $adminId2,
+        'admin_id_3' => $adminId3,
         'support_telegram' => $telegramSupport,
         'channel_telegram' => $telegramChannel,
         'card_number' => $cardNumber,
@@ -168,6 +172,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'card_name' => $cardName,
             'is_enabled' => $data['bot']['is_enabled'],
             'admin_id' => $adminId,
+            'admin_id_2' => $adminId2,
+            'admin_id_3' => $adminId3,
             'is_90_percent_plan_notifications_enabled' => $data['bot']['is_90_percent_plan_notifications_enabled'],
             'is_expired_plan_notifications_enabled' => $data['bot']['is_expired_plan_notifications_enabled'],
         ];
@@ -586,6 +592,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $config = json_decode($data, true);
                 $appName = $config['app_name'] ?? '';
                 $adminId = $config['admin_id'] ?? '';
+                $adminId2 = $config['admin_id_2'] ?? '';
+                $adminId3 = $config['admin_id_3'] ?? '';
                 $telegramSupport = $config['support_telegram'] ?? '';
                 $telegramChannel = $config['channel_telegram'] ?? '';
                 $cardNumber = $config['card_number'] ?? '';
@@ -623,8 +631,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             class="w-full px-4 py-3 border border-gray-300 rounded-lg file:mr-4 file:py-3 file:px-6 file:rounded-lg file:border-0 file:bg-blue-600 file:text-white hover:file:bg-blue-700">
                     </div>
                     <div class="input-group">
-                        <label class="block text-gray-700 font-semibold mb-2"> آیدی عددی ادمین</label>
+                        <label class="block text-gray-700 font-semibold mb-2"> آیدی عددی ادمین اصلی</label>
                         <input type="text" id="admin_id" name="admin_id" value="<?= $adminId ?>"
+                            class="w-full px-4 py-3 border border-gray-300 rounded-lg file:mr-4 file:py-3 file:px-6 file:rounded-lg file:border-0 file:bg-blue-600 file:text-white hover:file:bg-blue-700">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="input-group">
+                        <label class="block text-gray-700 font-semibold mb-2">آیدی عددی ادمین دوم</label>
+                        <input type="text" id="admin_id_2" name="admin_id_2" value="<?= $adminId2 ?>"
+                            class="w-full px-4 py-3 border border-gray-300 rounded-lg file:mr-4 file:py-3 file:px-6 file:rounded-lg file:border-0 file:bg-blue-600 file:text-white hover:file:bg-blue-700">
+                    </div>
+                    <div class="input-group">
+                        <label class="block text-gray-700 font-semibold mb-2">آیدی عددی ادمین سوم</label>
+                        <input type="text" id="admin_id_3" name="admin_id_3" value="<?= $adminId3 ?>"
                             class="w-full px-4 py-3 border border-gray-300 rounded-lg file:mr-4 file:py-3 file:px-6 file:rounded-lg file:border-0 file:bg-blue-600 file:text-white hover:file:bg-blue-700">
                     </div>
                 </div>

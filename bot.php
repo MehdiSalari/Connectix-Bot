@@ -510,14 +510,24 @@ try {
 
             if (!empty($params) && is_array($params)) {
                 $method = (isset($params['caption'])) ? 'editMessageCaption' : 'editMessageText';
-                $result = tg($method, array_merge([
+                $result = tg($method, params: array_merge([
                     'chat_id' => $callback_chat_id,
                     'message_id' => $callback_message_id,
                     'parse_mode' => 'html'
                 ], $params));
 
-                if (!($result = json_decode($result))->ok) {
-                    errorLog("Error in sending message to chat_id: $uid | Message: {$result->description}", "bot.php", 520);
+                $result = json_decode($result);
+
+                if (!$result->ok) {
+                    if (strpos($result->description, 'message is not modified') !== false) {
+                        break;
+                    }
+
+                    errorLog(
+                        "Error in sending message to chat_id: $uid | Message: {$result->description}",
+                        "bot.php",
+                        526
+                    );
                     exit;
                 }
             }
