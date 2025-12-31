@@ -1693,7 +1693,7 @@ function payment($receipt, $action) {
         $admin_chat_id = $bot_config->admin_id ?? null;
         $admin_chat_id2 = $bot_config->admin_id_2 ?? null;
         $admin_chat_id3 = $bot_config->admin_id_3 ?? null;
-        $admins =array_filter([$admin_chat_id, $admin_chat_id2, $admin_chat_id3], fn($value) => $value !== null);
+        $admins =array_filter([$admin_chat_id, $admin_chat_id2, $admin_chat_id3], fn($value) => $value !== null && $value !== '');
         $uid = UID;
         switch ($action) {
             case 'buy':

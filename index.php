@@ -62,8 +62,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // get data from request
     $appName = $_POST['app_name'] ?? '';
     $adminId = $_POST['admin_id'] ?? '';
-    $adminId2 = $_POST['admin_id_2'] ?? '';
-    $adminId3 = $_POST['admin_id_3'] ?? '';
+    $adminId2 = $_POST['admin_id_2'] ?? null;
+    $adminId3 = $_POST['admin_id_3'] ?? null;
     $telegramSupport = $_POST['telegram_support'] ?? '';
     $telegramChannel = $_POST['telegram_channel'] ?? '';
     $cardNumber = $_POST['card_number'] ?? '';
