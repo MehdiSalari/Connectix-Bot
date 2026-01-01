@@ -1,5 +1,5 @@
 <?php
-require_once '../functions.php';
+require_once '../../functions.php';
 header('Content-Type: application/json');
 
 $id = $_GET['id'] ?? '';

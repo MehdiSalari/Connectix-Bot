@@ -13,6 +13,13 @@ require_once '../functions.php';
 $adminId = $_SESSION['admin_id'];
 $admin = getAdminById($adminId);
 
+// if ($_GET['tab']) {
+//     $tab = $_GET['tab'];
+//     $backLink = match ($tab) {
+//         'transactions' => 
+//     }
+// }
+
 $userId = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 if ($userId <= 0) die('کاربر یافت نشد.');
 
@@ -79,6 +86,8 @@ if (isset($_GET['wallet_updated'])) {
         $messageType = 'error';
     }
 }
+
+$appName = json_decode(file_get_contents('../setup/bot_config.json'), true)['app_name'] ?? 'Connectix Bot';
 ?>
 
 <!DOCTYPE html>
@@ -137,13 +146,13 @@ if (isset($_GET['wallet_updated'])) {
     <div class="bg-white rounded-xl shadow-lg p-6 mb-8">
         <div class="grid md:grid-cols-2 gap-6 items-start">
             <div class="text-right">
-                <h1 class="text-3xl font-bold text-gray-800">پنل مدیریت Connectix Bot</h1>
+                <h1 class="text-3xl font-bold text-gray-800">پنل مدیریت <?= $appName ?></h1>
                 <p class="text-gray-600 mt-1">خوش آمدید، <?= htmlspecialchars($admin['email']) ?></p>
             </div>
             <div class="flex flex-col gap-5 items-end">
-                <a href="index.php" class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-lg font-semibold transition flex items-center gap-2 w-fit shadow-md">
-                    بازگشت به لیست کاربران
-                </a>
+                <button onclick="window.history.back()" class="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold transition flex items-center gap-2">
+                    <i class="fas fa-arrow-right"></i> بازگشت
+                </button>
             </div>
         </div>
     </div>

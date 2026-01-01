@@ -50,6 +50,8 @@ if ($stmt) {
 $conn->close();
 
 $totalPages = max(1, (int)ceil($totalUsers / $itemsPerPage));
+
+$appName = json_decode(file_get_contents('../setup/bot_config.json'), true)['app_name'] ?? 'Connectix Bot';
 ?>
 <!DOCTYPE html>
 <html lang="fa" dir="rtl">
@@ -93,7 +95,7 @@ $totalPages = max(1, (int)ceil($totalUsers / $itemsPerPage));
         <div class="bg-white rounded-xl shadow-lg p-6 mb-8">
             <div class="grid md:grid-cols-2 gap-6 items-start">
                 <div class="text-right">
-                    <h1 class="text-3xl font-bold text-gray-800">پنل مدیریت Connectix Bot</h1>
+                    <h1 class="text-3xl font-bold text-gray-800">پنل مدیریت <?= $appName ?></h1>
                     <p class="text-gray-600 mt-1">خوش آمدید، <?= htmlspecialchars($admin['email']) ?></p>
                 </div>
 

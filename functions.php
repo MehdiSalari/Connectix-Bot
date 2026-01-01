@@ -5,8 +5,7 @@ if (!file_exists(__DIR__ . '/config.php')) {
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/gregorian_jalali.php';
 define('BOT_TOKEN', $botToken);  // Bot token for authentication with Telegram API
-// define('TELEGRAM_URL', 'https://api.telegram.org/bot' . BOT_TOKEN . '/');  // Base URL for Telegram Bot API
-define('TELEGRAM_URL', 'https://mehdisalari.ir/bot/tgtunnel.php?bot_token=' . BOT_TOKEN . '&method=');
+define('TELEGRAM_URL', 'https://api.telegram.org/bot' . BOT_TOKEN . '/');  // Base URL for Telegram Bot API
 
 function tg($method, $params = []) {
     if (!$params) {
@@ -555,7 +554,7 @@ function getWalletTransactions($page = 1, $itemsPerPage = 20, $search = null) {
         $total = $totalRow['total'];
         $countStmt->close();
 
-        $stmt = $conn->prepare("SELECT wt.*, u.name AS user_name, u.telegram_id AS user_telegram 
+        $stmt = $conn->prepare("SELECT wt.*, u.name AS user_name, u.telegram_id AS user_telegram, u.id AS user_id
                                 $baseQuery 
                                 WHERE wt.amount LIKE ? OR wt.operation LIKE ? OR wt.status LIKE ? OR wt.type LIKE ? OR wt.chat_id LIKE ? OR u.name LIKE ? 
                                 ORDER BY wt.created_at DESC LIMIT ?, ?");
@@ -565,7 +564,7 @@ function getWalletTransactions($page = 1, $itemsPerPage = 20, $search = null) {
         $totalRow = $countResult->fetch_assoc();
         $total = $totalRow['total'];
 
-        $stmt = $conn->prepare("SELECT wt.*, u.name AS user_name, u.telegram_id AS user_telegram 
+        $stmt = $conn->prepare("SELECT wt.*, u.name AS user_name, u.telegram_id AS user_telegram, u.id AS user_id
                                 $baseQuery 
                                 ORDER BY wt.created_at DESC LIMIT ?, ?");
         $stmt->bind_param("ii", $offset, $itemsPerPage);
@@ -731,7 +730,7 @@ function getTransactions($page = 1, $itemsPerPage = 20, $search = null) {
         $total = $totalRow['total'];
         $countStmt->close();
 
-        $stmt = $conn->prepare("SELECT p.*, u.name AS user_name, u.telegram_id AS user_telegram 
+        $stmt = $conn->prepare("SELECT p.*, u.name AS user_name, u.telegram_id AS user_telegram, u.id AS user_id 
                                 $baseQuery 
                                 WHERE p.order_number LIKE ? OR p.chat_id LIKE ? OR p.price LIKE ? OR p.coupon LIKE ? OR p.client_id LIKE ? OR p.plan_id LIKE ? OR u.name LIKE ? 
                                 ORDER BY p.created_at DESC LIMIT ?, ?");
@@ -741,7 +740,7 @@ function getTransactions($page = 1, $itemsPerPage = 20, $search = null) {
         $totalRow = $countResult->fetch_assoc();
         $total = $totalRow['total'];
 
-        $stmt = $conn->prepare("SELECT p.*, u.name AS user_name, u.telegram_id AS user_telegram 
+        $stmt = $conn->prepare("SELECT p.*, u.name AS user_name, u.telegram_id AS user_telegram, u.id AS user_id 
                                 $baseQuery 
                                 ORDER BY p.created_at DESC LIMIT ?, ?");
         $stmt->bind_param("ii", $offset, $itemsPerPage);

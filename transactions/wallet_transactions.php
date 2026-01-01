@@ -21,6 +21,8 @@ $data = getWalletTransactions($page, $itemsPerPage, $search);
 $transactions = $data['transactions'];
 $totalTransactions = $data['total'];
 $totalPages = max(1, (int)ceil($totalTransactions / $itemsPerPage));
+
+$appName = json_decode(file_get_contents('../setup/bot_config.json'), true)['app_name'] ?? 'Connectix Bot';
 ?>
 
 <!DOCTYPE html>
@@ -53,7 +55,7 @@ $totalPages = max(1, (int)ceil($totalTransactions / $itemsPerPage));
         <div class="bg-white rounded-xl shadow-lg p-6 mb-8">
             <div class="grid md:grid-cols-2 gap-6 items-start">
                 <div class="text-right">
-                    <h1 class="text-3xl font-bold text-gray-800">پنل مدیریت Connectix Bot</h1>
+                    <h1 class="text-3xl font-bold text-gray-800">پنل مدیریت <?= $appName ?></h1>
                     <p class="text-gray-600 mt-1">خوش آمدید، <?= htmlspecialchars($admin['email']) ?></p>
                 </div>
                 <div class="flex flex-col gap-5 items-end">
@@ -96,6 +98,7 @@ $totalPages = max(1, (int)ceil($totalTransactions / $itemsPerPage));
                             <th class="px-6 py-4 text-right text-xs font-bold text-gray-700 uppercase tracking-wider">نوع</th>
                             <th class="px-6 py-4 text-right text-xs font-bold text-gray-700 uppercase tracking-wider">وضعیت</th>
                             <th class="px-6 py-4 text-right text-xs font-bold text-gray-700 uppercase tracking-wider">تاریخ</th>
+                            <th class="px-6 py-4 text-right text-xs font-bold text-gray-700 uppercase tracking-wider">عملیات</th>
                         </tr>
                     </thead>
                     <tbody class="bg-white divide-y divide-gray-200">
@@ -139,6 +142,12 @@ $totalPages = max(1, (int)ceil($totalTransactions / $itemsPerPage));
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                                 <?= jdate($t['created_at'], true) ?>
                             </td>
+                            <td>
+                                <a href="../users/user.php?id=<?= $t['user_id'] ?>"
+                                    class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-white font-bold transition bg-indigo-600 hover:bg-indigo-700">
+                                    <i class="fas fa-user"></i> مشاهده کاربر
+                                </a>
+                            </td>
                         </tr>
                         <?php endforeach; endif; ?>
                     </tbody>
@@ -174,10 +183,6 @@ $totalPages = max(1, (int)ceil($totalTransactions / $itemsPerPage));
             </div>
             <?php endif; ?>
         </div>
-    </div>
-
-    <div class="copyright">
-        <p>&copy; 2024 - <?= date('Y') ?> Connectix Bot designed by <a href="https://github.com/MehdiSalari" target="_blank">Mehdi Salari</a>. All rights reserved.</p>
     </div>
 </body>
 </html>

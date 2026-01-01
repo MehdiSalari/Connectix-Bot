@@ -285,6 +285,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 
+//get data from bot_config.json
+$data = file_get_contents('setup/bot_config.json');
+$config = json_decode($data, true);
+
 ?>
 
 <!DOCTYPE html>
@@ -507,7 +511,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <div class="grid md:grid-cols-2 gap-6 items-start">
 
                 <div class="text-right">
-                    <h1 class="text-3xl font-bold text-gray-800">پنل مدیریت Connectix Bot</h1>
+                    <h1 class="text-3xl font-bold text-gray-800">پنل مدیریت <?= $config['app_name'] ?></h1>
                     <p class="text-gray-600 mt-1">خوش آمدید، <?= htmlspecialchars($admin['email']) ?></p>
                 </div>
 
@@ -565,10 +569,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                         تراکنش‌های سفارشات
                                     </a>
                                     <a href="transactions/wallet_transactions.php"
+                                        class="block px-5 py-3 text-sm font-medium text-gray-800 hover:bg-yellow-50 hover:text-yellow-600 transition flex items-center gap-3"
+                                        role="menuitem">
+                                        <i class="fas fa-wallet text-yellow-600"></i>
+                                        تراکنش‌های کیف پول
+                                    </a>
+                                    <a href="transactions/sms_payments.php"
                                         class="block px-5 py-3 text-sm font-medium text-gray-800 hover:bg-green-50 hover:text-green-600 transition flex items-center gap-3"
                                         role="menuitem">
-                                        <i class="fas fa-wallet text-green-600"></i>
-                                        تراکنش‌های کیف پول
+                                        <i class="fas fa-comment-dots text-green-600"></i>
+                                        پیامک های واریزی
                                     </a>
                                 </div>
                             </div>
@@ -587,9 +597,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             <form id="messageForm" method="post" action="index.php" enctype="multipart/form-data" class="space-y-6">
                 <?php
-                //get data from bot_config.json
-                $data = file_get_contents('setup/bot_config.json');
-                $config = json_decode($data, true);
                 $appName = $config['app_name'] ?? '';
                 $adminId = $config['admin_id'] ?? '';
                 $adminId2 = $config['admin_id_2'] ?? '';

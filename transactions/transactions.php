@@ -21,6 +21,8 @@ $data = getTransactions($page, $itemsPerPage, $search);
 $transactions = $data['transactions'];
 $totalTransactions = $data['total'];
 $totalPages = max(1, (int)ceil($totalTransactions / $itemsPerPage));
+
+$appName = json_decode(file_get_contents('../setup/bot_config.json'), true)['app_name'] ?? 'Connectix Bot';
 ?>
 
 <!DOCTYPE html>
@@ -42,8 +44,6 @@ $totalPages = max(1, (int)ceil($totalTransactions / $itemsPerPage));
         .pay-pending { background-color: #fff3cd; color: #856404; }
         .uuid { font-family: monospace; font-size: 0.85em; color: #4c1d95; }
         .modal { transition: opacity 0.3s ease; }
-        .copyright { width: 100%; text-align: center; color: #777; font-size: 15px; direction: ltr; margin: 20px 0 10px; padding-bottom: 10px; }
-        .copyright a { color: #b500bbff; text-decoration: none; }
     </style>
 </head>
 <body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen">
@@ -53,7 +53,7 @@ $totalPages = max(1, (int)ceil($totalTransactions / $itemsPerPage));
         <div class="bg-white rounded-xl shadow-lg p-6 mb-8">
             <div class="grid md:grid-cols-2 gap-6 items-start">
                 <div class="text-right">
-                    <h1 class="text-3xl font-bold text-gray-800">پنل مدیریت Connectix Bot</h1>
+                    <h1 class="text-3xl font-bold text-gray-800">پنل مدیریت <?= $appName ?></h1>
                     <p class="text-gray-600 mt-1">خوش آمدید، <?= htmlspecialchars($admin['email']) ?></p>
                 </div>
                 <div class="flex flex-col gap-5 items-end">
@@ -166,7 +166,7 @@ $totalPages = max(1, (int)ceil($totalTransactions / $itemsPerPage));
                                 <?= jdate($t['created_at'], true) ?>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-center">
-                                <button onclick="showTransactionDetails(<?= $t['id'] ?>, '<?= htmlspecialchars($t['plan_id']) ?>', '<?= htmlspecialchars($t['client_id']) ?>')"
+                                <button onclick="showTransactionDetails(<?= $t['id'] ?>, '<?= htmlspecialchars($t['plan_id']) ?>', '<?= htmlspecialchars($t['client_id']) ?>', <?= $t['user_id'] ?>)"
                                     class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-white font-bold transition bg-indigo-600 hover:bg-indigo-700">
                                     <i class="fas fa-eye"></i> جزئیات
                                 </button>
@@ -208,15 +208,18 @@ $totalPages = max(1, (int)ceil($totalTransactions / $itemsPerPage));
         </div>
     </div>
 
-    <div class="copyright">
-        <p>&copy; 2024 - <?= date('Y') ?> Connectix Bot designed by <a href="https://github.com/MehdiSalari" target="_blank">Mehdi Salari</a>. All rights reserved.</p>
-    </div>
-
     <!-- Modal for displaying transaction details -->
     <div id="detailModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50 modal">
         <div class="bg-white rounded-xl shadow-2xl max-w-4xl w-full mx-4 max-h-screen overflow-y-auto">
             <div class="p-6 border-b border-gray-200 flex justify-between items-center">
-                <h3 class="text-2xl font-bold text-gray-800">جزئیات تراکنش</h3>
+                <div class="flex flex-row gap-5">
+                    <h3 class="text-2xl font-bold text-gray-800">جزئیات تراکنش</h3>
+                    <button id="show-user"
+                        class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-white font-bold transition bg-indigo-600 hover:bg-indigo-700">
+                        <i class="fas fa-user ml-1"></i>
+                        مشاهده کاربر
+                    </button>
+                </div>
                 <button onclick="closeModal()" class="text-red-500 hover:text-red-700 text-2xl"><i class="fas fa-times-circle"></i></button>
             </div>
             <div class="p-6" id="modalContent">
@@ -229,9 +232,11 @@ $totalPages = max(1, (int)ceil($totalTransactions / $itemsPerPage));
     </div>
 
     <script>
-        function showTransactionDetails(transactionId, planId, clientId) {
+        function showTransactionDetails(transactionId, planId, clientId, userId) {
             const modal = document.getElementById('detailModal');
             const content = document.getElementById('modalContent');
+            const showUserBtn = document.getElementById('show-user');
+            showUserBtn.setAttribute('onclick', `window.location.href = ('../users/user.php?id=${userId}')`);
 
             modal.classList.remove('hidden');
             modal.classList.add('flex');
@@ -245,8 +250,8 @@ $totalPages = max(1, (int)ceil($totalTransactions / $itemsPerPage));
 
             // simultaneous requests for plan and client
             Promise.all([
-                fetch(`get_plan_details.php?id=${planId}`).then(r => r.json()),
-                fetch(`get_client_details.php?id=${clientId}`).then(r => r.json())
+                fetch(`actions/get_plan_details.php?id=${planId}`).then(r => r.json()),
+                fetch(`actions/get_client_details.php?id=${clientId}`).then(r => r.json())
             ]).then(([planData, clientData]) => {
                 let html = `<div class="grid md:grid-cols-2 gap-8">`;
 
