@@ -9,7 +9,7 @@ require_once '../functions.php';
 $adminId = $_SESSION['admin_id'];
 $admin = getAdminById($adminId);
 
-// بارگذاری بانک‌ها
+// Load Banks
 $banksJson = @file_get_contents('../bank/banks.json');
 $banksData = $banksJson ? json_decode($banksJson, true) : ['banks' => []];
 $banks = [];
@@ -17,19 +17,19 @@ foreach ($banksData['banks'] ?? [] as $b) {
     $banks[$b['name']] = $b['title'];
 }
 
-// صفحه‌بندی و جستجو
+// Pagination and Search
 $itemsPerPage = 20;
 $page = isset($_GET['page']) && is_numeric($_GET['page']) ? max(1, (int)$_GET['page']) : 1;
 $search = isset($_GET['search']) ? trim($_GET['search']) : '';
 
 $offset = ($page - 1) * $itemsPerPage;
 
-// اتصال به دیتابیس
+// Connect to the database
 $conn = new mysqli($db_host, $db_user, $db_pass, $db_name);
 if ($conn->connect_error) die("Connection failed: " . $conn->connect_error);
 $conn->set_charset("utf8mb4");
 
-// کوئری با فیلتر
+// Query with filters
 $where = "WHERE (payment_id IS NOT NULL AND payment_id != '' OR expired_at > NOW())";
 $params = [];
 $types = '';
@@ -41,7 +41,7 @@ if ($search !== '') {
     $types = 'sss';
 }
 
-// شمارش کل
+// Count all payments
 $countQuery = "SELECT COUNT(*) as total FROM sms_payments $where";
 $stmt = $conn->prepare($countQuery);
 if (!empty($params)) $stmt->bind_param($types, ...$params);
@@ -49,7 +49,7 @@ $stmt->execute();
 $totalPayments = $stmt->get_result()->fetch_assoc()['total'];
 $totalPages = max(1, ceil($totalPayments / $itemsPerPage));
 
-// دریافت داده‌ها
+// Get Data
 $query = "SELECT * FROM sms_payments $where ORDER BY created_at DESC LIMIT ?, ?";
 $types .= 'ii';
 $params[] = $offset;
@@ -88,7 +88,7 @@ $appName = json_decode(file_get_contents('../setup/bot_config.json'), true)['app
 <body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen">
     <div class="container mx-auto px-4 py-8 max-w-7xl">
 
-        <!-- هدر -->
+        <!-- Header -->
         <div class="bg-white rounded-xl shadow-lg p-6 mb-8">
             <div class="grid md:grid-cols-2 gap-6 items-start">
                 <div class="text-right">
@@ -103,7 +103,7 @@ $appName = json_decode(file_get_contents('../setup/bot_config.json'), true)['app
             </div>
         </div>
 
-        <!-- لیست پیام‌های واریز -->
+        <!-- List of Variance Payments -->
         <div class="bg-white rounded-xl shadow-xl overflow-hidden">
             <div class="p-6 border-b border-gray-200">
                 <div class="flex flex-col md:flex-row justify-between items-center gap-4">
@@ -199,7 +199,7 @@ $appName = json_decode(file_get_contents('../setup/bot_config.json'), true)['app
                 </table>
             </div>
 
-            <!-- صفحه‌بندی -->
+            <!-- Pagination -->
             <?php if ($totalPages > 1):
                 $window = 2;
                 $start = max(1, $page - $window);
@@ -229,7 +229,7 @@ $appName = json_decode(file_get_contents('../setup/bot_config.json'), true)['app
         </div>
     </div>
 
-    <!-- مودال زیبا برای جزئیات تراکنش -->
+    <!-- Transaction Detail Modal -->
     <div id="transactionModal" class="fixed inset-0 bg-black bg-opacity-60 hidden flex items-center justify-center z-50 p-4">
         <div class="bg-white rounded-2xl shadow-2xl w-full max-w-5xl modal-content">
             <div class="p-6 rounded-t-2xl flex justify-between items-center border-b border-gray-200">
@@ -252,25 +252,35 @@ $appName = json_decode(file_get_contents('../setup/bot_config.json'), true)['app
             const modal = document.getElementById('transactionModal');
             const content = document.getElementById('transactionContent');
             modal.classList.remove('hidden');
-
-            // اول اطلاعات تراکنش اصلی (از جدول payments یا wallet_transactions)
-            let url = type === 'wallet' 
-                ? `actions/get_wallet_transaction.php?id=${transactionId}`
-                : `actions/get_payment_transaction.php?id=${transactionId}`;
+            content.innerHTML = `
+                <div class="text-center py-12">
+                    <i class="fas fa-spinner fa-spin text-5xl text-indigo-600 mb-4"></i>
+                    <p class="text-xl text-gray-600">در حال بارگذاری جزئیات...</p>
+                </div>
+            `;
 
             const typeName = type === 'wallet' ? 'شارژ کیف پول' : 'خرید اشتراک';
 
-            const smsRes = await fetch(`actions/get_sms_message.php?id=${smsId}`);
-            const message = await smsRes.json();
+            // adding timestamp to prevent caching
+            const cacheBuster = Date.now();
 
-            fetch(url)
+            // get sms message text
+            const smsRes = await fetch(`actions/get_sms_message.php?id=${smsId}&_=${cacheBuster}`);
+            const smsData = await smsRes.json();
+
+            // get main transaction data
+            let transactionUrl = type === 'wallet'
+                ? `actions/get_wallet_transaction.php?id=${transactionId}&_=${cacheBuster}`
+                : `actions/get_payment_transaction.php?id=${transactionId}&_=${cacheBuster}`;
+
+            fetch(transactionUrl)
                 .then(r => r.json())
                 .then(mainData => {
                     if (mainData.error) throw new Error(mainData.error);
 
-                    let html = `<div class="grid lg:grid-cols-3 gap-8 mb-8">`;
+                    let html = `<div class="grid lg:grid-cols-3 gap-4 mb-4">`;
 
-                    // بخش اطلاعات عمومی
+                    // General information
                     html += `<div class="bg-gradient-to-br from-blue-50 to-indigo-100 rounded-xl p-6">
                         <h4 class="text-xl font-bold text-indigo-700 mb-4 flex items-center gap-2">
                             <i class="fas fa-info-circle"></i> اطلاعات واریز
@@ -279,11 +289,11 @@ $appName = json_decode(file_get_contents('../setup/bot_config.json'), true)['app
                             <div><strong>مبلغ:</strong> <span class="text-green-600 font-bold">${(mainData.amount || mainData.price || 0).toLocaleString()} تومان</span></div>
                             <div><strong>وضعیت:</strong> <span class="px-3 py-1 rounded-full text-xs font-bold bg-green-100 text-green-800">تأیید شده</span></div>
                             <div><strong>تاریخ:</strong> ${mainData.created_at || 'نامشخص'}</div>
-                            <div><strong>نوع پرداخت:</strong> ${typeName || 'نامشخص'}</div>
+                            <div><strong>نوع پرداخت:</strong> ${typeName}</div>
                         </div>
                     </div>`;
 
-                    // بخش کاربر
+                    // User information
                     html += `<div class="bg-gradient-to-br from-purple-50 to-pink-100 rounded-xl p-6">
                         <h4 class="text-xl font-bold text-purple-700 mb-4 flex items-center gap-2">
                             <i class="fas fa-user"></i> اطلاعات کاربر
@@ -292,31 +302,37 @@ $appName = json_decode(file_get_contents('../setup/bot_config.json'), true)['app
                             <div><strong>نام:</strong> ${mainData.user_name || 'نامشخص'}</div>
                             <div><strong>چت آیدی:</strong> <code class="bg-white px-2 py-1 rounded">${mainData.chat_id || '—'}</code></div>
                             ${mainData.user_telegram ? `<div><strong>یوزرنیم:</strong> <a href="https://t.me/${mainData.user_telegram}" target="_blank" class="text-blue-600 hover:underline">@${mainData.user_telegram}</a></div>` : ''}
-                            <a href="../users/user.php?id=${mainData.user_id}" class="inline-flex items-center gap-1 px-4 py-2 rounded-lg text-white font-bold transition bg-indigo-600 hover:bg-indigo-700">مشاهده کاربر</a>
+                            ${mainData.user_id ? `<a href="../users/user.php?id=${mainData.user_id}" class="inline-flex items-center gap-1 px-4 py-2 mt-4 rounded-lg text-white font-bold transition bg-indigo-600 hover:bg-indigo-700">
+                                <i class="fas fa-user ml-1"></i> مشاهده کاربر
+                            </a>` : ''}
                         </div>
                     </div>`;
 
-                    // بخش متن پیام
+                    // SMS message
                     html += `<div class="bg-gradient-to-br from-yellow-50 to-amber-100 rounded-xl p-6">
                         <h4 class="text-xl font-bold text-yellow-700 mb-4 flex items-center gap-2">
-                            <i class="fas fa-comment"></i> متن پیام
+                            <i class="fas fa-comment-dots"></i> متن پیام واریز
                         </h4>
                         <div class="space-y-3 text-lg">
-                            <div style="font-size: 14px; line-height: normal;">${message.message.replace(/\n/g, '<br>') || 'نامشخص'}</div></div>
+                            <div style="font-size: 14px; line-height: normal;">
+                            ${smsData.message ? smsData.message.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>') : '<em class="text-gray-500">پیامی ثبت نشده</em>'}
+                            </div>
                         </div>
                     </div>`;
 
-                    // اگر خرید اشتراک بود → جزئیات پلن و اکانت
+                    // Plan information (if sms for buying plan)
                     if (type === 'buy' && mainData.plan_id) {
+                        const planUrl = `actions/get_plan_details.php?id=${mainData.plan_id}&_=${cacheBuster}`;
+                        const clientUrl = `actions/get_client_details.php?id=${mainData.client_id}&_=${cacheBuster}`;
+
                         Promise.all([
-                            fetch(`actions/get_plan_details.php?id=${mainData.plan_id}`).then(r => r.json()),
-                            fetch(`actions/get_client_details.php?id=${mainData.client_id}`).then(r => r.json())
+                            fetch(planUrl).then(r => r.json()),
+                            fetch(clientUrl).then(r => r.json())
                         ]).then(([planData, clientData]) => {
                             html += `<div class="bg-gradient-to-br from-green-50 to-emerald-100 rounded-xl p-6 lg:col-span-3">
                                 <h4 class="text-xl font-bold text-green-700 mb-6 text-center">جزئیات خرید اشتراک</h4>
                                 <div class="grid md:grid-cols-2 gap-8">`;
 
-                            // پلن
                             if (planData && !planData.error) {
                                 html += `<div>
                                     <h5 class="font-bold text-green-800 mb-3">پلن خریداری شده</h5>
@@ -330,7 +346,6 @@ $appName = json_decode(file_get_contents('../setup/bot_config.json'), true)['app
                                 </div>`;
                             }
 
-                            // اکانت
                             if (clientData && clientData.client) {
                                 const c = clientData.client;
                                 html += `<div>
@@ -348,13 +363,10 @@ $appName = json_decode(file_get_contents('../setup/bot_config.json'), true)['app
                             html += `</div></div>`;
                             content.innerHTML = html;
                         }).catch(() => {
-                            html += `<div class="text-center text-red-600 py-8 lg:col-span-3">خطا در دریافت جزئیات پلن یا اکانت</div>`;
-                            content.innerHTML = html;
+                            content.innerHTML = html + `<div class="text-center text-red-600 py-8 lg:col-span-3">خطا در بارگذاری جزئیات پلن یا اکانت</div>`;
                         });
                     } else {
-                        // فقط اطلاعات عمومی و کاربر
-                        html += `</div>`;
-                        content.innerHTML = html;
+                        content.innerHTML = html + `</div>`;
                     }
                 })
                 .catch(err => {
