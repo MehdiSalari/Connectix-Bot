@@ -297,7 +297,7 @@ $config = json_decode($data, true);
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>پنل مدیریت | Connectix Bot</title>
+    <title><?= $config['app_name'] ?> | پنل مدیریت</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -574,12 +574,14 @@ $config = json_decode($data, true);
                                         <i class="fas fa-wallet text-yellow-600"></i>
                                         تراکنش‌های کیف پول
                                     </a>
+                                    <?php if ($config['bank']['name'] != '' || $config['bank']['name'] != null): ?>
                                     <a href="transactions/sms_payments.php"
                                         class="block px-5 py-3 text-sm font-medium text-gray-800 hover:bg-green-50 hover:text-green-600 transition flex items-center gap-3"
                                         role="menuitem">
                                         <i class="fas fa-comment-dots text-green-600"></i>
                                         پیامک های واریزی
                                     </a>
+                                    <?php endif; ?>
                                 </div>
                             </div>
                         </div>

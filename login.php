@@ -89,13 +89,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error = 'Invalid email or password';
     }
 }
+
+//get app name from bot_config.json if exists
+$data = file_get_contents('setup/bot_config.json');
+$config = json_decode($data, true);
+$appName = $config['app_name'] ?? 'Connectix Bot';
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Connectix Bot | Login</title>
+    <title><?= $appName ?> | Login</title>
     <style>
         * {
             box-sizing: border-box;
@@ -221,7 +226,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <body>
 
     <div class="main">
-        <h2>Connectix Bot Login</h2>
+        <h2><?= $appName ?> Login</h2>
         
         <form action="#" method="post">
             <div class="input-group">

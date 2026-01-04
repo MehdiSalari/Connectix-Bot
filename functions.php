@@ -702,7 +702,7 @@ function discount($query, $coupon = null) {
     }
 }
 
-function getTransactions($page = 1, $itemsPerPage = 20, $search = null) {
+function getTransactions($page = 1, $itemsPerPage = 20, $search = null, $id = null) {
     global $db_host, $db_user, $db_pass, $db_name;
 
     $conn = new mysqli($db_host, $db_user, $db_pass, $db_name);
@@ -716,11 +716,24 @@ function getTransactions($page = 1, $itemsPerPage = 20, $search = null) {
     $total = 0;
 
     $searchLike = $search ? "%" . $conn->real_escape_string($search) . "%" : null;
+    $idLike = $id ? $conn->real_escape_string($id) : null;
+
 
     // Only JOIN with users to get user name and telegram id (local database)
     $baseQuery = "FROM payments p LEFT JOIN users u ON p.chat_id = u.chat_id";
 
-    if ($search) {
+    if ($id) {
+        $countStmt = $conn->prepare("SELECT COUNT(*) AS total $baseQuery WHERE p.id = ?");
+        $countStmt->bind_param("i", $id);
+        $countStmt->execute();
+        $countResult = $countStmt->get_result();
+        $totalRow = $countResult->fetch_assoc();
+        $total = $totalRow['total'];
+        $countStmt->close();
+
+        $stmt = $conn->prepare("SELECT p.*, u.name AS user_name, u.telegram_id AS user_telegram, u.id AS user_id $baseQuery WHERE p.id = ? ORDER BY p.created_at DESC LIMIT ?, ?");
+        $stmt->bind_param("iii", $id, $offset, $itemsPerPage);
+    } elseif ($search) {
         $countStmt = $conn->prepare("SELECT COUNT(*) AS total $baseQuery 
             WHERE p.order_number LIKE ? OR p.chat_id LIKE ? OR p.price LIKE ? OR p.coupon LIKE ? OR p.client_id LIKE ? OR p.plan_id LIKE ? OR u.name LIKE ?");
         $countStmt->bind_param("sssssss", $searchLike, $searchLike, $searchLike, $searchLike, $searchLike, $searchLike, $searchLike);
