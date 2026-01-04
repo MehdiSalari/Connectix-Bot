@@ -13,13 +13,6 @@ require_once '../functions.php';
 $adminId = $_SESSION['admin_id'];
 $admin = getAdminById($adminId);
 
-// if ($_GET['tab']) {
-//     $tab = $_GET['tab'];
-//     $backLink = match ($tab) {
-//         'transactions' => 
-//     }
-// }
-
 $userId = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 if ($userId <= 0) die('کاربر یافت نشد.');
 
@@ -163,7 +156,7 @@ $appName = json_decode(file_get_contents('../setup/bot_config.json'), true)['app
             <!-- Avatar and Primary Information -->
             <div class="flex flex-col md:flex-row items-center gap-8 flex-1">
                 <div class="w-28 h-28 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center text-white text-5xl font-bold shadow-xl">
-                    <?= mb_substr($user['name'] ?? 'U', 0, 1) ?>
+                    <?= $user['avatar'] ? '<img class="w-28 h-28 rounded-full" src="' . $user['avatar'] . '" alt="' . $user['name'] . '">' : mb_substr($user['name'] ?? 'U', 0, 1); ?>
                 </div>
                 <div class="text-center md:text-right">
                     <h2 class="text-3xl font-bold text-gray-800"><?= htmlspecialchars($user['name'] ?? 'نامشخص') ?></h2>
@@ -193,8 +186,13 @@ $appName = json_decode(file_get_contents('../setup/bot_config.json'), true)['app
     <!-- Wallet Modal -->
     <div id="walletModal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50 overflow-y-auto">
         <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full mx-4 my-8 max-h-screen overflow-y-auto" style="max-height: 90vh">
-            <div class="p-8">
-                <h3 class="text-2xl font-bold text-gray-800 mb-6 text-center">مدیریت کیف پول کاربر</h3>
+            <div class="p-8 relative">
+                <div>
+                    <button onclick="closeWalletModal()" class="absolute top-4 left-4 text-red-500 hover:text-red-700 text-3xl z-10">
+                        <i class="fas fa-times-circle"></i>
+                    </button>
+                    <h3 class="text-2xl font-bold text-gray-800 mb-6 text-center">مدیریت کیف پول کاربر</h3>
+                </div>
                 
                 <div class="text-center mb-8 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl p-6">
                     <p class="text-gray-700">کاربر: <strong><?= htmlspecialchars($user['name'] ?? 'نامشخص') ?></strong></p>

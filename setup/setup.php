@@ -381,6 +381,7 @@ function dbSetup()
     name VARCHAR(255),
     email VARCHAR(255),
     phone VARCHAR(50),
+    avatar VARCHAR(255) DEFAULT NULL,
     test TINYINT(1) DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

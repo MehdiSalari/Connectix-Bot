@@ -2865,10 +2865,16 @@ function keyboard($keyboard) {
                 }
 
                 $current_url = $protocol . "://" . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
-                $full_url = str_replace("bot.php", "", $current_url);
-                $panelBtn = ($uid == $config['admin_id']) ? [
-                    ['text' => '👨🏻‍💻 | پنل مدیریت', 'url' => $full_url]
-                ] : [];
+                $app_url = str_replace("bot.php", "app.php", $current_url);
+                
+                $panelBtn = match (strval($uid)) {
+                    strval($config['admin_id']) => [
+                        ['text' => '👨🏻‍💻 | پنل مدیریت', 'web_app' => ['url' => $app_url]]
+                    ],
+                    default => ($user['test'] != 0) ? [
+                        ['text' => '👤 | پروفایل', 'web_app' => ['url' => $app_url]]
+                    ] : [],
+                };
 
                 $keyboard = [
                     // test row (may be empty)
@@ -2888,10 +2894,10 @@ function keyboard($keyboard) {
                     [
                         ['text' => '👝 |  کیف پول', 'callback_data' => 'wallet']
                     ],
+                    $panelBtn,
                     [
                         ['text' => '📣 | اخبار و اطلاعیه ها', 'url' => "t.me/$channelTelegram"]
                     ],
-                    $panelBtn
                 ];
                 break;
 
