@@ -236,7 +236,7 @@ $appName = json_decode(file_get_contents('../setup/bot_config.json'), true)['app
             const modal = document.getElementById('detailModal');
             const content = document.getElementById('modalContent');
             const showUserBtn = document.getElementById('show-user');
-            showUserBtn.setAttribute('onclick', `window.location.href = ('../users/user.php?id=${userId}')`);
+            showUserBtn.setAttribute('onclick', `window.location.href = ('../users/user.php?id=${userId}&tab=transactions');`);
 
             modal.classList.remove('hidden');
             modal.classList.add('flex');

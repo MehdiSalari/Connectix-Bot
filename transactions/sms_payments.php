@@ -302,7 +302,7 @@ $appName = json_decode(file_get_contents('../setup/bot_config.json'), true)['app
                             <div><strong>نام:</strong> ${mainData.user_name || 'نامشخص'}</div>
                             <div><strong>چت آیدی:</strong> <code class="bg-white px-2 py-1 rounded">${mainData.chat_id || '—'}</code></div>
                             ${mainData.user_telegram ? `<div><strong>یوزرنیم:</strong> <a href="https://t.me/${mainData.user_telegram}" target="_blank" class="text-blue-600 hover:underline">@${mainData.user_telegram}</a></div>` : ''}
-                            ${mainData.user_id ? `<a href="../users/user.php?id=${mainData.user_id}" class="inline-flex items-center gap-1 px-4 py-2 mt-4 rounded-lg text-white font-bold transition bg-indigo-600 hover:bg-indigo-700">
+                            ${mainData.user_id ? `<a href="../users/user.php?id=${mainData.user_id}&tab=sms" class="inline-flex items-center gap-1 px-4 py-2 mt-4 rounded-lg text-white font-bold transition bg-indigo-600 hover:bg-indigo-700">
                                 <i class="fas fa-user ml-1"></i> مشاهده کاربر
                             </a>` : ''}
                         </div>

@@ -387,7 +387,7 @@ $appName = json_decode(file_get_contents('../setup/bot_config.json'), true)['app
 
         // View user
         function viewUser(userId) {
-            window.location.href = 'user.php?id=' + userId;
+            window.location.href = 'user.php?id=' + userId + '&tab=users';
         }
     </script>
 </body>

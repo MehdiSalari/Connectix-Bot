@@ -143,7 +143,7 @@ $appName = json_decode(file_get_contents('../setup/bot_config.json'), true)['app
                                 <?= jdate($t['created_at'], true) ?>
                             </td>
                             <td>
-                                <a href="../users/user.php?id=<?= $t['user_id'] ?>"
+                                <a href="../users/user.php?id=<?= $t['user_id'] ?>&tab=wallet"
                                     class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-white font-bold transition bg-indigo-600 hover:bg-indigo-700">
                                     <i class="fas fa-user"></i> مشاهده کاربر
                                 </a>

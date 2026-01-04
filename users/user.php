@@ -13,6 +13,8 @@ require_once '../functions.php';
 $adminId = $_SESSION['admin_id'];
 $admin = getAdminById($adminId);
 
+$tab = $_GET['tab'] ?? 'users';
+
 $userId = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 if ($userId <= 0) die('کاربر یافت نشد.');
 
@@ -45,25 +47,28 @@ $walletData = wallet('get', $user['chat_id']);
 
 if (isset($_POST['update_wallet'])) {
     $chat_id = $_POST['chat_id'];
-    $amount = str_replace(',', '', $_POST['amount']); // remove commas
-    $action = $_POST['action']; // 'increase' or 'decrease'
+    $amount  = str_replace(',', '', $_POST['amount']);
+    $action  = $_POST['action'];
+
     $walletID = wallet($action, $chat_id, $amount);
 
-
-    $currentUrl = $_SERVER['PHP_SELF'];
-    $queryString = $_SERVER['QUERY_STRING'];
     if ($walletID) {
-        createWalletTransaction(null, 'SUCCESS', $walletID, $amount, $action, $chat_id, 'DONE_BY_ADMIN');
+        createWalletTransaction(
+            null,
+            'SUCCESS',
+            $walletID,
+            $amount,
+            $action,
+            $chat_id,
+            'DONE_BY_ADMIN'
+        );
         $status = 'success';
-        $messageParam = 'wallet_updated=success';
     } else {
         $status = 'error';
-        $messageParam = 'wallet_updated=error';
     }
 
-    $separator = empty($queryString) ? '?' : '&';
-    header("Location: {$currentUrl}?{$queryString}{$separator}{$messageParam}");
-    exit();
+    header("Location: {$_SERVER['PHP_SELF']}?id={$userId}&wallet_updated={$status}&tab={$tab}");
+    exit;
 }
 
 
@@ -81,6 +86,14 @@ if (isset($_GET['wallet_updated'])) {
 }
 
 $appName = json_decode(file_get_contents('../setup/bot_config.json'), true)['app_name'] ?? 'Connectix Bot';
+
+$backLink = match ($tab) {
+    'users' => 'index.php',
+    'transactions' => '../transactions/transactions.php',
+    'wallet' => '../transactions/wallet_transactions.php',
+    'sms' => '../transactions/sms_payments.php',
+    default => 'index.php',
+}
 ?>
 
 <!DOCTYPE html>
@@ -105,6 +118,11 @@ $appName = json_decode(file_get_contents('../setup/bot_config.json'), true)['app
         .loading { opacity: 0.6; pointer-events: none; }
         .copyright { width: 100%; text-align: center; color: #777; font-size: 15px; direction: ltr; margin: 20px 0 10px; }
         .copyright a { color: #b500bbff; text-decoration: none; }
+        #profileLightbox {animation: fadeIn 0.3s ease-out; display: flex; justify-content: center; align-items: center;}
+        #profileLightbox.hidden {display: none;}
+        #lightboxImage {animation: zoomIn 0.4s ease-out;max-width: 90vw;max-height: 90vh;object-fit: contain;}
+        @keyframes fadeIn {from { opacity: 0; }to { opacity: 1; }}
+        @keyframes zoomIn {from { transform: scale(0.8); opacity: 0; }to { transform: scale(1); opacity: 1; }}
         /* Mobile Width */
         @media (max-width: 768px) {
             .operation { width: 100vw; }
@@ -127,10 +145,21 @@ $appName = json_decode(file_get_contents('../setup/bot_config.json'), true)['app
                 setTimeout(() => document.querySelector('.fixed.top-4').remove(), 500);
             }, 4000);
 
-            // Remove "?wallet_updated=***" from url
             setTimeout(() => {
-                window.history.replaceState({}, document.title, window.location.pathname);
-            }, 5000);
+                const url = new URL(window.location);
+                const id = url.searchParams.get('id');
+                const tab = url.searchParams.get('tab');
+
+                url.search = '';
+                if (id) {
+                    url.searchParams.set('id', id);
+                }
+                if (tab) {
+                    url.searchParams.set('tab', tab);
+                }
+
+                window.history.replaceState({}, document.title, url.toString());
+            }, 1000);
         </script>
     <?php endif; ?>
 <div class="container mx-auto px-4 py-8 max-w-7xl">
@@ -143,7 +172,7 @@ $appName = json_decode(file_get_contents('../setup/bot_config.json'), true)['app
                 <p class="text-gray-600 mt-1">خوش آمدید، <?= htmlspecialchars($admin['email']) ?></p>
             </div>
             <div class="flex flex-col gap-5 items-end">
-                <button onclick="window.history.back()" class="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold transition flex items-center gap-2">
+                <button onclick="window.location.href = '<?= $backLink ?>';" class="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold transition flex items-center gap-2">
                     <i class="fas fa-arrow-right"></i> بازگشت
                 </button>
             </div>
@@ -153,10 +182,11 @@ $appName = json_decode(file_get_contents('../setup/bot_config.json'), true)['app
     <!-- User Details and Wallet -->
     <div class="bg-white rounded-xl shadow-xl p-8 mb-8">
         <div class="flex flex-col md:flex-row items-center justify-between gap-8">
+            
             <!-- Avatar and Primary Information -->
             <div class="flex flex-col md:flex-row items-center gap-8 flex-1">
                 <div class="w-28 h-28 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center text-white text-5xl font-bold shadow-xl">
-                    <?= $user['avatar'] ? '<img class="w-28 h-28 rounded-full" src="' . $user['avatar'] . '" alt="' . $user['name'] . '">' : mb_substr($user['name'] ?? 'U', 0, 1); ?>
+                    <?= $user['avatar'] ? '<img id="avatar" class="w-28 h-28 rounded-full" src="' . $user['avatar'] . '" alt="' . $user['name'] . '">' : mb_substr($user['name'] ?? 'U', 0, 1); ?>
                 </div>
                 <div class="text-center md:text-right">
                     <h2 class="text-3xl font-bold text-gray-800"><?= htmlspecialchars($user['name'] ?? 'نامشخص') ?></h2>
@@ -280,6 +310,12 @@ $appName = json_decode(file_get_contents('../setup/bot_config.json'), true)['app
                 </div>
             </div>
         </div>
+    </div>
+
+    <!-- Profile Lightbox -->
+    <div id="profileLightbox" class="fixed inset-0 hidden items-center justify-center z-50">
+        <div class="absolute inset-0 bg-black bg-opacity-50" onclick="closeProfileLightbox()"></div>
+        <img id="lightboxImage" class="relative max-w-full max-h-full rounded-2xl shadow-2xl z-10" src="" alt="<?= $user['name'] ?>">
     </div>
 
     <!-- Clients (Connected Accounts) -->
@@ -471,6 +507,42 @@ function closeWalletModal() {
 // Close the modal with a click outside of it
 document.getElementById('walletModal').addEventListener('click', function(e) {
     if (e.target === this) closeWalletModal();
+});
+
+function openProfileLightbox() {
+    const lightbox = document.getElementById('profileLightbox');
+    const lightboxImg = document.getElementById('lightboxImage');
+    
+    lightboxImg.src = '<?= $user['avatar'] ?>';
+    lightbox.classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+}
+
+function closeProfileLightbox() {
+    document.getElementById('profileLightbox').classList.add('hidden');
+    document.body.style.overflow = 'auto';
+}
+
+// Close the lightbox with a click outside of it
+document.getElementById('profileLightbox').addEventListener('click', function(e) {
+    if (e.target === this || e.target.id === 'lightboxImage') {
+        closeProfileLightbox();
+    }
+});
+
+// Close with Escape key press
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        closeProfileLightbox();
+    }
+});
+
+// Open the lightbox with a click on the avatar
+document.getElementById('avatar').addEventListener('click', function(e) {
+    e.stopPropagation();
+    if ('<?= $user['avatar'] ?>') {
+        openProfileLightbox();
+    }
 });
 </script>
 </body>

@@ -87,6 +87,11 @@ if (isset($_POST['update_wallet'])) {
         .copy-btn { transition: all 0.2s; }
         .copy-btn:hover { transform: scale(1.2); }
         .loading { opacity: 0.6; pointer-events: none; }
+        #profileLightbox {animation: fadeIn 0.3s ease-out; display: flex; justify-content: center; align-items: center;}
+        #profileLightbox.hidden {display: none;}
+        #lightboxImage {animation: zoomIn 0.4s ease-out;max-width: 90vw;max-height: 90vh;object-fit: contain;}
+        @keyframes fadeIn {from { opacity: 0; }to { opacity: 1; }}
+        @keyframes zoomIn {from { transform: scale(0.8); opacity: 0; }to { transform: scale(1); opacity: 1; }}
         
         /* Mobile Width */
         @media (max-width: 768px) {
@@ -105,7 +110,7 @@ if (isset($_POST['update_wallet'])) {
                 <!-- Avatar and Primary Information -->
                 <div class="flex flex-col md:flex-row items-center gap-8 flex-1">
                     <div class="w-28 h-28 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center text-white text-5xl font-bold shadow-xl">
-                        <img class="w-28 h-28 rounded-full" src="<?= $imgUrl ?>" alt="<?= $user['name'] ?>">
+                        <img id="avatar" class="w-28 h-28 rounded-full" src="<?= $imgUrl ?>" alt="<?= $user['name'] ?>">
                     </div>
                     <div class="text-center md:text-right">
                         <h2 class="text-3xl font-bold text-gray-800"><?= htmlspecialchars($user['name'] ?? 'نامشخص') ?></h2>
@@ -190,6 +195,13 @@ if (isset($_POST['update_wallet'])) {
                     </div>
                 </div>
             </div>
+        </div>
+
+        
+        <!-- Profile Lightbox -->
+        <div id="profileLightbox" class="fixed inset-0 hidden items-center justify-center z-50">
+            <div class="absolute inset-0 bg-black bg-opacity-50" onclick="closeProfileLightbox()"></div>
+            <img id="lightboxImage" class="relative max-w-full max-h-full rounded-2xl shadow-2xl z-10" src="" alt="<?= $user['name'] ?>">
         </div>
 
         <!-- Clients (Connected Accounts) -->
@@ -384,6 +396,42 @@ if (isset($_POST['update_wallet'])) {
     // Close the modal with a click outside of it
     document.getElementById('walletModal').addEventListener('click', function(e) {
         if (e.target === this) closeWalletModal();
+    });
+        
+    function openProfileLightbox() {
+        const lightbox = document.getElementById('profileLightbox');
+        const lightboxImg = document.getElementById('lightboxImage');
+        
+        lightboxImg.src = '<?= $user['avatar'] ?>';
+        lightbox.classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closeProfileLightbox() {
+        document.getElementById('profileLightbox').classList.add('hidden');
+        document.body.style.overflow = 'auto';
+    }
+
+    // Close the lightbox with a click outside of it
+    document.getElementById('profileLightbox').addEventListener('click', function(e) {
+        if (e.target === this || e.target.id === 'lightboxImage') {
+            closeProfileLightbox();
+        }
+    });
+
+    // Close with Escape key press
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            closeProfileLightbox();
+        }
+    });
+
+    // Open the lightbox with a click on the avatar
+    document.getElementById('avatar').addEventListener('click', function(e) {
+        e.stopPropagation();
+        if ('<?= $user['avatar'] ?>') {
+            openProfileLightbox();
+        }
     });
     </script>
 </body>

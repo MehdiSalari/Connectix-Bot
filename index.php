@@ -518,10 +518,10 @@ $config = json_decode($data, true);
                 <div class="flex flex-col gap-5 items-end">
 
                     <div class="flex flex-row gap-5">
-                        <a href="update/update.php?ok=true"
+                        <a href="#"
+                            onclick="return confirm('Are you sure you want to update the bot? This will get new files and updates from GitHub and overwrite your current unnecessary files.') ? window.location.href='update/update.php?ok=true' : false"
                             class="bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-lg font-semibold transition flex items-center gap-2 w-fit">
                             <i class="fas fa-sync"></i> بروزرسانی ربات
-                        </a>
 
                         <a href="logout.php"
                             class="bg-red-500 hover:bg-red-600 text-white px-6 py-3 rounded-lg font-semibold transition flex items-center gap-2 w-fit">
@@ -578,7 +578,7 @@ $config = json_decode($data, true);
                                     <a href="transactions/sms_payments.php"
                                         class="block px-5 py-3 text-sm font-medium text-gray-800 hover:bg-green-50 hover:text-green-600 transition flex items-center gap-3"
                                         role="menuitem">
-                                        <i class="fas fa-comment-dots text-green-600"></i>
+                                        <i class="fas fa-sms text-green-600"></i>
                                         پیامک های واریزی
                                     </a>
                                     <?php endif; ?>
