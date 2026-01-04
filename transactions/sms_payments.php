@@ -148,8 +148,8 @@ $appName = json_decode(file_get_contents('../setup/bot_config.json'), true)['app
                         <?php else: foreach ($payments as $p):
                             $isPending = empty($p['payment_id']);
                             $status = $isPending ? 'در انتظار' : 'تأیید شده';
-                            $statusClass = $isPending ? 'status-pending' : 'status-confirmed';
                             $bankName = $banks[$p['bank']] ?? ($p['bank'] ?: 'نامشخص');
+                            $paymentType = $p['payment_type'] ?? null;
 
                             if (!function_exists('getPaymentTime')) {
                                 function getPaymentTime($dateTime) {
@@ -167,8 +167,15 @@ $appName = json_decode(file_get_contents('../setup/bot_config.json'), true)['app
                                 <?= htmlspecialchars($bankName) ?>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
-                                <span class="px-3 py-1 rounded-full text-xs font-bold <?= $p['payment_type'] == 'buy' ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800' ?>">
-                                    <?= $p['payment_type'] == 'buy' ? 'خرید اشتراک' : 'شارژ کیف پول' ?>
+                                <span class="px-3 py-1 rounded-full text-xs font-bold
+                                    <?= $p['payment_type'] === 'buy'
+                                        ? 'bg-blue-100 text-blue-800'
+                                        : (!empty($p['payment_type'])
+                                            ? 'bg-purple-100 text-purple-800'
+                                            : 'bg-yellow-100 text-yellow-800') ?>">
+                                    <?= $p['payment_type'] === 'buy'
+                                        ? 'خرید اشتراک'
+                                        : (!empty($p['payment_type']) ? 'شارژ کیف پول' : 'نامشخص') ?>
                                 </span>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
