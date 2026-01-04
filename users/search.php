@@ -56,6 +56,7 @@ $searchQuery = '%' . $conn->real_escape_string($query) . '%';
 $sql = "
     SELECT 
         id, 
+        avatar,
         name, 
         telegram_id, 
         chat_id, 
@@ -104,6 +105,7 @@ $users = [];
 while ($row = $result->fetch_assoc()) {
     $users[] = [
         'id' => (int)$row['id'],
+        'avatar' => htmlspecialchars($row['avatar'] ?? '', ENT_QUOTES, 'UTF-8'),
         'name' => htmlspecialchars($row['name'] ?? '', ENT_QUOTES, 'UTF-8'),
         'telegram_id' => htmlspecialchars($row['telegram_id'] ?? '', ENT_QUOTES, 'UTF-8'),
         'chat_id' => htmlspecialchars($row['chat_id'] ?? '', ENT_QUOTES, 'UTF-8'),

@@ -131,6 +131,7 @@ $appName = json_decode(file_get_contents('../setup/bot_config.json'), true)['app
                 <table class="w-full">
                     <thead class="bg-gradient-to-r from-indigo-50 to-purple-50">
                         <tr>
+                            <th class="px-6 py-4 text-right text-xs font-bold text-gray-700 uppercase tracking-wider">آواتار</th>
                             <th class="px-6 py-4 text-right text-xs font-bold text-gray-700 uppercase tracking-wider">نام</th>
                             <th class="px-6 py-4 text-right text-xs font-bold text-gray-700 uppercase tracking-wider">یوزرنیم</th>
                             <th class="px-6 py-4 text-right text-xs font-bold text-gray-700 uppercase tracking-wider">آیدی عددی</th>
@@ -143,6 +144,11 @@ $appName = json_decode(file_get_contents('../setup/bot_config.json'), true)['app
                         foreach ($users as $user) {
                         ?>
                         <tr class="table-row transition-all duration-200">
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center text-white text-s font-bold shadow-xl">
+                                    <?= $user['avatar'] ? '<img id="avatar" class="w-10 h-10 rounded-full" src="' . $user['avatar'] . '" alt="' . $user['name'] . '">' : mb_substr($user['name'] ?? 'U', 0, 1); ?>
+                                </div>
+                            </td>
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <div class="flex items-center">
                                     <div class="ml-4">
@@ -219,20 +225,32 @@ $appName = json_decode(file_get_contents('../setup/bot_config.json'), true)['app
 
         // Initialize with current page users
         document.addEventListener('DOMContentLoaded', function() {
-            const rows = document.querySelectorAll('#usersTableBody tr');
-            rows.forEach(row => {
-                const userId = row.querySelector('button[onclick*="viewUser"]').onclick.toString().match(/\d+/)[0];
-                const nameCell = row.querySelector('td:first-child');
-                const telegramCell = row.querySelector('td:nth-child(2)');
-                const chatIdCell = row.querySelector('td:nth-child(3)');
-                
-                allUsers.push({
-                    id: parseInt(userId),
-                    name: nameCell.textContent.trim(),
-                    telegram_id: telegramCell.textContent.trim(),
-                    chat_id: chatIdCell.textContent.trim()
+                const rows = document.querySelectorAll('#usersTableBody tr');
+                rows.forEach(row => {
+                    const btn = row.querySelector('button[onclick*="viewUser("]');
+                    let userId = null;
+                    if (btn) {
+                        const onclick = btn.getAttribute('onclick') || '';
+                        const m = onclick.match(/\d+/);
+                        userId = m ? m[0] : null;
+                    }
+
+                    const avatarCell = row.querySelector('td:nth-child(1)');
+                    const nameCell = row.querySelector('td:nth-child(2)');
+                    const telegramCell = row.querySelector('td:nth-child(3)');
+                    const chatIdCell = row.querySelector('td:nth-child(4)');
+
+                    const imgEl = avatarCell ? avatarCell.querySelector('img') : null;
+                    const avatarSrc = imgEl ? imgEl.src : '';
+
+                    allUsers.push({
+                        id: userId ? parseInt(userId) : null,
+                        avatar: avatarSrc,
+                        name: nameCell ? nameCell.textContent.trim() : '',
+                        telegram_id: telegramCell ? telegramCell.textContent.trim() : '',
+                        chat_id: chatIdCell ? chatIdCell.textContent.trim() : ''
+                    });
                 });
-            });
         });
 
         // جستجوی زنده - Global search
@@ -304,7 +322,7 @@ $appName = json_decode(file_get_contents('../setup/bot_config.json'), true)['app
             if (results.length === 0) {
                 tbody.innerHTML = `
                     <tr>
-                        <td colspan="5" class="px-6 py-8 text-center text-gray-500">
+                        <td colspan="6" class="px-6 py-8 text-center text-gray-500">
                             <i class="fas fa-search text-3xl mb-2 block opacity-50"></i>
                             نتیجه‌ای یافت نشد
                         </td>
@@ -316,16 +334,21 @@ $appName = json_decode(file_get_contents('../setup/bot_config.json'), true)['app
             tbody.innerHTML = results.map(user => `
                 <tr class="table-row transition-all duration-200">
                     <td class="px-6 py-4 whitespace-nowrap">
+                        <div class="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center text-white text-s font-bold shadow-xl">
+                            ${user.avatar ? `<img id="avatar" class="w-10 h-10 rounded-full" src="${user.avatar}" alt="${escapeHtml(user.name || '')}">` : (user.name ? escapeHtml((user.name || '').charAt(0)) : 'U')}
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
                         <div class="flex items-center">
                             <div class="ml-4">
-                                <div class="text-sm font-bold text-gray-900">${user.name || '-'}</div>
+                                <div class="text-sm font-bold text-gray-900">${escapeHtml(user.name || '-')}</div>
                             </div>
                         </div>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap username">
-                        ${user.telegram_id ? `<a href="https://t.me/${user.telegram_id}" target="_blank" class="text-blue-600 hover:underline">@${user.telegram_id}</a>` : '<span class="text-gray-400">ندارد</span>'}
+                        ${user.telegram_id ? `<a href="https://t.me/${user.telegram_id}" target="_blank" class="text-blue-600 hover:underline">@${escapeHtml(user.telegram_id)}</a>` : '<span class="text-gray-400">ندارد</span>'}
                     </td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600 font-mono">${user.chat_id}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600 font-mono">${escapeHtml(user.chat_id || '')}</td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                         ${formatDate(user.created_at)}
                     </td>
@@ -371,6 +394,18 @@ $appName = json_decode(file_get_contents('../setup/bot_config.json'), true)['app
                 minute: '2-digit'
             };
             return date.toLocaleDateString('fa-IR', options);
+        }
+
+        // Simple HTML escaper to avoid injecting unsafe content
+        function escapeHtml(text) {
+            if (!text) return '';
+            return text
+                .toString()
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
         }
 
         // Show notification

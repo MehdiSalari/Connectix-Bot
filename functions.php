@@ -1667,6 +1667,9 @@ function checkout($data) {
             // Save payment to database
             $paymentId = savePayment( $client_id, $selectedPlan['id'], $selectedPlan['sell_price'], $isPaid, $planData['pay']);
 
+            // Create wallet transaction
+            $txID = createWalletTransaction(null, 'SUCCESS', $walletBalance['id'], $amountInt, 'DECREASE', $uid, 'BUY');
+
             // Decrement wallet balance
             $walletBalance = wallet('DECREASE', $uid, $amountInt);
             if (!$walletBalance) {
