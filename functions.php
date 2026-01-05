@@ -2887,9 +2887,9 @@ function keyboard($keyboard) {
                     strval($config['admin_id']) => [
                         ['text' => '👨🏻‍💻 | پنل مدیریت', 'web_app' => ['url' => $app_url]]
                     ],
-                    default => ($user['test'] != 0) ? [
+                    default => [
                         ['text' => '👤 | پروفایل', 'web_app' => ['url' => $app_url]]
-                    ] : [],
+                    ]
                 };
 
                 $keyboard = [
