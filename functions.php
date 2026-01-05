@@ -5,9 +5,7 @@ if (!file_exists(__DIR__ . '/config.php')) {
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/gregorian_jalali.php';
 define('BOT_TOKEN', $botToken);  // Bot token for authentication with Telegram API
-// define('TELEGRAM_URL', 'https://api.telegram.org/bot' . BOT_TOKEN . '/');  // Base URL for Telegram Bot API
-
-define('TELEGRAM_URL', 'https://mehdisalari.ir/bot/tgtunnel.php?bot_token=' . BOT_TOKEN . '&method=');
+define('TELEGRAM_URL', 'https://api.telegram.org/bot' . BOT_TOKEN . '/');  // Base URL for Telegram Bot API
 
 function tg($method, $params = []) {
     if (!$params) {
@@ -80,7 +78,7 @@ function userInfo($chat_id, $user_id, $user_name) {
         global $db_host, $db_user, $db_pass, $db_name;
         $conn = new mysqli($db_host, $db_user, $db_pass, $db_name);
         if ($conn->connect_error) {
-            errorLog("Connection failed: " . $conn->connect_error, "functions.php", 82);
+            errorLog("Connection failed: " . $conn->connect_error, "functions.php", 81);
         }
         $stmt = $conn->prepare("SELECT * FROM users WHERE chat_id = ?");
         $stmt->bind_param("i", $chat_id);
@@ -98,8 +96,18 @@ function userInfo($chat_id, $user_id, $user_name) {
         }
         $stmt->close();
         $conn->close();
+
+        //if user not have a record in wallets table, add it
+        $walletData = wallet('get', $chat_id);
+        if (!$walletData) {
+            $isWalletCreated = wallet('create', $chat_id, '0');
+            if (!$isWalletCreated) {
+                errorLog("Error creating wallet for user: $chat_id", "functions.php", 106);
+            }
+        }
+        
     } catch (Exception $e) {
-        errorLog("Exception: " . $e->getMessage(), "functions.php", 101);
+        errorLog("Exception: " . $e->getMessage(), "functions.php", 110);
     }
 }
 
@@ -3035,7 +3043,7 @@ function keyboard($keyboard) {
                         "default" => "📱 | $name (پیشنهاد میشود)",
                         "Sublink" => "🔗 | $name",
                         "Static IP" => "📍 | $name",
-                        "Iran Access" => "🇮🇷 | $name",
+                        "Iran Access" => "🏠 | $name",
                         default => $group['name']
                     };
                     $keyboard[] = [
@@ -3215,10 +3223,35 @@ function message($message, $variables = []) {
             "ویژه" => "📱",
             "ساب‌لینک" => "🔗",
             "آی‌پی ثابت" => "📍",
+            "ایران اکسس" => "🏠",
             default => "📱"
         };
         $groupName = $variables['groupName'];
     }
+
+    $groupMessage = "لطفاً ابتدا نوع سرویس مدنظر را انتخاب کنید: 👇";
+    $groups = getSellerPlans('group');
+
+    foreach ($groups as $group) {
+        switch ($group['name']) {
+            case "default":
+                $groupMessage .= "\n\n<b>📱 ویژه (پیشنهاد میشود):</b>\nدریافت نام کاربری و رمز عبور جهت ورود به نرم افزار Connectix و استفاده از 4 پروتکل و بیش از 10 کشور برای اتصال.";
+                break;
+            case "Iran Access":
+                $groupMessage .= "\n\n<b>🏠 ایران اکسس</b>\nسرویس دسترسی به آیپی ایران برای هموطنان ایرانی مقیم خارج کشور";
+                break;
+            case "Sublink":
+                $groupMessage .= "\n\n<b>🔗 سابسکریبشن:</b>\nدریافت لینک سابسکریپشن جهت استفاده در نرم افزار هایی که از سرویس V2Ray پشتیبانی میکنند (مثل V2RayNG و V2Box)";
+                break;
+            case "Static IP":
+                $groupMessage .= "\n\n<b>📍 آی‌پی ثابت:</b>\nدریافت نام کاربری و رمز عبور جهت ورود به نرم افزار Connectix و استفاده از آیپی ثابت.";
+                break;
+            default:
+                $typeEmoji = "📱";
+                break;
+        }
+    }
+
         
 
     $msg = match ($message) {
@@ -3227,7 +3260,7 @@ function message($message, $variables = []) {
         "get_test" => "🎁 لطفا نوع اکانت تست را انتخاب کنید:\n\n<b>📱 ویژه(پیشنهاد میشود):</b>\nدریافت نام کاربری و رمز عبور جهت ورود به نرم افزار Connectix و استفاده از 4 پروتکل و بیش از 10 کشور برای اتصال.\n\n<b>🔗 سابسکریبشن:</b>\nدریافت لینک سابسکریپشن جهت استفاده در نرم افزار هایی که از سرویس V2Ray پشتیبانی میکنند (مثل V2RayNG و V2Box)",
         "count" => "$typeEmoji نوع سرویس $groupName انتخاب شد.\n\n🔢 این اکانت را برای چند کاربر (دستگاه) قابل استفاده باشد؟",
         "buy" => "با تشکر از اعتماد و حسن انتخاب شما در خرید سرویس فیلترشکن {$appName} .\nلطفا نوع خرید خود را انتخاب کنید:\n\n<b>🔄️ تمدید اکانت فعلی:</b>\nاین دکمه برای خرید اشتراک برای اکانت قبلی استفاده میشود.\n\n<b>🛍️ خرید اکانت جدید:</b>\nاین دکمه برای خرید اکانت جدید استفاده میشود.",
-        "group" => "لطفاً ابتدا نوع سرویس مدنظر را انتخاب کنید: 👇\n\n<b>📱 ویژه (پیشنهاد میشود):</b>\nدریافت نام کاربری و رمز عبور جهت ورود به نرم افزار Connectix و استفاده از 4 پروتکل و بیش از 10 کشور برای اتصال.\n\n<b>🇮🇷 ایران اکسس</b>\nسرویس دسترسی به آیپی ایران برای هموطنان ایرانی مقیم خارج کشور\n\n<b>🔗 سابسکریبشن:</b>\nدریافت لینک سابسکریپشن جهت استفاده در نرم افزار هایی که از سرویس V2Ray پشتیبانی میکنند (مثل V2RayNG و V2Box)\n\n<b>📍 آی‌پی ثابت:</b>\nدریافت نام کاربری و رمز عبور جهت ورود به نرم افزار Connectix و استفاده از آیپی ثابت.",
+        "group" => $groupMessage . $groups,
         "renew" => "📦 لطفا اکانت مدنظر خود را جهت تمدید اشتراک انتخاب کنید:",
         "card" => "💸  لطفاً مبلغ لازمه را به شماره کارت زیر واریز و سپس سند پرداخت را به صورت تصویری در ادامه ارسال کنید:\n\n💴 مبلغ: " . $variables['amount'] . "\n💳 شماره کارت: " . $config['card_number'] . "\n👤 به نام: " . $config['card_name'] . "\n",
         "add_account" => "🔗 شما در حال متصل کردن اکانت قبلی به حساب تلگرام خود هستید.\n\n👤 لطفا نام کاربری اکانت را وارد نمایید:",
