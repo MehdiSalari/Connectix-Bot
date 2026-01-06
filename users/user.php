@@ -95,11 +95,11 @@ if (isset($_GET['wallet_updated'])) {
 $appName = json_decode(file_get_contents('../setup/bot_config.json'), true)['app_name'] ?? 'Connectix Bot';
 
 $backLink = match ($tab) {
-    'users' => 'index.php',
-    'transactions' => '../transactions/transactions.php',
-    'wallet' => '../transactions/wallet_transactions.php',
-    'sms' => '../transactions/sms_payments.php',
-    default => 'index.php',
+    "users" => "window.history.back();",
+    "transactions" => "window.location.href = '../transactions/transactions.php';",
+    "wallet" => "window.location.href = '../transactions/wallet_transactions.php';",
+    "sms" => "window.location.href = '../transactions/sms_payments.php';",
+    default => "window.history.back();",
 }
 ?>
 
@@ -163,7 +163,7 @@ $backLink = match ($tab) {
                 <p class="text-gray-600 mt-1">خوش آمدید، <?= htmlspecialchars($admin['email']) ?></p>
             </div>
             <div class="flex flex-col gap-5 items-end">
-                <button onclick="window.location.href = '<?= $backLink ?>';" class="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold transition flex items-center gap-2">
+                <button onclick="<?= $backLink ?>" class="bg-blue-500 hover:bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold transition flex items-center gap-2">
                     <i class="fas fa-arrow-right"></i> بازگشت
                 </button>
             </div>
