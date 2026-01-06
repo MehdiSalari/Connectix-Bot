@@ -71,6 +71,13 @@ if (isset($_POST['update_wallet'])) {
     exit;
 }
 
+if (isset($_GET['create_wallet']) && $_GET['create_wallet'] == true && $walletData == null) {
+    $createWallet = wallet('create', $user['chat_id'], 0);
+    if ($createWallet) {
+        $walletData = wallet('get', $user['chat_id']);
+    }
+}
+
 
 $message = '';
 $messageType = '';
@@ -144,22 +151,6 @@ $backLink = match ($tab) {
                 document.querySelector('.fixed.top-4').style.opacity = '0';
                 setTimeout(() => document.querySelector('.fixed.top-4').remove(), 500);
             }, 4000);
-
-            setTimeout(() => {
-                const url = new URL(window.location);
-                const id = url.searchParams.get('id');
-                const tab = url.searchParams.get('tab');
-
-                url.search = '';
-                if (id) {
-                    url.searchParams.set('id', id);
-                }
-                if (tab) {
-                    url.searchParams.set('tab', tab);
-                }
-
-                window.history.replaceState({}, document.title, url.toString());
-            }, 1000);
         </script>
     <?php endif; ?>
 <div class="container mx-auto px-4 py-8 max-w-7xl">
@@ -202,6 +193,7 @@ $backLink = match ($tab) {
 
             <!-- Wallet Section -->
             <div class="text-center md:text-right">
+                <?php if ($walletData): ?>
                 <p class="text-lg text-gray-600 mb-2">موجودی کیف پول</p>
                 <p class="text-4xl font-bold text-indigo-600 mb-4">
                     <?= number_format($walletData['balance'] ?? 0) ?> تومان
@@ -209,6 +201,13 @@ $backLink = match ($tab) {
                 <button onclick="openWalletModal()" class="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-semibold py-3 px-6 rounded-xl shadow-lg transition transform hover:scale-105">
                     مدیریت کیف پول
                 </button>
+                <?php else: ?>
+                <p class="text-lg text-gray-600 mb-2">کیف پول کاربر</p>
+                <p class="text-4xl font-bold text-gray-600 mb-4">بدون کیف پول</p>
+                <button onclick="createWallet()" class="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-semibold py-3 px-6 rounded-xl shadow-lg transition transform hover:scale-105">
+                    ایجاد کیف پول
+                </button>
+                <?php endif; ?>
             </div>
         </div>
     </div>
@@ -538,12 +537,35 @@ document.addEventListener('keydown', function(e) {
 });
 
 // Open the lightbox with a click on the avatar
-document.getElementById('avatar').addEventListener('click', function(e) {
-    e.stopPropagation();
-    if ('<?= $user['avatar'] ?>') {
-        openProfileLightbox();
+const avatar = document.getElementById('avatar');
+if (avatar) {
+    avatar.addEventListener('click', function(e) {
+        e.stopPropagation();
+        if ('<?= $user['avatar'] ?>') {
+            openProfileLightbox();
+        }
+    });
+}
+
+function createWallet() {
+    window.location.href = window.location.href + '&create_wallet=true';
+}
+
+setTimeout(() => {
+    const url = new URL(window.location);
+    const id = url.searchParams.get('id');
+    const tab = url.searchParams.get('tab');
+
+    url.search = '';
+    if (id) {
+        url.searchParams.set('id', id);
     }
-});
+    if (tab) {
+        url.searchParams.set('tab', tab);
+    }
+
+    window.history.replaceState({}, document.title, url.toString());
+}, 1000);
 </script>
 </body>
 </html>

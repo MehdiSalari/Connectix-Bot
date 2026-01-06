@@ -74,6 +74,23 @@ function userInfo($chat_id, $user_id, $user_name) {
         $redis->del("user:steps:$chat_id");
         $redis->close();
 
+        $avatar = null;
+        //get user avatar
+        if ($user_id) {
+            $html = file_get_contents("https://t.me/$user_id");
+
+            libxml_use_internal_errors(true);
+            
+            $dom = new DOMDocument();
+            $dom->loadHTML($html);
+            $xpath = new DOMXPath($dom);
+            $imgTags = $xpath->query('//img[contains(@class, "tgme_page_photo_image")]');
+            foreach ($imgTags as $imgTag) {
+                $avatar = $imgTag->getAttribute('src');
+                if ($avatar) break;
+            }
+        }
+
         // Update user info in the database
         global $db_host, $db_user, $db_pass, $db_name;
         $conn = new mysqli($db_host, $db_user, $db_pass, $db_name);
@@ -86,12 +103,12 @@ function userInfo($chat_id, $user_id, $user_name) {
         $result = $stmt->get_result();
         $user = $result->fetch_assoc();
         if ($user) {
-            $stmt = $conn->prepare("UPDATE users SET telegram_id = ?, name = ? WHERE chat_id = ?");
-            $stmt->bind_param("ssi", $user_id, $user_name, $chat_id);
+            $stmt = $conn->prepare("UPDATE users SET telegram_id = ?, name = ?, avatar = ? WHERE chat_id = ?");
+            $stmt->bind_param("sssi", $user_id, $user_name, $avatar, $chat_id);
             $result = $stmt->execute();
         } else {
-            $stmt = $conn->prepare("INSERT INTO users (chat_id, telegram_id, name, created_at) VALUES (?, ?, ?, NOW())");
-            $stmt->bind_param("ssi", $chat_id, $user_id, $user_name);
+            $stmt = $conn->prepare("INSERT INTO users (chat_id, telegram_id, name, avatar, created_at) VALUES (?, ?, ?, ?, NOW())");
+            $stmt->bind_param("isss", $chat_id, $user_id, $user_name, $avatar);
             $result = $stmt->execute();
         }
         $stmt->close();

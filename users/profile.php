@@ -17,14 +17,6 @@ $userChatId = $user['chat_id'];
 
 $conn = new mysqli($db_host, $db_user, $db_pass, $db_name);
 
-//update user img in DB
-if (isset($imgUrl)) {
-    $stmt = $conn->prepare("UPDATE users SET avatar = ? WHERE id = ?");
-    $stmt->bind_param("si", $imgUrl, $userId);
-    $stmt->execute();
-    $stmt->close();
-}
-
 if ($userChatId == $adminID && isset($_SESSION['admin_id'])) {
     header("Location: user.php?id=$userId");
     exit;
@@ -42,27 +34,11 @@ $stmt->close();
 
 $walletData = wallet('get', $user['chat_id']);
 
-if (isset($_POST['update_wallet'])) {
-    $chat_id = $_POST['chat_id'];
-    $amount = str_replace(',', '', $_POST['amount']); // remove commas
-    $action = $_POST['action']; // 'increase' or 'decrease'
-    $walletID = wallet($action, $chat_id, $amount);
-
-
-    $currentUrl = $_SERVER['PHP_SELF'];
-    $queryString = $_SERVER['QUERY_STRING'];
-    if ($walletID) {
-        createWalletTransaction(null, 'SUCCESS', $walletID, $amount, $action, $chat_id, 'DONE_BY_ADMIN');
-        $status = 'success';
-        $messageParam = 'wallet_updated=success';
-    } else {
-        $status = 'error';
-        $messageParam = 'wallet_updated=error';
+if (isset($_GET['create_wallet']) && $_GET['create_wallet'] == true && $walletData == null) {
+    $createWallet = wallet('create', $userChatId, 0);
+    if ($createWallet) {
+        $walletData = wallet('get', $userChatId);
     }
-
-    $separator = empty($queryString) ? '?' : '&';
-    header("Location: {$currentUrl}?{$queryString}{$separator}{$messageParam}");
-    exit();
 }
 
 ?>
@@ -126,6 +102,7 @@ if (isset($_POST['update_wallet'])) {
 
                 <!-- Wallet Section -->
                 <div class="text-center md:text-right">
+                    <?php if ($walletData): ?>
                     <p class="text-lg text-gray-600 mb-2">موجودی کیف پول</p>
                     <p class="text-4xl font-bold text-indigo-600 mb-4">
                         <?= number_format($walletData['balance'] ?? 0) ?> تومان
@@ -133,6 +110,13 @@ if (isset($_POST['update_wallet'])) {
                     <button onclick="openWalletModal()" class="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-semibold py-3 px-6 rounded-xl shadow-lg transition transform hover:scale-105">
                         مشاهده کیف پول
                     </button>
+                    <?php else: ?>
+                    <p class="text-lg text-gray-600 mb-2">کیف پول کاربر</p>
+                    <p class="text-4xl font-bold text-gray-600 mb-4">بدون کیف پول</p>
+                    <button onclick="createWallet()" class="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-semibold py-3 px-6 rounded-xl shadow-lg transition transform hover:scale-105">
+                        ایجاد کیف پول
+                    </button>
+                    <?php endif; ?>
                 </div>
             </div>
         </div>
@@ -427,12 +411,36 @@ if (isset($_POST['update_wallet'])) {
     });
 
     // Open the lightbox with a click on the avatar
-    document.getElementById('avatar').addEventListener('click', function(e) {
-        e.stopPropagation();
-        if ('<?= $user['avatar'] ?>') {
-            openProfileLightbox();
+    const avatar = document.getElementById('avatar');
+    if (avatar) {
+        avatar.addEventListener('click', function(e) {
+            e.stopPropagation();
+            if ('<?= $user['avatar'] ?>') {
+                openProfileLightbox();
+            }
+        });
+    }
+
+
+    function createWallet() {
+        window.location.href = window.location.href + '&create_wallet=true';
+    }
+
+    setTimeout(() => {
+        const url = new URL(window.location);
+        const userID = url.searchParams.get('userID');
+        const userPic = url.searchParams.get('userPic');
+
+        url.search = '';
+        if (userID) {
+            url.searchParams.set('userID', userID);
         }
-    });
+        if (userPic) {
+            url.searchParams.set('userPic', userPic);
+        }
+
+        window.history.replaceState({}, document.title, url.toString());
+    }, 1000);
     </script>
 </body>
 </html>
