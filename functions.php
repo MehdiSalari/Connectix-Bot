@@ -1197,20 +1197,18 @@ function addAccount($step, $data = null) {
             $password = $data;
             $uid = UID;
 
+            // Get client
             $client = getClientByUsername($username);
             if (!$client || $client['password'] != $password || !$client['username']) {
                 return "نام کاربری و یا رمز عبور اشتباه است.";
             }
 
-            global $db_host, $db_user, $db_pass, $db_name;
-            $conn = new mysqli($db_host, $db_user, $db_pass, $db_name); 
-            $stmt = $conn->prepare("SELECT id FROM users WHERE chat_id = ?");
-            $stmt->bind_param("s", $uid);
-            $stmt->execute();
-            $result = $stmt->get_result();
-            $user = $result->fetch_assoc();
+            // Get user username
+            $user = getUser($uid); 
             
             // Update chat_id and user_id in clients table
+            global $db_host, $db_user, $db_pass, $db_name;
+            $conn = new mysqli($db_host, $db_user, $db_pass, $db_name); 
             $stmt = $conn->prepare("UPDATE clients SET chat_id = ?, user_id = ? WHERE id = ?");
             $stmt->bind_param("sss", $uid, $user['id'], $client['id']);
             $stmt->execute();
@@ -1218,9 +1216,47 @@ function addAccount($step, $data = null) {
             $conn->close();
             $redis->del("user:steps:$uid");
             $redis->close();
+
+            // Get client count of devices
+            $planName = $client['plan_name'];
+            $cod = (int)preg_match('/\((\d+)x\)/', $planName, $matches) ? $matches[1] : 1;
+            global $panelToken;
+            
+            // Update client in CX panel
+            $endpoint = 'https://api.connectix.vip/v1/seller/clients/update';
+
+            $ch = curl_init($endpoint);
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_SSL_VERIFYPEER => false,
+                CURLOPT_SSL_VERIFYHOST => false,
+                CURLOPT_POST => true,
+                CURLOPT_POSTFIELDS => json_encode([
+                    "id" => $client['id'],
+                    "password" => $password,
+                    "count_of_devices" => $cod,
+                    "chat_id" => $uid,
+                    "telegram_id" => $user['telegram_id']
+                ]),
+                CURLOPT_HTTPHEADER     => [
+                    "Authorization: Bearer {$panelToken}",
+                    "Accept: application/json",
+                    "Content-Type: application/json",
+                    "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                ],
+            ]);
+            $response = curl_exec($ch);
+            if ($response === false || curl_getinfo($ch, CURLINFO_HTTP_CODE) !== 200) {
+                $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                $curlErr  = curl_error($ch);
+
+                errorLog("Error: cURL updateClient failed | HTTP: {$httpCode} | cURL: {$curlErr} | Response: {$response} | Client ID: {$client['id']} | Username: {$client['username']}", "functions.php", 1251);
+
+                return false;
+            }
+            curl_close($ch);
+
             return "✅ اکانت با نام کاربری $username با موفقیت حساب تلگرام شما متصل شد.";
-
-
     }
 }
 
