@@ -1812,8 +1812,8 @@ function payment($receipt, $action) {
                         'reply_markup' => json_encode([
                             'inline_keyboard' => [
                                 [
+                                    ['text' => '❌ |  رد', 'callback_data' => "payment_reject:$paymentId"],
                                     ['text' => '✅ |  تایید', 'callback_data' => "payment_accept:$paymentId"],
-                                    ['text' => '❌ |  لغو', 'callback_data' => "payment_reject:$paymentId"],
                                 ]
                             ]
                         ])
@@ -1886,8 +1886,8 @@ function payment($receipt, $action) {
                         'reply_markup' => json_encode([
                             'inline_keyboard' => [
                                 [
+                                    ['text' => '❌ |  رد', 'callback_data' => "wallet_reject:$txID"],
                                     ['text' => '✅ |  تایید', 'callback_data' => "wallet_accept:$txID"],
-                                    ['text' => '❌ |  لغو', 'callback_data' => "wallet_reject:$txID"],
                                 ]
                             ]
                         ])
@@ -2407,12 +2407,38 @@ function getSellerPlans($type) {
                 }
             }
             return $validPlans;
-        case "group":
+        case "all-group":
             $groups = $data['groups'] ?? null;
             if ($groups === null) {
                 return false;
             }
             return $groups;
+        case "group":
+            $groups = $data['groups'] ?? null;
+            if ($groups === null) {
+                return false;
+            }
+
+            $resultGroups = [];
+
+            foreach ($groups as $group) {
+                $hasValidPlan = false;
+
+                foreach ($data['seller_plan_group'] as $planGroup) {
+                    foreach ($planGroup['seller_plans'] as $plan) {
+                        if (planMatchesGroup($plan, $group['name'])) {
+                            $hasValidPlan = true;
+                            break 2; // دیگه کافیه، این group پلن داره
+                        }
+                    }
+                }
+
+                if ($hasValidPlan) {
+                    $resultGroups[] = $group;
+                }
+            }
+
+            return $resultGroups;
         case "periods":
             $periods = $data['periods'] ?? null;
             if ($periods === null) {
@@ -2439,6 +2465,38 @@ function getSellerPlans($type) {
             return $validPlans[0];
     }
 }
+
+function planMatchesGroup($plan, $groupName)
+{
+    if ($plan['is_displayed_in_robot'] !== true) return false;
+
+    switch ($groupName) {
+        case 'default':
+            return $plan['type'] === 'Premium'
+                && stripos($plan['title'], 'Sublink') === false
+                && stripos($plan['title'], 'Static IP') === false
+                && stripos($plan['title'], 'Iran Access') === false;
+
+        case 'Sublink':
+            return $plan['type'] === 'Premium'
+                && (
+                    stripos($plan['title'], '+ Sublink') !== false ||
+                    stripos($plan['title'], '+Sublink') !== false
+                );
+
+        case 'Static IP':
+            return $plan['type'] === 'Premium'
+                && stripos($plan['title'], 'Static IP') !== false;
+
+        case 'Iran Access':
+            return $plan['type'] === 'Premium'
+                && stripos($plan['title'], 'Iran Access') !== false;
+
+        default:
+            return false;
+    }
+}
+
 
 function getTest($type) {
     try {
@@ -2890,12 +2948,17 @@ function keyboard($keyboard) {
                 $stmt->close();
                 $conn->close();
 
-                // include test button row only when user didn't get test account
-                $testBtn = ($user['test'] == 0) ? [
-                    ['text' => '🎁 | دریافت اکانت تست', 'callback_data' => 'get_test']
-                ] : [
-                    ['text' => '🙋🏻 | همون همیشگی', 'callback_data' => 'always_select:0']
-                ];
+                $firstBtn = [];
+
+                if ($config['test'] && $user['test'] == 0) {
+                    $firstBtn[] = [
+                        ['text' => '🎁 | دریافت اکانت تست', 'callback_data' => 'get_test']
+                    ];
+                } elseif ($user['test'] == 1) {
+                    $firstBtn[] = [
+                        ['text' => '🙋🏻 | همون همیشگی', 'callback_data' => 'always_select:0']
+                    ];
+                }
                 
                 //panel link
                 if ((!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') 
@@ -2918,29 +2981,31 @@ function keyboard($keyboard) {
                     ]
                 };
 
-                $keyboard = [
-                    // test row (may be empty)
-                    $testBtn,
+                $keyboard = array_merge(
+                    $firstBtn,
                     [
-                        ['text' => '📦 | اکانت های من', 'callback_data' => 'accounts'],
-                        ['text' => '🛍️ | خرید / تمدید اکانت ', 'callback_data' => 'action:buy_or_renew_service']
-                    ],
-                    [
-                        ['text' => '📲 | دانلود نرم افزار', 'callback_data' => 'apps'],
-                        ['text' => '💡 | آموزش ها', 'callback_data' => 'guide']
-                    ],
-                    [
-                        ['text' => '💁🏻‍♂️ | پشتیبانی', 'callback_data' => 'support'],
-                        ['text' => '❓ | سوالات متداول', 'callback_data' => 'faq'],
-                    ],
-                    [
-                        ['text' => '👝 |  کیف پول', 'callback_data' => 'wallet']
-                    ],
-                    $panelBtn,
-                    [
-                        ['text' => '📣 | اخبار و اطلاعیه ها', 'url' => "t.me/$channelTelegram"]
-                    ],
-                ];
+                        [
+                            ['text' => '📦 | اکانت های من', 'callback_data' => 'accounts'],
+                            ['text' => '🛍️ | خرید / تمدید اکانت ', 'callback_data' => 'action:buy_or_renew_service']
+                        ],
+                        [
+                            ['text' => '📲 | دانلود نرم افزار', 'callback_data' => 'apps'],
+                            ['text' => '💡 | آموزش ها', 'callback_data' => 'guide']
+                        ],
+                        [
+                            ['text' => '💁🏻‍♂️ | پشتیبانی', 'callback_data' => 'support'],
+                            ['text' => '❓ | سوالات متداول', 'callback_data' => 'faq'],
+                        ],
+                        [
+                            ['text' => '👝 |  کیف پول', 'callback_data' => 'wallet']
+                        ],
+                        $panelBtn,
+                        [
+                            ['text' => '📣 | اخبار و اطلاعیه ها', 'url' => "t.me/$channelTelegram"]
+                        ],
+                    ]
+                );
+
                 break;
 
             case "accounts":
@@ -3248,7 +3313,7 @@ function message($message, $variables = []) {
     }
 
     $groupMessage = "لطفاً ابتدا نوع سرویس مدنظر را انتخاب کنید: 👇";
-    $groups = getSellerPlans('group');
+    $groups = getSellerPlans("group");
 
     foreach ($groups as $group) {
         switch ($group['name']) {

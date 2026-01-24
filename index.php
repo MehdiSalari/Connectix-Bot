@@ -75,6 +75,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $autoPayment = $_POST['auto_payment'] ?? null;
     $bank = $autoPayment == '1' ? ($_POST['bank'] ?? null) : null;
     $botNotice = isset($_POST['bot_notice']) && $_POST['bot_notice'] == '1' && $bank ? true : false;
+    $test = isset($_POST['test']) && $_POST['test'] == '1' ? true : false;
 
     // update config file
     $botConfig = [
@@ -95,7 +96,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'bank' => [
             'name' => $bank,
             'bot_notice' => $botNotice
-        ]
+        ],
+        'test' => $test
     ];
 
     $config = json_encode($botConfig, JSON_PRETTY_PRINT);
@@ -615,6 +617,7 @@ $config = json_decode($data, true);
 
                 $bank = $config['bank']['name'] ?? null;
                 $botNotice = $config['bank']['bot_notice'] ?? false;
+                $test = $config['test'] ?? false;
 
                 $banksFile = @file_get_contents('https://raw.githubusercontent.com/MehdiSalari/Connectix-Bot/main/bank/banks.json');
                 if ($banksFile === false) {
@@ -773,7 +776,23 @@ $config = json_decode($data, true);
                         </textarea>
                 </div>
 
-                <div>
+                <div class="flex items-center gap-2 mb-2">
+                    <div class="toggler">
+                        <input id="toggler-3" name="test" type="checkbox" value="<?= $bank ? '1' : '0' ?>" <?= $bank ? 'checked' : '' ?>>
+                        <label for="toggler-3">
+                            <svg class="toggler-on" version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 130.2 130.2">
+                                <polyline class="path check" points="100.2,40.2 51.5,88.8 29.8,67.5"></polyline>
+                            </svg>
+                            <svg class="toggler-off" version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 130.2 130.2">
+                                <line class="path line" x1="34.4" y1="34.4" x2="95.8" y2="95.8"></line>
+                                <line class="path line" x1="95.8" y1="34.4" x2="34.4" y2="95.8"></line>
+                            </svg>
+                        </label>
+                    </div>
+                    <label class="block text-gray-700 font-semibold mb-2">فعال سازی اکانت تست رایگان</label>
+                </div>
+
+                <div id="free_trial_message_div">
                     <label class="block text-gray-700 font-semibold mb-2">متن پیام دریافت اکانت تست</label>
                     <textarea id="free_trial_message" name="free_trial_message" rows="5"
                         class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-4 focus:ring-blue-200 focus:border-blue-500 outline-none transition"
@@ -1215,12 +1234,15 @@ $config = json_decode($data, true);
         document.addEventListener('DOMContentLoaded', function () {
 
             const hasBank = <?= (!empty($bank)) ? 'true' : 'false' ?>;
-            const botNotice = <?= (!empty($botNotice)) ? 'true' : 'false' ?>
+            const botNotice = <?= (!empty($botNotice)) ? 'true' : 'false' ?>;
+            const test = <?= $test ? 'true' : 'false' ?>; 
 
             const toggler1 = document.getElementById('toggler-1');
             const toggler2 = document.getElementById('toggler-2');
+            const toggler3 = document.getElementById('toggler-3');
             const container = document.getElementById('autoPaymentContainer');
             const bankSelector = document.getElementById('bank');
+            const freeTrialMessageBox = document.getElementById('free_trial_message_div');
 
             if (!hasBank) {
                 // bank خالی یا null
@@ -1242,6 +1264,16 @@ $config = json_decode($data, true);
                 toggler2.value = '0';
             }
 
+            if (test) {
+                toggler3.checked = true;
+                toggler3.value = '1';
+                freeTrialMessageBox.style.display = 'block';
+            } else {
+                toggler3.checked = false;
+                toggler3.value = '0';
+                freeTrialMessageBox.style.display = 'none';
+            }
+
             // on change toggler1
             toggler1.addEventListener('change', function () {
                 this.value = this.checked ? '1' : '0';
@@ -1253,6 +1285,12 @@ $config = json_decode($data, true);
             // on change toggler2
             toggler2.addEventListener('change', function () {
                 this.value = this.checked ? '1' : '0';
+            });
+
+            // on change toggler3
+            toggler3.addEventListener('change', function () {
+                this.value = this.checked ? '1' : '0';
+                freeTrialMessageBox.style.display = this.checked ? 'block' : 'none';
             });
 
         });

@@ -217,7 +217,8 @@ function fetchBotConfig($panelToken) {
                 'bank' => [
                     'name' => null,
                     'bot_notice' => false
-                ]
+                ],
+                'test' => true
             ];
 
             $botConfigJson = json_encode($botConfig, JSON_PRETTY_PRINT);
