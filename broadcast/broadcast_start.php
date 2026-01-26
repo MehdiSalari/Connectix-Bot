@@ -40,7 +40,7 @@ if ($isTest) {
         
         // Convert local path to HTTPS URL (for images/videos that support URL)
         $fileName = basename($mediaPath);
-        $mediaUrl = 'https://lcl.mehdisite.ir/Bots/Connectix/broadcast/uploads/' . $fileName;
+        $mediaUrl = 'https://' . $_SERVER['HTTP_HOST'] . str_replace("broadcast_start.php", "/uploads/$fileName", $_SERVER['REQUEST_URI']);
 
         if (strpos($mime, 'image/') === 0 && $ext !== 'gif') {
             $result = tg('sendPhoto', [
