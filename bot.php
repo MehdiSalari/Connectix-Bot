@@ -48,8 +48,6 @@ define('CBID', $callback_id);
 define('CBMID', $callback_message_id);
 
 try {
-    //debug
-    // file_put_contents('debug/user_info.txt', "Chat ID: $chat_id\nUser: $user_name\nMessage: $text\n");
     
     // Handle the user's message
     switch ($text) {
@@ -73,12 +71,9 @@ try {
                 break;
             }
 
-            $redis = new Redis();
-            $redis->connect('127.0.0.1', 6379);
-            $RedisData = $redis->hgetall("user:steps:$uid");
-            $redis->close();
+            $actionData = actionStep('get', $uid);
 
-            if ($RedisData['pay'] && $RedisData['action'] != 'discount') {
+            if ($actionData['pay'] && $actionData['action'] != 'discount') {
                 // Check if send just image
                 if ($photo == null) {
                     $message = "🖼️ لطفا سند واریزی را به صورت تصویر ارسال کنید!";
@@ -108,8 +103,8 @@ try {
                 break;
             }
 
-            if ($RedisData['action'] == 'add_account') {
-                switch($RedisData['step']) {
+            if ($actionData['action'] == 'add_account') {
+                switch($actionData['step']) {
                     case 'get_username':
                         $username = $text;
                         addAccount("get_password", $username);
@@ -117,6 +112,13 @@ try {
                         $result = tg('sendMessage',[
                             'chat_id' => $uid,
                             'text' => "نام کاربری واردشده: $username\nلطفا رمزعبور حساب را وارد نمایید",
+                            'reply_markup' => json_encode([
+                                    'inline_keyboard' => [
+                                        [
+                                            ['text' => '❌ | انصراف', 'callback_data' => 'acounts'],
+                                        ]
+                                    ]
+                            ])
                         ]);
                         if (!($result = json_decode($result))->ok) {
                             errorLog("Failed to send receipt error message to chat_id: $uid | Message: {$result->description}", "bot.php", 122);
@@ -132,7 +134,7 @@ try {
                             'reply_markup' => json_encode([
                                     'inline_keyboard' => [
                                         [
-                                            ['text' => '🏡 | خانه', 'callback_data' => 'main_menu'],
+                                            ['text' => '↪️ | بازگشت', 'callback_data' => 'accounts'],
                                         ]
                                     ]
                             ])
@@ -143,12 +145,12 @@ try {
                         }
                         break;
                 }
-            } elseif ($RedisData['action'] == 'wallet_increase') {
-                switch($RedisData['step']) {
+            } elseif ($actionData['action'] == 'wallet_increase') {
+                switch($actionData['step']) {
                     case 'get_amount':
                         //check text for amount
                         if (!is_numeric($text)) {
-                            $message = "🔢 لطفا مبلغ را به صورت عداد انگلیسی وارد کنید!";
+                            $message = "🔢 لطفا مبلغ را به صورت اعداد انگلیسی وارد کنید!";
                             $result = tg('sendMessage',[
                                 'chat_id' => $uid,
                                 'text' => $message,
@@ -176,12 +178,12 @@ try {
                             break;
                         }
         
-                        $redis = new Redis();
-                        $redis->connect('127.0.0.1', 6379);
-                        $key = "user:steps:" . UID;
-                        $redis->hmset($key, ['action' => 'wallet_increase', 'step' => 'get_receipt', 'amount' => $amount]);
-                        $redis->expire($key, 1800);
-                        $redis->close();
+                        $stepData = [
+                            'action' => 'wallet_increase',
+                            'step' => 'get_receipt',
+                            'amount' => $amount
+                        ];
+                        actionStep('set', $uid, $stepData);
         
                         $variables = [
                             'amount' => $amount
@@ -226,28 +228,23 @@ try {
                             break;
                         }
 
-                        $redis = new Redis();
-                        $redis->connect('127.0.0.1', 6379);
-                        $key = "user:steps:" . UID;
-                        $walletData = $redis->hgetall($key);
+                        $walletData = actionStep('get', $uid);
                         $amount = $walletData['amount'];
 
                         $walletID = wallet('get', $uid)['id'];
                         $txID = createWalletTransaction(null, 'PENDING', $walletID, $amount, 'INCREASE', UID, 'CARD_TO_CARD');
                         
-                        $redis->hmset($key, ['action' => 'wallet_increase', 'step' => 'pending', 'txID' => $txID]);
-                        $redis->expire($key, 1800);
-                        $redis->close();
-                        
-
+                        $stepData = [
+                            'action' => 'wallet_increase',
+                            'step' => 'pending',
+                            'amount' => $amount,
+                            'txID' => $txID
+                        ];
+                        actionStep('set', $uid, $stepData);
 
                         $payment = payment($photo, 'wallet');
-
-                        // if (!$payment) {
-                        //     errorLog("Failed to send receipt error message to chat_id: $uid", "bot.php", 247);
-                        // }
                 }
-            } elseif ($RedisData['action'] == 'discount') {
+            } elseif ($actionData['action'] == 'discount') {
                 $couponCode = $text;
                 $coupon = checkCoupon($couponCode);
 
@@ -274,7 +271,7 @@ try {
                                 // Accept
                                 $discountResult = discount("apply:null", $coupon);
                             } else {
-                                $planID = $RedisData['plan'];
+                                $planID = $actionData['plan'];
                                 $couponPlans = $coupon['plans_ids'];
                                 if (in_array($planID, $couponPlans)) {
                                     // Accept
@@ -300,7 +297,7 @@ try {
                         'reply_markup' => json_encode([
                                 'inline_keyboard' => [
                                     [
-                                        ['text' => '❌ | انصراف', 'callback_data' => 'pay_card:' . $RedisData['price']],
+                                        ['text' => '❌ | انصراف', 'callback_data' => 'pay_card:' . $actionData['price']],
                                     ]
                                 ]
                             ])
@@ -462,10 +459,7 @@ try {
             ]);
             break;
         case 'wallet':
-            $redis = new Redis();
-            $redis->connect('127.0.0.1', 6379);
-            $redis->del("user:steps:" . UID);
-            $redis->close();
+            actionStep('clear', $callback_chat_id);
 
             $walletBalance = wallet('get', $callback_chat_id)['balance'];
 

@@ -42,6 +42,7 @@ function tg($method, $params = []) {
     }
 
     $result = curl_exec($ch);
+    file_put_contents( __DIR__ .'/debug/telres.log', date('Y-m-d H:i:s') . " - " . $result . "\n", FILE_APPEND);
     if ($result === false) {
         $err = curl_error($ch);
         curl_close($ch);
@@ -68,11 +69,7 @@ function getUser($chat_id) {
 
 function userInfo($chat_id, $user_id, $user_name) {
     try {
-        // Delete Redis key if exists
-        $redis = new Redis();
-        $redis->connect('127.0.0.1', 6379);
-        $redis->del("user:steps:$chat_id");
-        $redis->close();
+        actionStep('clear', $chat_id);
 
         $avatar = null;
         //get user avatar
@@ -125,6 +122,43 @@ function userInfo($chat_id, $user_id, $user_name) {
         
     } catch (Exception $e) {
         errorLog("Exception: " . $e->getMessage(), "functions.php", 110);
+    }
+}
+
+function actionStep($cmd, $uid, $data = null) {
+    global $db_host, $db_user, $db_pass, $db_name;
+    $conn = new mysqli($db_host, $db_user, $db_pass, $db_name);
+    if ($conn->connect_error) {
+        errorLog("Connection failed: " . $conn->connect_error, "functions.php", 73);
+    }
+
+    switch($cmd) {
+        case 'get':
+            $stmt = $conn->prepare("SELECT action FROM users WHERE chat_id = ?");
+            $stmt->bind_param("i", $uid);
+            $stmt->execute();
+            $result = $stmt->get_result();
+            $action = $result->fetch_assoc();
+            $conn->close();
+            if (!$action["action"]) {
+                return false;
+            }
+            return json_decode($action["action"], true);
+        case 'set':
+            $data = json_encode($data);
+            $stmt = $conn->prepare("UPDATE users SET action = ? WHERE chat_id = ?");
+            $stmt->bind_param("si", $data, $uid);
+            $result = $stmt->execute();
+            
+            return $result ? true : false;
+        case 'clear':
+            $data = null;
+            $stmt = $conn->prepare("UPDATE users SET action = ? WHERE chat_id = ?");
+            $stmt->bind_param("si", $data, $uid);
+            $result = $stmt->execute();
+            $conn->close();
+            
+            return $result ? true : false;
     }
 }
 
@@ -223,35 +257,24 @@ function walletReqs($query) {
     $uid = UID;
     switch ($action) {
         case 'increase':
-            $redis = new Redis();
-            $redis->connect('127.0.0.1', 6379);
-            $key = "user:steps:" . $uid;
-            $redis->hmset($key, ['action' => 'wallet_increase', 'step' => 'get_amount', 'amount' => null]);
-            $redis->expire($key, 1800);
-            $redis->close();
-            
-            $tgResult = tg('editMessageText',[
-                'chat_id' => $uid,
-                'message_id' => CBMID,
-                'text' => message('wallet_increase'),
-                'parse_mode' => 'html',
-                'reply_markup' => keyboard('wallet_increase')
-            ]);
-            break;
+            $stepData = [
+                'action' => 'wallet_increase',
+                'step' => 'get_amount',
+                'amount' => null
+            ];
+            actionStep('set', $uid, $stepData);
+
+            return [
+                "text" => message('wallet_increase'),
+                "reply_markup" => keyboard('wallet_increase')
+            ];
         case 'cancel':
             $txID = createWalletTransaction($txID, 'CANCLED_BY_USER');
-            $redis = new Redis();
-            $redis->connect('127.0.0.1', 6379);
-            $redis->del("user:steps:" . $uid);
-            $redis->close();
-            $tgResult = tg('editMessageText',[
-                'chat_id' => $uid,
-                'message_id' => CBMID,
-                'text' => message('wallet'),
-                'parse_mode' => 'html',
-                'reply_markup' => keyboard('wallet')
-            ]);
-            break;
+
+            return [
+                "text" => message('wallet'),
+                "reply_markup" => keyboard('wallet')
+            ];
         case 'accept':
             $conn = new mysqli($db_host, $db_user, $db_pass, $db_name);
             $stmt = $conn->prepare("SELECT * FROM wallet_transactions WHERE id = ?");
@@ -642,7 +665,7 @@ function checkCoupon($couponCode) {
 
     $data = json_decode($response, true);
     $couponsData = array_filter($data['coupons'], function ($item) use ($couponCode) {
-        return $item['coupon_code'] === $couponCode;
+        return $item['coupon_code'] == $couponCode;
     });
     foreach ($couponsData as $couponData) {
         return $couponData;
@@ -653,16 +676,20 @@ function discount($query, $coupon = null) {
     $uid = UID;
     $action = explode(":", $query)[0];
     $data = explode(":", $query)[1];
-    $redis = new Redis();
-    $redis->connect('127.0.0.1', 6379);
-    $key = "user:steps:$uid";
-    $RedisData = $redis->hgetall($key);
+    $actionData = actionStep('get', $uid);
     switch ($action) {
         case "set":
-            $price = $RedisData['price'];
-            $redis->hmset($key, ['action' => 'discount']);
-            $redis->expire($key, 1800);
-            $redis->close();
+            $price = $actionData['price'];
+            $stepData = [
+                'action' => 'discount',
+                'step' => 'set',
+                'pay' => $actionData['pay'],
+                'acc' => $actionData['acc'],
+                'group' => $actionData['group'],
+                'plan' => $actionData['plan'],
+                'price' => $price,
+            ];
+            actionStep('set', $uid, $stepData);
 
             $message = "🎟 کد تخفیف خود را وارد کنید:";
             $keyboard = json_encode([
@@ -678,7 +705,7 @@ function discount($query, $coupon = null) {
             $isPercent = !empty($coupon['per_cent']) && is_numeric($coupon['per_cent']);
             $isAmount  = !empty($coupon['amount']) && is_numeric($coupon['amount']);
 
-            $originalPrice = str_replace(',', '', $RedisData['price']);
+            $originalPrice = str_replace(',', '', $actionData['price']);
             $finalPrice    = $originalPrice;
 
             if ($isPercent) {
@@ -687,7 +714,6 @@ function discount($query, $coupon = null) {
                 $discountAmount = ($originalPrice * $percentValue) / 100;
                 $finalPrice = $originalPrice - $discountAmount;
 
-                // errorLog("coupon: {$coupon['code']} applied - {$percentValue}% discount ({$discountAmount} off) - original: {$originalPrice} → final: {$finalPrice}", "functions.php", 664);
             } elseif ($isAmount) {
                 $amountValue = (int)$coupon['amount'];
                 $discountAmount = $amountValue;
@@ -698,21 +724,24 @@ function discount($query, $coupon = null) {
                     $finalPrice = 0;
                 }
 
-                // errorLog("coupon: {$coupon['code']} applied - {$amountValue} amount discount - original: {$originalPrice} → final: {$finalPrice}", "functions.php", 675);
             } else {
                 errorLog("coupon: {$coupon['code']} has no valid discount value!", "functions.php", 677);
                 return false;
             }
 
-            // $key = "user:steps:" . UID;
-            $redis->hmset($key, [
+            $stepData = [
+                'action' => 'pay',
+                'step' => 'pay',
+                'pay' => $actionData['pay'],
+                'acc' => $actionData['acc'],
+                'group' => $actionData['group'],
+                'plan' => $actionData['plan'],
+                'price' => $finalPrice,
                 'coupon_code' => $coupon['coupon_code'],
                 'original_price' => $originalPrice,
                 'final_price' => $finalPrice,
-            ]);
-            $redis->hdel($key, 'action');
-            $redis->expire($key, 1800);
-            $redis->close();
+            ];
+            actionStep('set', $uid, $stepData);
 
             $discountAmountText = number_format($discountAmount);
             $tgResult = tg('sendMessage', [
@@ -725,7 +754,6 @@ function discount($query, $coupon = null) {
                 exit;
             }
             return $finalPrice;
-
     }
 }
 
@@ -1179,23 +1207,28 @@ function app($platform) {
 }
 
 function addAccount($step, $data = null) {
-    $redis = new Redis();
-    $redis->connect('127.0.0.1', 6379);
-    $key = "user:steps:" . UID;
     switch ($step) {
         case "get_username":
-            $redis->hmset($key, ['action' => 'add_account', 'step' => $step, 'username' => null]);
-            $redis->expire($key, 1800);
+            $stepData = [
+                'action' => 'add_account',
+                'step' => $step,
+                'username' => null
+            ];
+            actionStep('set', UID, $stepData);
             break;
         case "get_password":
-            $redis->hmset($key, ['action' => 'add_account', 'step' => $step, 'username' => $data]);
-            $redis->expire($key, 1800);
+            $stepData = [
+                'action' => 'add_account',
+                'step' => $step,
+                'username' => $data
+            ];
+            actionStep('set', UID, $stepData);
             break;
         case "add_account":
-            $redisData = $redis->hgetall($key);
-            $username = $redisData['username'];
-            $password = $data;
             $uid = UID;
+            $actionData = actionStep('get', $uid);
+            $username = $actionData['username'];
+            $password = $data;
 
             // Get client
             $client = getClientByUsername($username);
@@ -1214,8 +1247,8 @@ function addAccount($step, $data = null) {
             $stmt->execute();
             $stmt->close();
             $conn->close();
-            $redis->del("user:steps:$uid");
-            $redis->close();
+
+            actionStep('clear', $uid);
 
             // Get client count of devices
             $planName = $client['plan_name'];
@@ -1270,23 +1303,16 @@ function renew($info) {
     switch ($step) {
         case 'acc':
             $clientUsername = $data;
-            $redis = new Redis();
-            $redis->connect('127.0.0.1', 6379);
 
-            // Set Redis key with user id
-            $key = "user:steps:$uid";
-
-            //Set Redis data
-            $planData = [
-                'acc'   => $clientUsername,
-                'group' => null,
-                'plan'  => null,
-                'pay'   => null
+            $actionData = [
+                'action' => 'renew',
+                'step'   => 'acc',
+                'acc'    => $clientUsername,
+                'group'  => null,
+                'plan'   => null,
+                'pay'    => null
             ];
-            // Save in Hash foramt
-            $redis->hmset($key, $planData);
-            $redis->expire($key, 1800);
-            $redis->close();
+            actionStep('set', $uid, $actionData);
 
             //get client id from db
             global $db_host, $db_user, $db_pass, $db_name;
@@ -1358,27 +1384,18 @@ function renew($info) {
                 exit;
             }
 
-            $redis = new Redis();
-            $redis->connect('127.0.0.1', 6379);
+            $planData = actionStep('get', $uid);
 
-            // Set Redis key with user id
-            $key = "user:steps:$uid";
-
-            //get data from redis
-            $planData = $redis->hgetall($key);
-
-            //Set Redis data
-            $planData = [
-                'acc'   => $planData['acc'],
-                'group' => $planData['group'],
-                'plan'  => $planId,
-                'price' => $planPrice,
-                'pay'   => null
+            $stepData = [
+                'action' => 'renew',
+                'step'   => 'plan',
+                'acc'    => $planData['acc'],
+                'group'  => $planData['group'],
+                'plan'   => $planId,
+                'price'  => $planPrice,
+                'pay'    => null
             ];
-            // Save in Hash foramt
-            $redis->hmset($key, $planData);
-            $redis->expire($key, 1800);
-            $redis->close();
+            actionStep('set', $uid, $stepData);
 
             $planDetails = parsePlanTitle($planTitle);
             $planTitle = $planDetails['text'];
@@ -1415,39 +1432,32 @@ function buy($info) {
     $data = $infoParts[1];
     $uid = UID;
 
+    $actionData = actionStep('get', $uid);
+
     switch ($step) {
         case 'group':
-            // Initialize Redis if not initialized
-            $redis = new Redis();
-            $redis->connect('127.0.0.1', 6379);
-
-            // Set Redis key with user id
-            $key = "user:steps:$uid";
 
             // Check for acc
-            $acc = $redis->hget($key, 'acc');
+            $acc = $actionData['acc'] ?? null;
             if (!$acc) {
                 $acc = 'new';
             }
 
-            //Set Redis data
-            $planData = [
-                'acc'   => $acc,
-                'group' => $data,
-                'plan'  => null,
-                'pay'   => null
-            ];
-            // Save in Hash foramt
-            $redis->hmset($key, $planData);
-            
-            // Set expire time for 30mins 
-            $redis->expire($key, 1800);
+            $group = $data;
 
-            // Close Redis connection
-            $redis->close();
+            $stepData = [
+                'action' => 'buy',
+                'step'   => 'group',
+                'acc'    => $acc,
+                'group'  => $group,
+                'plan'   => null,
+                'pay'    => null
+            ];
+
+            actionStep('set', $uid, $stepData);
 
             // Get plans based on group
-            $plans = getSellerPlans($data);
+            $plans = getSellerPlans($group);
 
             if (empty($plans)) {
                 tg('answerCallbackQuery', [
@@ -1521,7 +1531,7 @@ function buy($info) {
 
             $keyboard = json_encode(['inline_keyboard' => $keyboard]);
 
-            $groupName = parseType($data);
+            $groupName = parseType($group);
 
             $variables = ['groupName' => $groupName];
 
@@ -1531,21 +1541,8 @@ function buy($info) {
             ];
         
         case 'count':
-            // Initialize Redis if not initialized
-            $redis = new Redis();
-            $redis->connect('127.0.0.1', 6379);
 
-            // Set Redis key with user id
-            $key = "user:steps:$uid";
-
-            // Get Data from redis
-            $planData = $redis->hgetall($key);
-
-            // Close Redis connection
-            $redis->close();
-
-
-            $planGroup = $planData['group'];
+            $planGroup = $actionData['group'];
 
             $plans = getSellerPlans($planGroup);
 
@@ -1578,14 +1575,8 @@ function buy($info) {
             ];
         case 'plan':
             $planId = $data;
-            $redis = new Redis();
-            $redis->connect('127.0.0.1', 6379);
 
-            // Set Redis key with user id
-            $key = "user:steps:$uid";
-
-            // Get Data from redis
-            $planData = $redis->hgetall($key);
+            $planData = actionStep('get', $uid);
 
             $planAcc = $planData['acc'];
 
@@ -1599,21 +1590,17 @@ function buy($info) {
                 }
             }
 
-            $planData = [
-                'acc'   => $planAcc,
-                'group' => $planGroup,
-                'plan'  => $planId,
-                'price' => $planPrice,
-                'pay'   => null
+            $stepData = [
+                'action' => 'buy',
+                'step'   => 'plan',
+                'acc'    => $planAcc,
+                'group'  => $planGroup,
+                'plan'   => $planId,
+                'price'  => $planPrice,
+                'pay'    => null
             ];
-            // Save in Hash foramt
-            $redis->hmset($key, $planData);
-            
-            // Set expire time for 30mins 
-            $redis->expire($key, 1800);
 
-            // Close Redis connection
-            $redis->close();
+            actionStep('set', $uid, $stepData);
 
             $plans = getSellerPlans($planGroup);
             foreach ($plans as $plan) {
@@ -1657,21 +1644,22 @@ function checkout($data) {
     $method = $parts[0];
     $amount = $parts[1];
 
-    $redis = new Redis();
-    $redis->connect('127.0.0.1', 6379);
-    $planData = $redis->hgetall("user:steps:$uid");
-    $planData['pay'] = $method;
-    $key = "user:steps:$uid";
-    $redis->hmset($key, $planData);
-    $redis->expire($key, 1800);
-    $planData = $redis->hgetall("user:steps:$uid");
-    if ($planData['action'] == 'discount') {
-        $redis->hdel($key, 'action');
-    }
-    $redis->close();
+    $acionData = actionStep('get', $uid);
 
     switch ($method) {
         case 'card':
+
+            $stepData = [
+                'action' => 'pay',
+                'step'   => 'pay',
+                'pay'    => $method,
+                'acc'    => $acionData['acc'],
+                'group'  => $acionData['group'],
+                'plan'   => $acionData['plan'],
+                'price'  => $acionData['price']
+            ];
+            actionStep('set', $uid, $stepData);
+
             $variables = [
                 'amount' => $amount
             ];
@@ -1716,17 +1704,17 @@ function checkout($data) {
 
             $plans = getSellerPlans("all-bot");
             foreach ($plans as $plan) {
-                if ($plan['id'] == $planData['plan']) {
+                if ($plan['id'] == $acionData['plan']) {
                     $selectedPlan = $plan;
                     break;
                 }
             }
 
             $isPaid = null;
-            $client_id = ($planData['acc'] == 'new') ? 'new' : getClientByUsername($planData['acc'])['id'];
+            $client_id = ($acionData['acc'] == 'new') ? 'new' : getClientByUsername($acionData['acc'])['id'];
 
             // Save payment to database
-            $paymentId = savePayment( $client_id, $selectedPlan['id'], $selectedPlan['sell_price'], $isPaid, $planData['pay']);
+            $paymentId = savePayment( $client_id, $selectedPlan['id'], $selectedPlan['sell_price'], $isPaid, 'wallet');
 
             // Create wallet transaction
             $txID = createWalletTransaction(null, 'SUCCESS', $walletBalance['id'], $amountInt, 'DECREASE', $uid, 'BUY');
@@ -1746,7 +1734,6 @@ function checkout($data) {
 
             // Accept payment
             paycheck("accept:$paymentId");
-
     }
 }
 
@@ -1773,29 +1760,28 @@ function payment($receipt, $action) {
         $admin_chat_id3 = $bot_config->admin_id_3 ?? null;
         $admins =array_filter([$admin_chat_id, $admin_chat_id2, $admin_chat_id3], fn($value) => $value !== null && $value !== '');
         $uid = UID;
+
+        $actionData = actionStep('get', $uid);
         switch ($action) {
             case 'buy':
-                $redis = new Redis();
-                $redis->connect('127.0.0.1', 6379);
-                $RedisData = $redis->hgetall("user:steps:$uid");
 
                 $plans = getSellerPlans("all-bot");
                 foreach ($plans as $plan) {
-                    if ($plan['id'] == $RedisData['plan']) {
+                    if ($plan['id'] == $actionData['plan']) {
                         $selectedPlan = $plan;
                         break;
                     }
                 }
 
                 $isPaid = null;
-                $client_id = ($RedisData['acc'] == 'new') ? 'new' : getClientByUsername($RedisData['acc'])['id'];
+                $client_id = ($actionData['acc'] == 'new') ? 'new' : getClientByUsername($actionData['acc'])['id'];
                 
-                $planPice = isset($RedisData['final_price']) ? number_format($RedisData['final_price']) : $selectedPlan['sell_price'];
+                $planPice = isset($actionData['final_price']) ? number_format($actionData['final_price']) : $selectedPlan['sell_price'];
 
-                $coupon = $RedisData['coupon_code'] ?? null;
+                $coupon = $actionData['coupon_code'] ?? null;
                 
                 // Save payment to database
-                $paymentId = savePayment( $client_id, $selectedPlan['id'], $planPice, $isPaid, $RedisData['pay'], $coupon);
+                $paymentId = savePayment( $client_id, $selectedPlan['id'], $planPice, $isPaid, $actionData['pay'], $coupon);
 
                 // Check autopayment setting
                 if ($autoPayment) {
@@ -1834,9 +1820,9 @@ function payment($receipt, $action) {
                 $caption = "📃 سند واریزی مورد تایید میباشد؟";
                 $caption .= "\n\n📦 پلن: $planName";
                 $caption .= "\n💸 مبلغ واریزی: $planPice";
-                if ($RedisData['coupon_code']) {
-                    $caption .= "\n💵 مبلغ اصلی: " . number_format($RedisData['original_price']);
-                    $caption .= "\n🎁 کد تخفیف استفاده شده: " . $RedisData['coupon_code'];
+                if ($actionData['coupon_code']) {
+                    $caption .= "\n💵 مبلغ اصلی: " . number_format($actionData['original_price']);
+                    $caption .= "\n🎟 کد تخفیف استفاده شده: " . $actionData['coupon_code'];
                 }
                 
                 //send receipt image to admin(s)
@@ -1860,15 +1846,11 @@ function payment($receipt, $action) {
                         exit;
                     }
                 }
-
-                $redis->del("user:steps:$uid");
-                $redis->close();
+                actionStep('clear', $uid);
                 return true;
 
             case 'wallet':
-                $redis = new Redis();
-                $redis->connect('127.0.0.1', 6379);
-                $walletData = $redis->hgetall("user:steps:$uid");
+                $walletData = actionStep('get', $uid);
                 $txID = $walletData['txID'];
                 $amount = $walletData['amount'];
                 $textAmount = number_format($amount);
@@ -2011,12 +1993,6 @@ function paycheck($query) {
     $paidStatus = $payment['is_paid'];
     $stmt->close();
 
-    $redis = new Redis();
-    $redis->connect('127.0.0.1', 6379);
-    $key = "user:steps:" . UID;
-    $redisData = $redis->hgetall($key);
-    $redis->close();
-
     switch ($paymentStatus) {
         case "accept":
 
@@ -2095,7 +2071,7 @@ function paycheck($query) {
                                 ['text' => '📦 | اکانت های من', 'callback_data' => 'accounts']
                             ],
                             [
-                                ['text' => '↪️ | بازگشت', 'callback_data' => 'new_menu']
+                                ['text' => '🏡 | خانه', 'callback_data' => 'new_menu']
                             ]
                         ]
                     ];
@@ -2129,7 +2105,7 @@ function paycheck($query) {
                                 ['text' => '📦 | اکانت های من', 'callback_data' => 'accounts']
                             ],
                             [
-                                ['text' => '↪️ | بازگشت', 'callback_data' => 'main_menu']
+                                ['text' => '🏡 | خانه', 'callback_data' => 'new_menu']
                             ]
                         ]
                     ];
@@ -2154,7 +2130,7 @@ function paycheck($query) {
 
             $plan = getSellerPlans($payment['plan_id']);
             $planName = parsePlanTitle($plan['title'])['text'];
-            $planPrice = $redisData['final_price'] ?? $plan['sell_price'] ?? null;
+            $planPrice = $payment['price'];
             // Update paycheck message for admin
             $caption = "✅ سفارش شماره <code>$orderNumber</code> با موفقیت تایید شد\n\n👤 نام کاربری: <code>$clientUsername</code>\n📦 پلن:\n $planName\n💵 مبلغ: $planPrice";
             $keyboard = [
@@ -2203,7 +2179,7 @@ function paycheck($query) {
 
             $plan = getSellerPlans($payment['plan_id']);
             $planName = parsePlanTitle($plan['title'])['text'];
-            $planPrice = $redisData['final_price'] ?? $plan['sell_price'] ?? null;
+            $planPrice = $payment['price'];
 
             tg('sendMessage',[
                 'chat_id' => $chat_id,

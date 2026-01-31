@@ -859,11 +859,11 @@ $config = json_decode($data, true);
                         <p style="display: flex; justify-content: center;" class="text-gray-600 mb-2">
                             <!-- Google Play -->
                             <a href="https://play.google.com/store/apps/details?id=com.frzinapps.smsforward" target="_blank" class="text-blue-600 underline">
-                                <img src="https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png" style="width: 200px;">
+                                <img src="assets/images/components/play-store.png" style="width: 200px;">
                             </a>
                             <!-- App Store -->
                             <a href="https://apps.apple.com/pk/app/sms-forwarder-forward-sms/id6693285061" target="_blank" class="text-blue-600 underline px-4 pt-3">
-                                <img src="https://developer.apple.com/assets/elements/badges/download-on-the-app-store.svg" style="height: 55px;">
+                                <img src="assets/images/components/apple-store.svg" style="height: 55px;">
                             </a>
                             <!-- farsroid -->
                             <a href="https://www.farsroid.com/sms-forwarder-android/" target="_blank" class="text-blue-600 underline">

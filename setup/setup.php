@@ -40,24 +40,6 @@ function checkRequirements(){
         logFlush("JSON extension is required. Please install it.");
         exit(1);
     }
-
-    // Check Redis
-    if (!extension_loaded('redis')) {
-        logFlush("Redis extension is required. Please install it.");
-        exit(1);
-    }
-
-    $redis = new Redis();
-    $redis->connect('127.0.0.1', 6379);
-    // set tset key
-    $redis->set('test', 'test');
-
-    if ($redis->get('test') !== 'test') {
-        logFlush("Redis connection failed.");
-        exit(1);
-    }
-    $redis->del('test');
-    $redis->close();
 }
 
 function getPanelToken($panelEmail, $panelPassword) {
@@ -383,6 +365,7 @@ function dbSetup()
     email VARCHAR(255),
     phone VARCHAR(50),
     avatar TEXT DEFAULT NULL,
+    action LONGTEXT NULL DEFAULT NULL,
     test TINYINT(1) DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
