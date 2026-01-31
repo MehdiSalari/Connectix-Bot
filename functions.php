@@ -295,10 +295,7 @@ function walletReqs($query) {
                 $textAmount = number_format($txAmount);
                 $walletID = wallet('INCREASE', $txUser, $txAmount);
                 
-                $redis = new Redis();
-                $redis->connect('127.0.0.1', 6379);
-                $redis->del("user:steps:" . $txUser);
-                $redis->close();
+                actionStep('clear', $txUser);
 
                 $walletBalance = wallet('get', $txUser)['balance'];
 
@@ -391,10 +388,7 @@ function walletReqs($query) {
 
                 $textAmount = number_format($txAmount);
 
-                $redis = new Redis();
-                $redis->connect('127.0.0.1', 6379);
-                $redis->del("user:steps:" . $txUser);
-                $redis->close();
+                actionStep('clear', $txUser);
                 
                 // to user
                 $message = "❌ تراکنش شما جهت افزایش موجودی کیف پول رد شد.\n\n";
