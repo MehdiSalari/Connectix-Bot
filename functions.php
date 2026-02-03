@@ -128,7 +128,7 @@ function userInfo($chat_id, $user_id, $user_name) {
 }
 
 function getBotProfiePhoto($dir = '') {
-    $avatarsPath = "{$dir}assets/images/avatars/";
+    $avatarsPath = "{$dir}assets/images/avatars";
     $botAvatarPath = "$avatarsPath/bot-avatar.jpg";
     if (!file_exists($botAvatarPath)) {
 

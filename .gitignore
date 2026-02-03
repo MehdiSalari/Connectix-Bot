@@ -3,6 +3,7 @@ debug/*.*
 .vscode/*
 assets/videos/guide/*
 assets/images/avatars/*
+!assets/images/avatars/bot-avatar-sample.jpg
 broadcast/uploads/*
 broadcast/*.json
 broadcast/*.txt
