@@ -89,11 +89,11 @@ if (isset($_GET['create_wallet']) && $_GET['create_wallet'] == true && $walletDa
                         <img id="avatar" class="w-28 h-28 rounded-full" src="<?= $imgUrl ?>" alt="<?= $user['name'] ?>">
                     </div>
                     <div class="text-center md:text-right">
-                        <h2 class="text-3xl font-bold text-gray-800"><?= htmlspecialchars($user['name'] ?? 'نامشخص') ?></h2>
+                        <h2 class="text-3xl font-bold text-gray-800"><?=$user['name'] ?? 'نامشخص' ?></h2>
                         <div class="mt-3 space-y-2 text-gray-600">
                             <p>آیدی عددی: <code class="bg-gray-100 px-3 py-1 rounded font-mono"><?= $user['chat_id'] ?></code></p>
                             <?php if ($user['telegram_id']): ?>
-                                <p>یوزرنیم: <a href="https://t.me/<?= htmlspecialchars($user['telegram_id']) ?>" target="_blank" class="text-blue-600 hover:underline">@<?= htmlspecialchars($user['telegram_id']) ?></a></p>
+                                <p>یوزرنیم: <a href="https://t.me/<?= $user['telegram_id'] ?>" target="_blank" class="text-blue-600 hover:underline">@<?= htmlspecialchars($user['telegram_id']) ?></a></p>
                             <?php endif; ?>
                             <p class="text-sm">ثبت‌نام: <?= jdate($user['created_at'], true) ?></p>
                         </div>

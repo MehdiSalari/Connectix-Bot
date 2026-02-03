@@ -20,6 +20,7 @@ if ($userId <= 0) die('کاربر یافت نشد.');
 
 $conn = new mysqli($db_host, $db_user, $db_pass, $db_name);
 if ($conn->connect_error) die("Connection failed: " . $conn->connect_error);
+$conn->set_charset("utf8mb4");
 
 // Retrieve user information from database
 $stmt = $conn->prepare("SELECT * FROM users WHERE id = ?");

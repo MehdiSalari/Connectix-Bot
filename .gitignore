@@ -2,6 +2,7 @@ config.php
 debug/*.*
 .vscode/*
 assets/videos/guide/*
+assets/images/avatars/*
 broadcast/uploads/*
 broadcast/*.json
 broadcast/*.txt

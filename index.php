@@ -7,7 +7,7 @@ if (!file_exists('config.php')) {
     header('Location: setup');
     exit();
 }
-require_once 'config.php';
+require_once 'functions.php';
 session_start();
 
 // === Security Checks ===
@@ -168,7 +168,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'app_name' => $appName,
             'support_telegram' => $telegramSupport,
             'channel_id' => $data['bot']['channel_id'],
-            'channel_telegram' => $telegramChannel,
+            'channel_telegram' => "@$telegramChannel",
             'token' => $data['bot']['token'],
             'card_number' => $cardNumber,
             'card_name' => $cardName,
@@ -290,6 +290,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 //get data from bot_config.json
 $data = file_get_contents('setup/bot_config.json');
 $config = json_decode($data, true);
+$botAvatar = getBotProfiePhoto();
 
 ?>
 
@@ -511,10 +512,14 @@ $config = json_decode($data, true);
         <!-- Header -->
         <div class="bg-white rounded-xl shadow-lg p-6 mb-8">
             <div class="grid md:grid-cols-2 gap-6 items-start">
-
-                <div class="text-right">
-                    <h1 class="text-3xl font-bold text-gray-800">پنل مدیریت <?= $config['app_name'] ?></h1>
-                    <p class="text-gray-600 mt-1">خوش آمدید، <?= htmlspecialchars($admin['email']) ?></p>
+                <div class="text-right gap-2 flex flex-row">
+                    <div class="bot-avatar flex items-center md:w-auto w-full">
+                        <img class="w-20 h-20 rounded-full" src="<?=$botAvatar?>" alt="">
+                    </div>
+                    <div class="flex flex-col justify-center">
+                        <h1 class="text-3xl font-bold text-gray-800">پنل مدیریت <?= $config['app_name'] ?></h1>
+                        <p class="text-gray-600 mt-1">خوش آمدید، <?= htmlspecialchars($admin['email']) ?></p>
+                    </div>
                 </div>
 
                 <div class="flex flex-col gap-5 items-end">
@@ -639,12 +644,12 @@ $config = json_decode($data, true);
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div class="input-group">
                         <label class="block text-gray-700 font-semibold mb-2">نام برنامه</label>
-                        <input type="text" id="app_name" name="app_name" value="<?= $appName ?>"
+                        <input type="text" placeholder="نمونه: Connectix" id="app_name" name="app_name" value="<?= $appName ?>"
                             class="w-full px-4 py-3 border border-gray-300 rounded-lg file:mr-4 file:py-3 file:px-6 file:rounded-lg file:border-0 file:bg-blue-600 file:text-white hover:file:bg-blue-700">
                     </div>
                     <div class="input-group">
                         <label class="block text-gray-700 font-semibold mb-2"> آیدی عددی ادمین اصلی</label>
-                        <input type="text" id="admin_id" name="admin_id" value="<?= $adminId ?>"
+                        <input type="text" placeholder="نمونه: 123456789" id="admin_id" name="admin_id" value="<?= $adminId ?>"
                             class="w-full px-4 py-3 border border-gray-300 rounded-lg file:mr-4 file:py-3 file:px-6 file:rounded-lg file:border-0 file:bg-blue-600 file:text-white hover:file:bg-blue-700">
                     </div>
                 </div>
@@ -652,12 +657,12 @@ $config = json_decode($data, true);
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div class="input-group">
                         <label class="block text-gray-700 font-semibold mb-2">آیدی عددی ادمین دوم</label>
-                        <input type="text" id="admin_id_2" name="admin_id_2" value="<?= $adminId2 ?>"
+                        <input type="text" placeholder="نمونه: 123456789" id="admin_id_2" name="admin_id_2" value="<?= $adminId2 ?>"
                             class="w-full px-4 py-3 border border-gray-300 rounded-lg file:mr-4 file:py-3 file:px-6 file:rounded-lg file:border-0 file:bg-blue-600 file:text-white hover:file:bg-blue-700">
                     </div>
                     <div class="input-group">
                         <label class="block text-gray-700 font-semibold mb-2">آیدی عددی ادمین سوم</label>
-                        <input type="text" id="admin_id_3" name="admin_id_3" value="<?= $adminId3 ?>"
+                        <input type="text" placeholder="نمونه: 123456789" id="admin_id_3" name="admin_id_3" value="<?= $adminId3 ?>"
                             class="w-full px-4 py-3 border border-gray-300 rounded-lg file:mr-4 file:py-3 file:px-6 file:rounded-lg file:border-0 file:bg-blue-600 file:text-white hover:file:bg-blue-700">
                     </div>
                 </div>
@@ -665,12 +670,12 @@ $config = json_decode($data, true);
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div class="input-group">
                         <label class="block text-gray-700 font-semibold mb-2">نام کاربری پشتیبانی تلگرام</label>
-                        <input type="text" id="telegram_support" name="telegram_support" value="<?= $telegramSupport ?>"
+                        <input type="text" placeholder="نمونه: Connectix_Support" id="telegram_support" name="telegram_support" value="<?= $telegramSupport ?>"
                             class="w-full px-4 py-3 border border-gray-300 rounded-lg file:mr-4 file:py-3 file:px-6 file:rounded-lg file:border-0 file:bg-blue-600 file:text-white hover:file:bg-blue-700">
                     </div>
                     <div class="input-group">
                         <label class="block text-gray-700 font-semibold mb-2">نام کاربری کانال تلگرام</label>
-                        <input type="text" id="telegram_channel" name="telegram_channel" value="<?= $telegramChannel ?>"
+                        <input type="text" placeholder="نمونه: Connectix_Channel" id="telegram_channel" name="telegram_channel" value="<?= $telegramChannel ?>"
                             class="w-full px-4 py-3 border border-gray-300 rounded-lg file:mr-4 file:py-3 file:px-6 file:rounded-lg file:border-0 file:bg-blue-600 file:text-white hover:file:bg-blue-700">
                     </div>
                 </div>
@@ -678,12 +683,12 @@ $config = json_decode($data, true);
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div class="input-group">
                         <label class="block text-gray-700 font-semibold mb-2">نام دارنده کارت</label>
-                        <input type="text" id="card_name" name="card_name" value="<?= $cardName ?>"
+                        <input type="text" placeholder="نمونه: علی راد" id="card_name" name="card_name" value="<?= $cardName ?>"
                             class="w-full px-4 py-3 border border-gray-300 rounded-lg file:mr-4 file:py-3 file:px-6 file:rounded-lg file:border-0 file:bg-blue-600 file:text-white hover:file:bg-blue-700">
                     </div>
                     <div class="input-group">
                         <label class="block text-gray-700 font-semibold mb-2">شماره کارت</label>
-                        <input type="text" id="card_number" name="card_number" value="<?= $cardNumber ?>"
+                        <input type="text" placeholder="نمونه: 1234123412341234" id="card_number" name="card_number" value="<?= $cardNumber ?>"
                             class="w-full px-4 py-3 border border-gray-300 rounded-lg file:mr-4 file:py-3 file:px-6 file:rounded-lg file:border-0 file:bg-blue-600 file:text-white hover:file:bg-blue-700">
                     </div>
                 </div>

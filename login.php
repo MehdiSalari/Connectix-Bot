@@ -1,6 +1,6 @@
 <?php
 if (file_exists('config.php')) {
-    require_once 'config.php';
+    require_once 'functions.php';
 } else {
     header('Location: setup/index.php');
     exit();
@@ -51,6 +51,9 @@ if (isset($_COOKIE['token'])) {
     }
 }
 
+// Get Bot Profile
+$botAvatar = getBotProfiePhoto();
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Process login form submission
     $email = $_POST['email'];
@@ -100,6 +103,7 @@ $appName = $config['app_name'] ?? 'Connectix Bot';
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="favicon.ico" type="image/x-icon">
     <title><?= $appName ?> | Login</title>
     <style>
         * {
@@ -126,6 +130,20 @@ $appName = $config['app_name'] ?? 'Connectix Bot';
             box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
             overflow: hidden;
             padding: 40px 30px;
+        }
+
+        .bot-avatar {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            margin: 0 auto 20px auto;
+            display: block;
+        }
+
+        .bot-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
         }
 
         h2 {
@@ -226,6 +244,9 @@ $appName = $config['app_name'] ?? 'Connectix Bot';
 <body>
 
     <div class="main">
+        <div class="bot-avatar">
+            <img src="<?=$botAvatar?>" alt="">
+        </div>
         <h2><?= $appName ?> Login</h2>
         
         <form action="#" method="post">

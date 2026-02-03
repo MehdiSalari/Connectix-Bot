@@ -22,6 +22,7 @@ $conn = new mysqli($db_host, $db_user, $db_pass, $db_name);
 if ($conn->connect_error) {
     die("Connection failed: " . $conn->connect_error);
 }
+$conn->set_charset("utf8mb4");
 
 // Fetch total users (for pagination)
 $countResult = $conn->query("SELECT COUNT(id) AS total FROM users");

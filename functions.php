@@ -58,6 +58,7 @@ function getUser($chat_id) {
     if ($conn->connect_error) {
         errorLog("Connection failed: " . $conn->connect_error, "functions.php", 59);
     }
+    $conn->set_charset("utf8mb4");
     $stmt = $conn->prepare("SELECT * FROM users WHERE chat_id = ?");
     $stmt->bind_param("i", $chat_id);
     $stmt->execute();
@@ -94,6 +95,7 @@ function userInfo($chat_id, $user_id, $user_name) {
         if ($conn->connect_error) {
             errorLog("Connection failed: " . $conn->connect_error, "functions.php", 81);
         }
+        $conn->set_charset("utf8mb4");
         $stmt = $conn->prepare("SELECT * FROM users WHERE chat_id = ?");
         $stmt->bind_param("i", $chat_id);
         $stmt->execute();
@@ -123,6 +125,41 @@ function userInfo($chat_id, $user_id, $user_name) {
     } catch (Exception $e) {
         errorLog("Exception: " . $e->getMessage(), "functions.php", 110);
     }
+}
+
+function getBotProfiePhoto($dir = '') {
+    $avatarsPath = "{$dir}assets/images/avatars/";
+    $botAvatarPath = "$avatarsPath/bot-avatar.jpg";
+    if (!file_exists($botAvatarPath)) {
+
+        $bot = json_decode(tg('getMe'), true);
+        $username = $bot['result']['username'];
+
+        $result = file_get_contents("https://t.me/$username");
+        libxml_use_internal_errors(true);
+        $dom = new DOMDocument();
+        $dom->loadHTML($result);
+        $xpath = new DOMXPath($dom);
+        $imgTags = $xpath->query('//img[contains(@class, "tgme_page_photo_image")]');
+        foreach ($imgTags as $imgTag) {
+            $avatar = $imgTag->getAttribute('src');
+            if ($avatar) break;
+        }
+
+        $botAvatarUrl = $avatar ?? null;
+
+        if ($botAvatarUrl) {
+            $botAvatarData = file_get_contents($botAvatarUrl);
+            if ($botAvatarData) {
+                file_put_contents($botAvatarPath, $botAvatarData);
+            } else {
+                $botAvatarPath = "$avatarsPath/bot-avatar-sample.jpg";
+            }
+        } else {
+            $botAvatarPath = "$avatarsPath/bot-avatar-sample.jpg";
+        }   
+    }
+    return $botAvatarPath;
 }
 
 function actionStep($cmd, $uid, $data = null) {
