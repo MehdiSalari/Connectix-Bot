@@ -27,6 +27,7 @@ foreach ($userIds as $index => $chatId) {
     $params = ['chat_id' => $chatId];
     $method = 'sendMessage';
     $params['text'] = $message ?: ' ';
+    $params['parse_mode'] = 'HTML';
 
     if ($mediaPath) {
         $ext = strtolower(pathinfo($mediaPath, PATHINFO_EXTENSION));

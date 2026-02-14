@@ -46,38 +46,44 @@ if ($isTest) {
             $result = tg('sendPhoto', [
                 'chat_id' => $adminChatId,
                 'photo' => $mediaUrl,
-                'caption' => $message
+                'caption' => $message,
+                'parse_mode' => 'HTML'
             ]);
         } elseif ($ext === 'gif' || strpos($mime, 'image/gif') === 0) {
             $result = tg('sendAnimation', [
                 'chat_id' => $adminChatId,
                 'animation' => new CURLFile($mediaPath),
-                'caption' => $message
+                'caption' => $message,
+                'parse_mode' => 'HTML'
             ]);
         } elseif (strpos($mime, 'video/') === 0) {
             $result = tg('sendVideo', [
                 'chat_id' => $adminChatId,
                 'video' => new CURLFile($mediaPath),
-                'caption' => $message
+                'caption' => $message,
+                'parse_mode' => 'HTML'
             ]);
         } elseif (strpos($mime, 'audio/') === 0 || $ext === 'ogg') {
             $result = tg('sendVoice', [
                 'chat_id' => $adminChatId,
                 'voice' => new CURLFile($mediaPath),
-                'caption' => $message
+                'caption' => $message,
+                'parse_mode' => 'HTML'
             ]);
         } else {
             // For documents like .docx, .pdf, etc., use CURLFile with local path
             $result = tg('sendDocument', [
                 'chat_id' => $adminChatId,
                 'document' => new CURLFile($mediaPath),
-                'caption' => $message
+                'caption' => $message,
+                'parse_mode' => 'HTML'
             ]);
         }
     } else {
         $result = tg('sendMessage', [
             'chat_id' => $adminChatId,
-            'text' => $message ?: 'تست موفق از پنل ادمین'
+            'text' => $message ?: 'تست موفق از پنل ادمین',
+                'parse_mode' => 'HTML'
         ]);
     }
 
@@ -89,7 +95,8 @@ if ($isTest) {
     if ($result && isset($result['ok']) && $result['ok']) {
         echo json_encode([
             'success' => true,
-            'message' => 'تست با موفقیت ارسال شد!'
+            'message' => 'تست با موفقیت ارسال شد!',
+            'parse_mode' => 'HTML'
         ]);
     } else {
         $errorMsg = 'خطا در ارسال تست';
