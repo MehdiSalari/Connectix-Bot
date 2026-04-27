@@ -2,6 +2,7 @@
 // if ok = true => update success
  if (!isset($_GET['ok']) || $_GET['ok'] === 'false') {
     header('Location: ../index.php');
+    exit;
  }
 // Check if zip extension is enabled
 if (!extension_loaded('zip')) {

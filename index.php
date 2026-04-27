@@ -43,6 +43,8 @@ $conn->close();
 
 $updateMessage = '';
 $updateStatus = '';
+$updateUsersReport = $_SESSION['update_users_report'] ?? null;
+unset($_SESSION['update_users_report']);
 
 if (isset($_GET['updated'])) {
     switch ($_GET['updated']) {
@@ -55,6 +57,10 @@ if (isset($_GET['updated'])) {
             $updateStatus = "error";
             break;
     }
+}
+
+if (is_array($updateUsersReport) && isset($updateUsersReport['total'], $updateUsersReport['updated'], $updateUsersReport['not_updated'])) {
+    $updateMessage .= " Total: {$updateUsersReport['total']} | Updated: {$updateUsersReport['updated']} | Not Updated: {$updateUsersReport['not_updated']}";
 }
 
 // Handle Configuration Form Submission
@@ -525,11 +531,41 @@ $botAvatar = getBotProfiePhoto();
                 <div class="flex flex-col gap-5 items-end">
 
                     <div class="flex flex-row gap-5">
-                        <a href="#"
-                            onclick="return confirm('Are you sure you want to update the bot? This will get new files and updates from GitHub and overwrite your current unnecessary files.') ? window.location.href='update/update.php?ok=true' : false"
-                            class="bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-lg font-semibold transition flex items-center gap-2 w-fit">
-                            <i class="fas fa-sync"></i> بروزرسانی ربات
+                        <div class="relative inline-block text-left">
+                            <button type="button"
+                                id="updatesDropdownBtn"
+                                class="bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-lg font-semibold transition flex items-center gap-2 w-fit">
+                                <i class="fas fa-sync"></i> بروزرسانی
+                                <i class="fas fa-chevron-down ml-2 text-sm"></i>
+                            </button>
 
+                            <div id="updatesDropdown"
+                                class="hidden absolute left-0 mt-2 w-64 rounded-lg shadow-xl bg-white ring-1 ring-black ring-opacity-5 z-50 overflow-hidden">
+                                <div class="py-1" role="menu">
+                                    <a href="#"
+                                        onclick="return confirm('Are you sure you want to update users? This will update users Name and Profile Picture from Telegram.') ? window.location.href='update/users.php?ok=true' : false"
+                                        class="block px-5 py-3 text-sm font-medium text-gray-800 hover:bg-indigo-50 hover:text-indigo-600 transition flex items-center gap-3"
+                                        role="menuitem">
+                                        <i class="fas fa-users text-indigo-600"></i>
+                                        بروزرسانی کاربران
+                                    </a>
+                                    <a href="#"
+                                        onclick="return confirm('Are you sure you want to update users? This will update users Name and Profile Picture from Telegram.') ? window.location.href='update/clients.php?ok=true' : false"
+                                        class="block px-5 py-3 text-sm font-medium text-gray-800 hover:bg-yellow-50 hover:text-yellow-600 transition flex items-center gap-3"
+                                        role="menuitem">
+                                        <i class="fas fa-archive text-yellow-600"></i>
+                                        بروزرسانی اکانت ها
+                                    </a>
+                                    <a href="#"
+                                        onclick="return confirm('Are you sure you want to update the bot? This will get new files and updates from GitHub and overwrite your current unnecessary files.') ? window.location.href='update/bot.php?ok=true' : false"
+                                        class="block px-5 py-3 text-sm font-medium text-gray-800 hover:bg-green-50 hover:text-green-600 transition flex items-center gap-3"
+                                        role="menuitem">
+                                        <i class="fas fa-download text-green-600"></i>
+                                        بروزرسانی ربات
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
                         <a href="logout.php"
                             class="bg-red-500 hover:bg-red-600 text-white px-6 py-3 rounded-lg font-semibold transition flex items-center gap-2 w-fit">
                             <i class="fas fa-sign-out-alt"></i> خروج
@@ -1212,27 +1248,51 @@ $botAvatar = getBotProfiePhoto();
         });
 
 
-
-        const dropdownBtn = document.getElementById('transactionsDropdownBtn');
-        const dropdownMenu = document.getElementById('transactionsDropdown');
+    // Transaction Dropdown
+        const transactionsDropdownBtn = document.getElementById('transactionsDropdownBtn');
+        const transactionsDropdownMenu = document.getElementById('transactionsDropdown');
 
         // toggle on click on the transactions button
-        dropdownBtn.addEventListener('click', function(e) {
+        transactionsDropdownBtn.addEventListener('click', function(e) {
             e.preventDefault();
-            dropdownMenu.classList.toggle('hidden');
+            transactionsDropdownMenu.classList.toggle('hidden');
         });
 
         // Close the dropdown when clicked outside of it
         document.addEventListener('click', function(e) {
-            if (!dropdownBtn.contains(e.target) && !dropdownMenu.contains(e.target)) {
-                dropdownMenu.classList.add('hidden');
+            if (!transactionsDropdownBtn.contains(e.target) && !transactionsDropdownMenu.contains(e.target)) {
+                transactionsDropdownMenu.classList.add('hidden');
             }
         });
 
         // Close with Escape key press
         document.addEventListener('keydown', function(e) {
             if (e.key === 'Escape') {
-                dropdownMenu.classList.add('hidden');
+                transactionsDropdownMenu.classList.add('hidden');
+            }
+        });
+
+    // Update Dropdown
+        const updatesDropdownBtn = document.getElementById('updatesDropdownBtn');
+        const updatesDropdownMenu = document.getElementById('updatesDropdown');
+
+        // toggle on click on the updates button
+        updatesDropdownBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            updatesDropdownMenu.classList.toggle('hidden');
+        });
+
+        // Close the dropdown when clicked outside of it
+        document.addEventListener('click', function(e) {
+            if (!updatesDropdownBtn.contains(e.target) && !updatesDropdownMenu.contains(e.target)) {
+                updatesDropdownMenu.classList.add('hidden');
+            }
+        });
+
+        // Close with Escape key press
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                updatesDropdownMenu.classList.add('hidden');
             }
         });
 

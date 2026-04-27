@@ -68,24 +68,124 @@ function getUser($chat_id) {
     return $user;
 }
 
+function normalizeTelegramUsername($username) {
+    $username = trim((string) $username);
+
+    if ($username === '') {
+        return '';
+    }
+
+    $username = preg_replace('#^https?://t\.me/#i', '', $username);
+    $username = ltrim($username, '@/');
+
+    $parts = explode('?', $username, 2);
+    $username = $parts[0];
+
+    return trim($username, '/');
+}
+
+function fetchTelegramProfile($username) {
+    $normalizedUsername = normalizeTelegramUsername($username);
+    $profile = [
+        'username' => $normalizedUsername,
+        'exists' => false,
+        'display_name' => null,
+        'avatar' => null,
+        'error' => null
+    ];
+
+    if ($normalizedUsername === '') {
+        return $profile;
+    }
+
+    $url = "https://t.me/" . rawurlencode($normalizedUsername);
+    $ch = curl_init($url);
+
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_FOLLOWLOCATION => true,
+        CURLOPT_CONNECTTIMEOUT => 10,
+        CURLOPT_TIMEOUT => 20,
+        CURLOPT_USERAGENT => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36',
+        CURLOPT_HTTPHEADER => ['Accept-Language: en-US,en;q=0.9']
+    ]);
+
+    $html = curl_exec($ch);
+    if ($html === false) {
+        $profile['error'] = curl_error($ch);
+        curl_close($ch);
+        return $profile;
+    }
+
+    $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+
+    if ($httpCode >= 400 || trim($html) === '') {
+        $profile['error'] = 'http_' . $httpCode;
+        return $profile;
+    }
+
+    $previousErrorsState = libxml_use_internal_errors(true);
+    $dom = new DOMDocument();
+    $loaded = $dom->loadHTML('<?xml encoding="UTF-8">' . $html);
+
+    if (!$loaded) {
+        libxml_clear_errors();
+        libxml_use_internal_errors($previousErrorsState);
+        $profile['error'] = 'invalid_html';
+        return $profile;
+    }
+
+    $xpath = new DOMXPath($dom);
+
+    $titleNodes = $xpath->query('//div[contains(@class, "tgme_page_title")]//span');
+    if ($titleNodes instanceof DOMNodeList && $titleNodes->length > 0) {
+        $displayName = trim($titleNodes->item(0)->textContent);
+        if ($displayName !== '') {
+            $profile['display_name'] = $displayName;
+        }
+    }
+
+    $imageMetaNodes = $xpath->query('//meta[@property="og:image"]');
+    if ($imageMetaNodes instanceof DOMNodeList && $imageMetaNodes->length > 0) {
+        $imageUrl = trim($imageMetaNodes->item(0)->getAttribute('content'));
+        if ($imageUrl !== '') {
+            $profile['avatar'] = $imageUrl;
+        }
+    }
+
+    if (!$profile['avatar']) {
+        $imageNodes = $xpath->query('//img[contains(@class, "tgme_page_photo_image")]');
+        if ($imageNodes instanceof DOMNodeList && $imageNodes->length > 0) {
+            $imageUrl = trim($imageNodes->item(0)->getAttribute('src'));
+            if ($imageUrl !== '') {
+                $profile['avatar'] = $imageUrl;
+            }
+        }
+    }
+
+    $profile['exists'] = ($profile['display_name'] !== null || $profile['avatar'] !== null);
+
+    libxml_clear_errors();
+    libxml_use_internal_errors($previousErrorsState);
+
+    return $profile;
+}
+
 function userInfo($chat_id, $user_id, $user_name) {
     try {
         actionStep('clear', $chat_id);
 
         $avatar = null;
-        //get user avatar
-        if ($user_id) {
-            $html = file_get_contents("https://t.me/$user_id");
+        $displayName = $user_name;
 
-            libxml_use_internal_errors(true);
-            
-            $dom = new DOMDocument();
-            $dom->loadHTML($html);
-            $xpath = new DOMXPath($dom);
-            $imgTags = $xpath->query('//img[contains(@class, "tgme_page_photo_image")]');
-            foreach ($imgTags as $imgTag) {
-                $avatar = $imgTag->getAttribute('src');
-                if ($avatar) break;
+        if ($user_id) {
+            $telegramProfile = fetchTelegramProfile($user_id);
+            if (!empty($telegramProfile['avatar'])) {
+                $avatar = $telegramProfile['avatar'];
+            }
+            if (!empty($telegramProfile['display_name'])) {
+                $displayName = $telegramProfile['display_name'];
             }
         }
 
@@ -103,11 +203,11 @@ function userInfo($chat_id, $user_id, $user_name) {
         $user = $result->fetch_assoc();
         if ($user) {
             $stmt = $conn->prepare("UPDATE users SET telegram_id = ?, name = ?, avatar = ? WHERE chat_id = ?");
-            $stmt->bind_param("sssi", $user_id, $user_name, $avatar, $chat_id);
+            $stmt->bind_param("sssi", $user_id, $displayName, $avatar, $chat_id);
             $result = $stmt->execute();
         } else {
             $stmt = $conn->prepare("INSERT INTO users (chat_id, telegram_id, name, avatar, created_at) VALUES (?, ?, ?, ?, NOW())");
-            $stmt->bind_param("isss", $chat_id, $user_id, $user_name, $avatar);
+            $stmt->bind_param("isss", $chat_id, $user_id, $displayName, $avatar);
             $result = $stmt->execute();
         }
         $stmt->close();
@@ -134,19 +234,8 @@ function getBotProfiePhoto($dir = '') {
 
         $bot = json_decode(tg('getMe'), true);
         $username = $bot['result']['username'];
-
-        $result = file_get_contents("https://t.me/$username");
-        libxml_use_internal_errors(true);
-        $dom = new DOMDocument();
-        $dom->loadHTML($result);
-        $xpath = new DOMXPath($dom);
-        $imgTags = $xpath->query('//img[contains(@class, "tgme_page_photo_image")]');
-        foreach ($imgTags as $imgTag) {
-            $avatar = $imgTag->getAttribute('src');
-            if ($avatar) break;
-        }
-
-        $botAvatarUrl = $avatar ?? null;
+        $telegramProfile = fetchTelegramProfile($username);
+        $botAvatarUrl = $telegramProfile['avatar'] ?? null;
 
         if ($botAvatarUrl) {
             $botAvatarData = file_get_contents($botAvatarUrl);
@@ -2423,6 +2512,17 @@ function getSellerPlans($type) {
                 }
             }
             return $validPlans;
+
+        case "Business Class":
+            $validPlans = [];
+            foreach ($data['seller_plan_group'] as $group) {
+                foreach ($group['seller_plans'] as $plan) {
+                    if ($plan['is_displayed_in_robot'] == true && $plan['type'] == "Premium" && stripos($plan['title'], 'Business Class') !== false) {
+                        $validPlans[] = $plan;
+                    }
+                }
+            }
+            return $validPlans;
         case "free":
             $validPlans = [];
             foreach ($data['seller_plan_group'] as $group) {
@@ -2518,7 +2618,8 @@ function planMatchesGroup($plan, $groupName)
             return $plan['type'] === 'Premium'
                 && stripos($plan['title'], 'Sublink') === false
                 && stripos($plan['title'], 'Static IP') === false
-                && stripos($plan['title'], 'Iran Access') === false;
+                && stripos($plan['title'], 'Iran Access') === false
+                && stripos($plan['title'], 'Business Class') === false;
 
         case 'Sublink':
             return $plan['type'] === 'Premium'
@@ -2534,6 +2635,10 @@ function planMatchesGroup($plan, $groupName)
         case 'Iran Access':
             return $plan['type'] === 'Premium'
                 && stripos($plan['title'], 'Iran Access') !== false;
+        
+        case 'Business Class':
+            return $plan['type'] === 'Premium'
+                && stripos($plan['title'], 'Business Class') !== false;
 
         default:
             return false;
@@ -2872,6 +2977,7 @@ function parsePlanTitle($title, $short = false) {
     if (str_contains($extraText, 'Sublink')) $extras[] = 'ساب‌لینک';
     if (str_contains($extraText, 'Static IP')) $extras[] = 'آی‌پی ثابت';
     if (str_contains($extraText, 'Iran Access')) $extras[] = 'ایران اکسس';
+    if (str_contains($extraText, 'Business Class')) $extras[] = 'بیزینس کلاس';
 
     // Short Mode (Just show devices and Traffic)
     if ($short) {
@@ -2892,6 +2998,8 @@ function parsePlanTitle($title, $short = false) {
                 $text .= " • ساب‌لینک";
             } elseif (in_array('آی‌پی ثابت', $extras)) {
                 $text .= " • آی‌پی ثابت";
+            } elseif (in_array('بیزینس کلاس', $extras)) {
+                $text .= " • بیزینس کلاس";
             } elseif (empty($extras) || (count($extras) === 1 && $extras[0] === "+$giftDays روز هدیه")) {
                 $text .= " • ویژه";
             }
@@ -2961,6 +3069,7 @@ function parseType($type) {
         "Sublink" => "ساب‌لینک",
         "Iran Access" => "ایران اکسس",
         "Static IP" => "آی‌پی ثابت",
+        "Business Class" => "بیزینس کلاس",
         default => $type
     };
     return $name;
@@ -3170,6 +3279,7 @@ function keyboard($keyboard) {
                         "Sublink" => "🔗 | $name",
                         "Static IP" => "📍 | $name",
                         "Iran Access" => "🏠 | $name",
+                        "Business Class" => "💼 | $name",
                         default => $group['name']
                     };
                     $keyboard[] = [
@@ -3350,6 +3460,7 @@ function message($message, $variables = []) {
             "ساب‌لینک" => "🔗",
             "آی‌پی ثابت" => "📍",
             "ایران اکسس" => "🏠",
+            "بیزینس کلاس" => "💼",
             default => "📱"
         };
         $groupName = $variables['groupName'];
@@ -3371,6 +3482,9 @@ function message($message, $variables = []) {
                 break;
             case "Static IP":
                 $groupMessage .= "\n\n<b>📍 آی‌پی ثابت:</b>\nدریافت نام کاربری و رمز عبور جهت ورود به نرم افزار Connectix و استفاده از آیپی ثابت.";
+                break;
+            case "Business Class":
+                $groupMessage .= "\n\n<b>💼 بیزینس کلاس:</b>\nسرویسی با کیفیت بالاتر و پشتیبانی بهتر برای کاربران حرفه‌ای.";
                 break;
             default:
                 $typeEmoji = "📱";
