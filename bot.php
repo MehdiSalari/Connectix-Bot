@@ -65,13 +65,13 @@ if (!$isBotActive && !$isAdminRequest) {
     if ($callback_id) {
         tg('answerCallbackQuery', [
             'callback_query_id' => $callback_id,
-            'text' => 'ربات موقتاً غیرفعال است 📴.',
+            'text' => 'ربات موقتاً غیرفعال است 💤',
             'show_alert' => true
         ]);
     } elseif ($uid !== null) {
         tg('sendMessage', [
             'chat_id' => $uid,
-            'text' => 'ربات موقتاً غیرفعال است 📴.'
+            'text' => 'ربات موقتاً غیرفعال است 💤'
         ]);
     }
     exit;

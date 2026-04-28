@@ -82,7 +82,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $bank = $autoPayment == '1' ? ($_POST['bank'] ?? null) : null;
     $botNotice = isset($_POST['bot_notice']) && $_POST['bot_notice'] == '1' && $bank ? true : false;
     $test = isset($_POST['test']) && $_POST['test'] == '1' ? true : false;
-    $botActive = !isset($_POST['bot_active']) || $_POST['bot_active'] == '1';
+    $botActive = isset($_POST['bot_active']) && $_POST['bot_active'] == '1' ? true : false;
 
     // update config file
     $botConfig = [
