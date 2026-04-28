@@ -82,6 +82,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $bank = $autoPayment == '1' ? ($_POST['bank'] ?? null) : null;
     $botNotice = isset($_POST['bot_notice']) && $_POST['bot_notice'] == '1' && $bank ? true : false;
     $test = isset($_POST['test']) && $_POST['test'] == '1' ? true : false;
+    $botActive = !isset($_POST['bot_active']) || $_POST['bot_active'] == '1';
 
     // update config file
     $botConfig = [
@@ -103,7 +104,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'name' => $bank,
             'bot_notice' => $botNotice
         ],
-        'test' => $test
+        'test' => $test,
+        'bot_active' => $botActive
     ];
 
     $config = json_encode($botConfig, JSON_PRETTY_PRINT);
@@ -550,11 +552,17 @@ $botAvatar = getBotProfiePhoto();
                                         بروزرسانی کاربران
                                     </a>
                                     <a href="#"
-                                        onclick="return confirm('Are you sure you want to update users? This will update users Name and Profile Picture from Telegram.') ? window.location.href='update/clients.php?ok=true' : false"
+                                        onclick="return confirm('Are you sure you want to sync accounts? This will import any missing Connectix clients into the bot database.') ? window.location.href='update/clients.php?ok=true' : false"
                                         class="block px-5 py-3 text-sm font-medium text-gray-800 hover:bg-yellow-50 hover:text-yellow-600 transition flex items-center gap-3"
                                         role="menuitem">
                                         <i class="fas fa-archive text-yellow-600"></i>
                                         بروزرسانی اکانت ها
+                                    </a>
+                                    <a href="setup"
+                                        class="block px-5 py-3 text-sm font-medium text-gray-800 hover:bg-sky-50 hover:text-sky-600 transition flex items-center gap-3"
+                                        role="menuitem">
+                                        <i class="fas fa-cloud-arrow-down text-sky-600"></i>
+                                        تنظیمات اولیه
                                     </a>
                                     <a href="#"
                                         onclick="return confirm('Are you sure you want to update the bot? This will get new files and updates from GitHub and overwrite your current unnecessary files.') ? window.location.href='update/bot.php?ok=true' : false"
@@ -573,11 +581,6 @@ $botAvatar = getBotProfiePhoto();
                     </div>
 
                     <div class="flex flex-wrap gap-3 justify-end w-full">
-
-                        <a href="setup"
-                            class="bg-blue-500 hover:bg-blue-600 text-white px-5 py-3 rounded-lg font-semibold transition flex items-center gap-2 whitespace-nowrap">
-                            <i class="fas fa-cloud-arrow-down"></i> تنظیمات اولیه
-                        </a>
 
                         <a id="messagesBtn" href="#"
                             class="bg-blue-500 hover:bg-blue-600 text-white px-5 py-3 rounded-lg font-semibold transition flex items-center gap-2 whitespace-nowrap">
@@ -659,6 +662,7 @@ $botAvatar = getBotProfiePhoto();
                 $bank = $config['bank']['name'] ?? null;
                 $botNotice = $config['bank']['bot_notice'] ?? false;
                 $test = $config['test'] ?? false;
+                $botActive = $config['bot_active'] ?? true;
 
                 $banksFile = @file_get_contents('https://raw.githubusercontent.com/MehdiSalari/Connectix-Bot/main/bank/banks.json');
                 if ($banksFile === false) {
@@ -702,6 +706,23 @@ $botAvatar = getBotProfiePhoto();
                             class="w-full px-4 py-3 border border-gray-300 rounded-lg file:mr-4 file:py-3 file:px-6 file:rounded-lg file:border-0 file:bg-blue-600 file:text-white hover:file:bg-blue-700">
                     </div>
                 </div>
+
+                <div class="flex items-center gap-2">
+                    <div class="toggler">
+                        <input id="toggler-4" name="bot_active" type="checkbox" value="<?= $botActive ? '1' : '0' ?>" <?= $botActive ? 'checked' : '' ?>>
+                        <label for="toggler-4">
+                            <svg class="toggler-on" version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 130.2 130.2">
+                                <polyline class="path check" points="100.2,40.2 51.5,88.8 29.8,67.5"></polyline>
+                            </svg>
+                            <svg class="toggler-off" version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 130.2 130.2">
+                                <line class="path line" x1="34.4" y1="34.4" x2="95.8" y2="95.8"></line>
+                                <line class="path line" x1="95.8" y1="34.4" x2="34.4" y2="95.8"></line>
+                            </svg>
+                        </label>
+                    </div>
+                    <label class="block text-gray-700 font-semibold mb-2">فعال بودن ربات برای کاربران</label>
+                </div>
+                <p class="text-sm text-gray-500 -mt-3">در صورت غیرفعال بودن، فقط ادمین‌ها می‌توانند از ربات استفاده کنند.</p>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div class="input-group">
@@ -819,7 +840,7 @@ $botAvatar = getBotProfiePhoto();
 
                 <div class="flex items-center gap-2 mb-2">
                     <div class="toggler">
-                        <input id="toggler-3" name="test" type="checkbox" value="<?= $bank ? '1' : '0' ?>" <?= $bank ? 'checked' : '' ?>>
+                        <input id="toggler-3" name="test" type="checkbox" value="<?= $test ? '1' : '0' ?>" <?= $test ? 'checked' : '' ?>>
                         <label for="toggler-3">
                             <svg class="toggler-on" version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 130.2 130.2">
                                 <polyline class="path check" points="100.2,40.2 51.5,88.8 29.8,67.5"></polyline>
@@ -870,7 +891,7 @@ $botAvatar = getBotProfiePhoto();
 
                     <div class="flex items-center gap-2 mb-2">
                         <div class="toggler">
-                            <input id="toggler-2" name="bot_notice" type="checkbox" value="<?= $bank ? '1' : '0' ?>" <?= $bank ? 'checked' : '' ?>>
+                            <input id="toggler-2" name="bot_notice" type="checkbox" value="<?= $botNotice ? '1' : '0' ?>" <?= $botNotice ? 'checked' : '' ?>>
                             <label for="toggler-2">
                                 <svg class="toggler-on" version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 130.2 130.2">
                                     <polyline class="path check" points="100.2,40.2 51.5,88.8 29.8,67.5"></polyline>
@@ -1300,11 +1321,13 @@ $botAvatar = getBotProfiePhoto();
 
             const hasBank = <?= (!empty($bank)) ? 'true' : 'false' ?>;
             const botNotice = <?= (!empty($botNotice)) ? 'true' : 'false' ?>;
-            const test = <?= $test ? 'true' : 'false' ?>; 
+            const test = <?= $test ? 'true' : 'false' ?>;
+            const botActive = <?= $botActive ? 'true' : 'false' ?>;
 
             const toggler1 = document.getElementById('toggler-1');
             const toggler2 = document.getElementById('toggler-2');
             const toggler3 = document.getElementById('toggler-3');
+            const toggler4 = document.getElementById('toggler-4');
             const container = document.getElementById('autoPaymentContainer');
             const bankSelector = document.getElementById('bank');
             const freeTrialMessageBox = document.getElementById('free_trial_message_div');
@@ -1321,7 +1344,7 @@ $botAvatar = getBotProfiePhoto();
                 container.style.display = 'block';
             }
 
-            if (bank && botNotice) {
+            if (hasBank && botNotice) {
                 toggler2.checked = true;
                 toggler2.value = '1';
             } else {
@@ -1338,6 +1361,9 @@ $botAvatar = getBotProfiePhoto();
                 toggler3.value = '0';
                 freeTrialMessageBox.style.display = 'none';
             }
+
+            toggler4.checked = botActive;
+            toggler4.value = botActive ? '1' : '0';
 
             // on change toggler1
             toggler1.addEventListener('change', function () {
@@ -1356,6 +1382,10 @@ $botAvatar = getBotProfiePhoto();
             toggler3.addEventListener('change', function () {
                 this.value = this.checked ? '1' : '0';
                 freeTrialMessageBox.style.display = this.checked ? 'block' : 'none';
+            });
+
+            toggler4.addEventListener('change', function () {
+                this.value = this.checked ? '1' : '0';
             });
 
         });

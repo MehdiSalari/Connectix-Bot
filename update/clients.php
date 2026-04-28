@@ -93,8 +93,8 @@ if ($ok !== 'true') {
     <div id="progressSection" class="hidden p-8 md:p-12 bg-gray-50">
         <div class="text-center mb-8">
             <i id="statusIcon" class="fas fa-sync-alt text-6xl text-indigo-600 animate-spin mb-6"></i>
-            <h3 class="text-2xl font-bold text-gray-800">در حال نصب و همگام‌سازی اطلاعات...</h3>
-            <p class="text-gray-600 mt-3">لطفاً منتظر بمانید، این عملیات ممکن است چند دقیقه طول بکشد.</p>
+            <h3 class="text-2xl font-bold text-gray-800">در حال بروزرسانی اکانت‌ها...</h3>
+            <p class="text-gray-600 mt-3">کلاینت‌های پنل Connectix با دیتابیس ربات همگام‌سازی می‌شوند. این عملیات ممکن است چند دقیقه طول بکشد.</p>
         </div>
         <div class="mb-6">
             <div class="progress-bar">
@@ -121,7 +121,7 @@ if ($ok !== 'true') {
         <button type="submit"
             class="flex-1 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-bold py-4 rounded-xl shadow-lg transition transform hover:scale-105">
             <i class="fas fa-rocket ml-3"></i>
-            شروع نصب و همگام‌سازی
+            شروع بروزرسانی اکانت‌ها
         </button>
         <button type="button" onclick="window.location.href='../'"
             class="px-8 py-4 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold rounded-xl transition">
@@ -173,8 +173,8 @@ if ($ok !== 'true') {
 
             // عوض کردن آیکون به علامت خطا
             document.getElementById("statusIcon").className = "fas fa-exclamation-triangle text-6xl text-red-600 mb-6";
-            document.querySelector("#progressSection h3").textContent = "نصب با خطا مواجه شد!";
-            document.querySelector("#progressSection p").textContent = "لطفاً اطلاعات وارد شده را بررسی کنید و دوباره تلاش کنید.";
+            document.querySelector("#progressSection h3").textContent = "بروزرسانی اکانت‌ها با خطا مواجه شد!";
+            document.querySelector("#progressSection p").textContent = "لطفاً لاگ‌ها را بررسی کنید و دوباره تلاش کنید.";
 
             finishBtn.classList.remove("hidden");
             finishBtn.textContent = "تلاش مجدد";
@@ -188,10 +188,10 @@ if ($ok !== 'true') {
 
             // عوض کردن آیکون به تیک سبز
             document.getElementById("statusIcon").className = "fas fa-check-circle text-6xl text-green-600 mb-6";
-            document.querySelector("#progressSection h3").textContent = "نصب با موفقیت انجام شد!";
-            document.querySelector("#progressSection p").textContent = "همه چیز آماده است. حالا می‌تونید وارد پنل بشید.";
+            document.querySelector("#progressSection h3").textContent = "بروزرسانی اکانت‌ها با موفقیت انجام شد!";
+            document.querySelector("#progressSection p").textContent = "همگام‌سازی کلاینت‌ها کامل شد. حالا می‌توانید به پنل برگردید.";
 
-            log("<span class='text-green-400 font-bold'>نصب با موفقیت تکمیل شد!</span>");
+            log("<span class='text-green-400 font-bold'>بروزرسانی اکانت‌ها با موفقیت تکمیل شد!</span>");
 
             finishBtn.classList.remove("hidden");
             finishBtn.textContent = "تکمیل شد! برو به پنل";

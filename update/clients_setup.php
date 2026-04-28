@@ -77,30 +77,6 @@ function dbSetup()
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     ");
 
-    $pdo->exec("
-    CREATE TABLE IF NOT EXISTS wallets (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    chat_id VARCHAR(255) UNIQUE,
-    balance VARCHAR(255),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-    ");
-
-    $pdo->exec("
-    CREATE TABLE IF NOT EXISTS wallet_transactions (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    wallet_id INT,
-    amount VARCHAR(255),
-    operation VARCHAR(255),
-    chat_id VARCHAR(255),
-    status VARCHAR(255),
-    type VARCHAR(255),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (wallet_id) REFERENCES wallets(id) ON DELETE SET NULL
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-    ");
-
-
     // prepared statements for speed
     $selectUserByChat = $pdo->prepare("SELECT id FROM users WHERE chat_id = ? LIMIT 1");
     $insertUser = $pdo->prepare("INSERT INTO users (chat_id, telegram_id, name, email, phone, test) VALUES (?, ?, ?, ?, ?, ?)");
@@ -116,8 +92,17 @@ function dbSetup()
     $skippedClientsNoDetail = 0;
     $totalClientsCount = 0;
 
-    // NOTE: Do NOT reset progress file here! It already has 5% from setup steps.
-    // We'll read the existing progress to keep 5% as starting point for client import.
+    file_put_contents(__DIR__ . '/setup_progress.json', json_encode([
+        'page' => 0,
+        'processedClients' => 0,
+        'insertedUsers' => 0,
+        'insertedClients' => 0,
+        'insertedPlans' => 0,
+        'skipped' => 0,
+        'total_clients' => 0,
+        'percent' => 0,
+        'stage' => 'Starting client sync...'
+    ]));
 
     try {
 
@@ -153,7 +138,7 @@ function dbSetup()
                 logFlush("Total clients to import: {$totalClientsCount}");
                 logFlush("Current page has: " . count($clientsArray) . " clients");
                 
-                // Write initial progress with total_clients set (starts at 5% since initial setup done)
+                // Write initial progress with total_clients set
                 file_put_contents(__DIR__ . '/setup_progress.json', json_encode([
                     'page' => $pageNum,
                     'processedClients' => 0,
@@ -162,7 +147,7 @@ function dbSetup()
                     'insertedPlans' => $insertedPlans,
                     'skipped' => $skippedClientsNoDetail,
                     'total_clients' => $totalClientsCount,
-                    'percent' => 5
+                    'percent' => 0
                 ]));
             }
 
@@ -255,8 +240,7 @@ function dbSetup()
             } // end foreach clientsArray
 
             // Write progress after each page
-            // Percent calculation: 5% (initial setup) + 95% (client import progress)
-            $currentPercent = $totalClientsCount > 0 ? (int)(5 + ($processedClients / $totalClientsCount * 95)) : 5;
+            $currentPercent = $totalClientsCount > 0 ? (int)(($processedClients / $totalClientsCount) * 100) : 0;
             file_put_contents(__DIR__ . '/setup_progress.json', json_encode([
                 'page' => $pageNum,
                 'processedClients' => $processedClients,
@@ -291,122 +275,6 @@ function dbSetup()
 
         } // end while pagination
 
-        
-        // ====================== Starting wallet and transaction import ======================
-        logFlush("<br><strong>Starting wallet and transaction import...</strong><br>");
-
-        // prepared statements for wallets and wallet_transactions
-        $insertWallet = $pdo->prepare("
-            INSERT INTO wallets (chat_id, balance) 
-            VALUES (?, ?) 
-            ON DUPLICATE KEY UPDATE balance = VALUES(balance)
-        ");
-
-        $insertTransaction = $pdo->prepare("
-            INSERT IGNORE INTO wallet_transactions 
-            (wallet_id, amount, operation, chat_id, status, type, created_at) 
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        ");
-
-        // New wallets counter
-        $insertedWallets = $updatedWallets = $insertedTransactions = 0;
-
-        try {
-            $walletsEndpoint = 'https://api.connectix.vip/v1/seller/telegram-wallets';
-            logFlush("Retrieving list of wallets");
-
-            $walletsResp = http_get_json($token, $walletsEndpoint);
-
-            if (!isset($walletsResp['data']) || !is_array($walletsResp['data'])) {
-                throw new Exception("The structure of the API response for wallets is invalid.");
-            }
-
-            $allWallets = $walletsResp['data'];
-            $totalWallets = count($allWallets);
-
-            logFlush("Retrieved wallets count: {$totalWallets}");
-
-            foreach ($allWallets as $index => $wallet) {
-                $walletId = $wallet['id'] ?? null;
-                $chat_id = $wallet['chat_id'] ?? null;
-                $balance = $wallet['balance'] ?? '0';
-
-                if (!$walletId || !$chat_id) continue;
-
-                $cleanBalance = str_replace(',', '', $balance);
-
-                $pdo->beginTransaction();
-                try {
-                    $insertWallet->execute([$chat_id, $cleanBalance]);
-
-                    // دریافت id کیف پول از دیتابیس
-                    if ($pdo->lastInsertId() > 0) {
-                        $walletDbId = $pdo->lastInsertId();
-                        $insertedWallets++;
-                    } else {
-                        // اگر آپدیت شده بود
-                        $stmt = $pdo->prepare("SELECT id FROM wallets WHERE chat_id = ?");
-                        $stmt->execute([$chat_id]);
-                        $row = $stmt->fetch();
-                        $walletDbId = $row['id'] ?? null;
-                        $updatedWallets++;
-                    }
-
-                    // دریافت تراکنش‌ها
-                    $detailUrl = "https://api.connectix.vip/v1/seller/telegram-wallets/{$walletId}?status=All";
-                    $detailResp = http_get_json($token, $detailUrl);
-
-                    if (isset($detailResp['wallet']['transactions']) && is_array($detailResp['wallet']['transactions'])) {
-                        foreach ($detailResp['wallet']['transactions'] as $tx) {
-                            $txAmount = str_replace(',', '', $tx['amount'] ?? '0');
-                            $txOperation = $tx['type'] ?? 'UNKNOWN';
-                            $txCreatedRaw = $tx['created_at'] ?? null;
-                            $txType = $tx['transaction_id'] ?? 'null';
-                            $txStatus = $tx['status'] ?? 'null';
-                            if ($txType == 'null' && $txOperation == 'DECREASE') {
-                                $txType = 'BUY';
-                            }
-
-                            $txCreated = null;
-                            if ($txCreatedRaw && strpos($txCreatedRaw, ' ') !== false) {
-                                list($datePart, $timePart) = explode(' ', $txCreatedRaw, 2);
-                                list($year, $month, $day) = explode('-', $datePart);
-                                list($hour, $minute) = explode(':', $timePart . ':00:00'); // پیش‌فرض ثانیه
-
-                                $gregorian = jalali_to_gregorian($year, $month, $day, true); // فرض بر اینه که تابع درست کار می‌کنه
-                                $txCreated = sprintf("%s %02d:%02d:00", $gregorian, $hour, $minute);
-                            }
-
-                            if ($walletDbId) {
-                                $insertTransaction->execute([$walletDbId, $txAmount, $txOperation, $chat_id, $txStatus, $txType, $txCreated]);
-                                $insertedTransactions++;
-                            }
-                        }
-                    }
-
-                    $pdo->commit();
-
-                    if (($index + 1) % 10 === 0 || ($index + 1) === $totalWallets) {
-                        logFlush("   Processed wallets: " . ($index + 1) . "/{$totalWallets}");
-                    }
-
-                } catch (Exception $e) {
-                    $pdo->rollBack();
-                    logFlush("   ! Error processing wallet {$walletId}: " . $e->getMessage());
-                }
-            }
-
-            logFlush("Wallets import completed successfully.");
-            logFlush("New wallets inserted: {$insertedWallets}");
-            logFlush("Wallets updated: {$updatedWallets}");
-            logFlush("Transactions inserted: {$insertedTransactions}");
-
-        } catch (Exception $e) {
-            logFlush("General error in wallets import: " . $e->getMessage());
-        }
-        // ====================== End of wallets import ======================
-
-
         logFlush("Done. summary:");
         logFlush("Processed clients (detailed fetched): {$processedClients}<br>");
         logFlush("Inserted new users: {$insertedUsers}<br>");
@@ -422,10 +290,12 @@ function dbSetup()
 }
 
 try {
-    logFlush("\n✅ Setup completed successfully!");
+    logFlush("Starting Connectix client sync...");
+    dbSetup();
+    logFlush("\n✅ Client sync completed successfully!");
 } catch (Exception $e) {
     logFlush("FATAL ERROR: " . $e->getMessage());
-    logFlush("ERROR: Setup failed permanently");
+    logFlush("ERROR: Client sync failed permanently");
 } finally {
     // Always execute this last line to finalize the setup process
     logFlush("SETUP_FINISHED");

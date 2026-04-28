@@ -200,7 +200,8 @@ function fetchBotConfig($panelToken) {
                     'name' => null,
                     'bot_notice' => false
                 ],
-                'test' => true
+                'test' => true,
+                'bot_active' => true
             ];
 
             $botConfigJson = json_encode($botConfig, JSON_PRETTY_PRINT);

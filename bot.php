@@ -47,6 +47,36 @@ define('UID', $uid);
 define('CBID', $callback_id);
 define('CBMID', $callback_message_id);
 
+$botConfig = [];
+if (file_exists(__DIR__ . '/setup/bot_config.json')) {
+    $botConfig = json_decode(file_get_contents(__DIR__ . '/setup/bot_config.json'), true) ?: [];
+}
+
+$adminIds = array_map('strval', array_filter([
+    $botConfig['admin_id'] ?? null,
+    $botConfig['admin_id_2'] ?? null,
+    $botConfig['admin_id_3'] ?? null,
+], fn($value) => $value !== null && $value !== ''));
+
+$isBotActive = $botConfig['bot_active'] ?? true;
+$isAdminRequest = $uid !== null && in_array((string) $uid, $adminIds, true);
+
+if (!$isBotActive && !$isAdminRequest) {
+    if ($callback_id) {
+        tg('answerCallbackQuery', [
+            'callback_query_id' => $callback_id,
+            'text' => 'ربات موقتاً غیرفعال است 📴.',
+            'show_alert' => true
+        ]);
+    } elseif ($uid !== null) {
+        tg('sendMessage', [
+            'chat_id' => $uid,
+            'text' => 'ربات موقتاً غیرفعال است 📴.'
+        ]);
+    }
+    exit;
+}
+
 try {
     
     // Handle the user's message
