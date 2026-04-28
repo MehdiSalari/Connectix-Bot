@@ -1588,19 +1588,9 @@ function buy($info) {
                 exit;
             }
 
-            // Find the maximum number of devices in this group
-            $maxDevices = 0;
-            foreach ($plans as $plan) {
-                $devices = (int)$plan['count_of_devices'];
-                if ($devices > $maxDevices) {
-                    $maxDevices = $devices;
-                }
-            }
+            $availableDeviceCounts = getAvailableDeviceCountsFromPlans($plans);
 
-            // Limit to a maximum of 4 devices
-            $maxDevices = min($maxDevices, 4);
-
-            if ($maxDevices === 0) {
+            if (empty($availableDeviceCounts)) {
                 tg('answerCallbackQuery', [
                     'callback_query_id' => CBID,
                     'text' => 'هیچ پلن معتبری در این گروه وجود ندارد.',
@@ -1612,31 +1602,27 @@ function buy($info) {
             // Construct keyboard buttons for device count (two in each row)
             $keyboard = [];
 
-            // First, sort all the buttons from small to large
             $buttons = [];
-            for ($i = 1; $i <= $maxDevices; $i++) {
-                $emoji = match ($i) {
+            foreach ($availableDeviceCounts as $deviceCount) {
+                $emoji = match ($deviceCount) {
                     1 => '1️⃣',
                     2 => '2️⃣',
                     3 => '3️⃣',
                     4 => '4️⃣',
-                    default => "$i"
+                    default => "$deviceCount"
                 };
-                $text = "$emoji | $i کاربر";
+                $text = "$emoji | $deviceCount کاربر";
 
-                $buttons[] = ['text' => $text, 'callback_data' => "buy_count:$i"];
+                $buttons[] = ['text' => $text, 'callback_data' => "buy_count:$deviceCount"];
             }
 
-            // Now, I'll pair the buttons and add them to the keyboard.
             for ($i = 0; $i < count($buttons); $i += 2) {
                 $row = [];
 
-                // If we have a pair of buttons, put the larger one first, then the smaller one.
                 if (isset($buttons[$i + 1])) {
-                    $row[] = $buttons[$i + 1];  // First add the larger one
-                    $row[] = $buttons[$i];      // Then add the smaller one
+                    $row[] = $buttons[$i + 1];
+                    $row[] = $buttons[$i];
                 } else {
-                    // If only one is left (e.g. 3 of them)
                     $row[] = $buttons[$i];
                 }
 
@@ -1677,6 +1663,15 @@ function buy($info) {
                         ['text' => $planText . ' | ' . $plan['sell_price'] . ' تومان', 'callback_data' => 'buy_plan:' . $plan['id']]
                     ];
                 }
+            }
+
+            if (empty($keyboard)) {
+                tg('answerCallbackQuery', [
+                    'callback_query_id' => CBID,
+                    'text' => 'برای این تعداد کاربر، پلنی وجود ندارد.',
+                    'show_alert' => true
+                ]);
+                exit;
             }
 
             $keyboard[] = [
@@ -2643,6 +2638,25 @@ function planMatchesGroup($plan, $groupName)
         default:
             return false;
     }
+}
+
+function getAvailableDeviceCountsFromPlans($plans) {
+    $deviceCounts = [];
+
+    foreach ($plans as $plan) {
+        $devices = isset($plan['count_of_devices']) ? (int) $plan['count_of_devices'] : 0;
+        if ($devices > 0) {
+            $deviceCounts[$devices] = $devices;
+        }
+    }
+
+    if (empty($deviceCounts)) {
+        return [];
+    }
+
+    ksort($deviceCounts, SORT_NUMERIC);
+
+    return array_values($deviceCounts);
 }
 
 
