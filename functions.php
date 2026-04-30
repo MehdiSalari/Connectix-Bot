@@ -3180,7 +3180,7 @@ function keyboard($keyboard) {
                         ],
                         $panelBtn,
                         [
-                            ['text' => '📣 | اخبار و اطلاعیه ها', 'url' => "ble.ir/$channelTelegram"]
+                            ['text' => '📣 | اخبار و اطلاعیه ها', 'url' => "https://ble.ir/$channelTelegram"]
                         ],
                     ]
                 );
@@ -3436,7 +3436,7 @@ function keyboard($keyboard) {
             case "support":
                 $keyboard = [
                     [
-                        ['text' => '📩 |  پیام به پشتیبانی', 'url' => "ble.ir/$supportTelegram"]
+                        ['text' => '📩 |  پیام به پشتیبانی', 'url' => "https://ble.ir/$supportTelegram"]
                     ],
                     [
                         ['text' => '↪️ | بازگشت', 'callback_data' => 'main_menu']
