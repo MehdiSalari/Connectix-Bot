@@ -4,8 +4,8 @@ if (!file_exists(__DIR__ . '/config.php')) {
 }
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/gregorian_jalali.php';
-define('BOT_TOKEN', $botToken);  // Bot token for authentication with Telegram API
-define('TELEGRAM_URL', 'https://api.telegram.org/bot' . BOT_TOKEN . '/');  // Base URL for Telegram Bot API
+define('BOT_TOKEN', $botToken);  // Bot token for authentication with Bale API
+define('TELEGRAM_URL', 'https://tapi.bale.ai/bot' . BOT_TOKEN . '/');  // Base URL for Bale Bot API
 
 function tg($method, $params = []) {
     if (!$params) {
@@ -68,14 +68,14 @@ function getUser($chat_id) {
     return $user;
 }
 
-function normalizeTelegramUsername($username) {
+function normalizeBaleUsername($username) {
     $username = trim((string) $username);
 
     if ($username === '') {
         return '';
     }
 
-    $username = preg_replace('#^https?://t\.me/#i', '', $username);
+    $username = preg_replace('#^https?://(?:www\.)?(?:ble\.ir|t\.me)/#i', '', $username);
     $username = ltrim($username, '@/');
 
     $parts = explode('?', $username, 2);
@@ -84,8 +84,21 @@ function normalizeTelegramUsername($username) {
     return trim($username, '/');
 }
 
-function fetchTelegramProfile($username) {
-    $normalizedUsername = normalizeTelegramUsername($username);
+function escapeMarkdown($text) {
+    $text = (string) $text;
+
+    return strtr($text, [
+        '\\' => '\\\\',
+        '`' => '\`',
+        '*' => '\*',
+        '_' => '\_',
+        '[' => '\[',
+        ']' => '\]',
+    ]);
+}
+
+function fetchBaleProfile($username) {
+    $normalizedUsername = normalizeBaleUsername($username);
     $profile = [
         'username' => $normalizedUsername,
         'exists' => false,
@@ -98,7 +111,7 @@ function fetchTelegramProfile($username) {
         return $profile;
     }
 
-    $url = "https://t.me/" . rawurlencode($normalizedUsername);
+    $url = "https://ble.ir/" . rawurlencode($normalizedUsername);
     $ch = curl_init($url);
 
     curl_setopt_array($ch, [
@@ -180,12 +193,12 @@ function userInfo($chat_id, $user_id, $user_name) {
         $displayName = $user_name;
 
         if ($user_id) {
-            $telegramProfile = fetchTelegramProfile($user_id);
-            if (!empty($telegramProfile['avatar'])) {
-                $avatar = $telegramProfile['avatar'];
+            $baleProfile = fetchBaleProfile($user_id);
+            if (!empty($baleProfile['avatar'])) {
+                $avatar = $baleProfile['avatar'];
             }
-            if (!empty($telegramProfile['display_name'])) {
-                $displayName = $telegramProfile['display_name'];
+            if (!empty($baleProfile['display_name'])) {
+                $displayName = $baleProfile['display_name'];
             }
         }
 
@@ -234,8 +247,8 @@ function getBotProfiePhoto($dir = '') {
 
         $bot = json_decode(tg('getMe'), true);
         $username = $bot['result']['username'];
-        $telegramProfile = fetchTelegramProfile($username);
-        $botAvatarUrl = $telegramProfile['avatar'] ?? null;
+        $baleProfile = fetchBaleProfile($username);
+        $botAvatarUrl = $baleProfile['avatar'] ?? null;
 
         if ($botAvatarUrl) {
             $botAvatarData = file_get_contents($botAvatarUrl);
@@ -316,7 +329,7 @@ function errorLog($message, $file, $line) {
     // Add timestamp to the log entry
     file_put_contents( __DIR__ .'/debug/error_log.log', date('Y-m-d H:i:s') . " - " . $message . " | in file: " . $file . " | at line: " . $line . "\n", FILE_APPEND);
 
-    //send to telegram for admin
+    //send to bale for admin
         //get admin chat id
     global $db_host, $db_user, $db_pass, $db_name;
     $conn = new mysqli($db_host, $db_user, $db_pass, $db_name); 
@@ -457,7 +470,7 @@ function walletReqs($query) {
 
                 $message = "✅ شماره تراکنش $txID با موفقیت تایید شد.\n\n";
                 $message .= "👝 شماره کیف پول: $walletID\n";
-                $message .= "🔢 آیدی: <code>$txUser</code>\n";
+                $message .= "🔢 آیدی: `" . escapeMarkdown($txUser) . "`\n";
                 $message .= "👤 نام کاربری: $userName\n";
                 $message .= "💵 مبلغ: $textAmount";
                 $keyboard = [
@@ -550,7 +563,7 @@ function walletReqs($query) {
 
                 $message = "❌ شماره تراکنش $txID  رد شد.\n\n";
                 $message .= "👝 شماره کیف پول: $walletID\n";
-                $message .= "🔢 آیدی: <code>$txUser</code>\n";
+                $message .= "🔢 آیدی: `" . escapeMarkdown($txUser) . "`\n";
                 $message .= "👤 نام کاربری: $userName\n";
                 $message .= "💵 مبلغ: $textAmount";
                 $keyboard = [
@@ -711,7 +724,7 @@ function getWalletTransactions($page = 1, $itemsPerPage = 20, $search = null) {
 
     $searchLike = $search ? "%" . $conn->real_escape_string($search) . "%" : null;
 
-    // Join with users table for name and telegram id
+    // Join with users table for name and bale id
     $baseQuery = "FROM wallet_transactions wt LEFT JOIN users u ON wt.chat_id = u.chat_id";
 
     if ($search) {
@@ -894,7 +907,7 @@ function getTransactions($page = 1, $itemsPerPage = 20, $search = null, $id = nu
     $idLike = $id ? $conn->real_escape_string($id) : null;
 
 
-    // Only JOIN with users to get user name and telegram id (local database)
+    // Only JOIN with users to get user name and bale id (local database)
     $baseQuery = "FROM payments p LEFT JOIN users u ON p.chat_id = u.chat_id";
 
     if ($id) {
@@ -973,7 +986,7 @@ function always($info) {
             $keyboard = [];
 
             if (empty($clients)) {
-                $keyboard[] = [['text' => '🤷🏻 | اکانتی به تلگرام شما متصل نیست', 'callback_data' => 'not']];
+                $keyboard[] = [['text' => '🤷🏻 | اکانتی به بله شما متصل نیست', 'callback_data' => 'not']];
             } elseif (count($clients) == 1) {
                 $clientData = getClientData($clients[0]['id']);
                 $clientPlans = $clientData['plans'] ?? [];
@@ -1280,7 +1293,7 @@ function app($platform) {
         default => $platformLabel = 'نامشخص'
     };
 
-    $message = "دانلود اپلیکیشن Connectix برای <b>{$platformLabel}</b>\n\nبرای دانلود از دکمه های زیر استفاده کنید.";
+    $message = "دانلود اپلیکیشن Connectix برای *" . escapeMarkdown($platformLabel) . "*\n\nبرای دانلود از دکمه های زیر استفاده کنید.";
 
     $keyboard = [];
 
@@ -1308,7 +1321,7 @@ function app($platform) {
             default => ''
         };
         $keyboard[] = [
-            ['text' => '📲 | دانلود از تلگرام', 'url' => "https://t.me/connectixapp/$directLink"]
+            ['text' => '📲 | دانلود از بله', 'url' => "https://ble.ir/connectixapp/$directLink"]
         ];
     }
     $keyboard[] = [
@@ -1409,7 +1422,7 @@ function addAccount($step, $data = null) {
             }
             curl_close($ch);
 
-            return "✅ اکانت با نام کاربری $username با موفقیت حساب تلگرام شما متصل شد.";
+            return "✅ اکانت با نام کاربری $username با موفقیت حساب بله شما متصل شد.";
     }
 }
 
@@ -2014,8 +2027,8 @@ function payment($receipt, $action) {
                     $result = tg('sendPhoto',[
                         'chat_id' => $admin,
                         'photo' => $photo_id,
-                        'caption' => "📃 سند واریزی مورد تایید میباشد؟\n\n💰 افزایش موجودی کیف پول:\n🔢 آیدی: <code>$uid</code>\n👤 نام کاربری: @$userID\n💵 مبلغ : $textAmount",
-                        'parse_mode' => 'HTML',
+                        'caption' => "📃 سند واریزی مورد تایید میباشد؟\n\n💰 افزایش موجودی کیف پول:\n🔢 آیدی: `" . escapeMarkdown($uid) . "`\n👤 نام کاربری: @" . escapeMarkdown($userID) . "\n💵 مبلغ : $textAmount",
+                        'parse_mode' => 'Markdown',
                         'reply_markup' => json_encode([
                             'inline_keyboard' => [
                                 [
@@ -2121,7 +2134,7 @@ function paycheck($query) {
                     "0" => '❌',
                     "1" => '✅'
                 };
-                $caption = "⚠️ سفارش شماره <code>$orderNumber</code> در وضعیت $paidStatusName است. ";
+                $caption = "⚠️ سفارش شماره `" . escapeMarkdown($orderNumber) . "` در وضعیت $paidStatusName است.";
                 $keyboard = [
                     'inline_keyboard' => [
                         [
@@ -2174,9 +2187,9 @@ function paycheck($query) {
                     }
 
                     // Send account data to user
-                    $msg = "\n\n👤 نام کاربری: <code>$clientUsername</code>\n🔑 رمز عبور: <code>$clientPassword</code>\n📦 پلن:\n$planName\n";
+                    $msg = "\n\n👤 نام کاربری: `" . escapeMarkdown($clientUsername) . "`\n🔑 رمز عبور: `" . escapeMarkdown($clientPassword) . "`\n📦 پلن:\n$planName\n";
                     if ($clientSublink) {
-                        $msg .= "\n🔗 لینک سابسکریبشن: <code>$clientSublink</code>";
+                        $msg .= "\n🔗 لینک سابسکریبشن: `" . escapeMarkdown($clientSublink) . "`";
                     }
                     $message = 'اکانت شما با موفقیت ایجاد شد.';
                     $message .= $msg;
@@ -2193,7 +2206,7 @@ function paycheck($query) {
                     tg ('sendMessage',[
                         'chat_id' => $chat_id,
                         'text' => $message,
-                        'parse_mode' => 'HTML',
+                        'parse_mode' => 'Markdown',
                         'reply_markup' => json_encode($keyboard)
                     ]);
                     
@@ -2210,9 +2223,9 @@ function paycheck($query) {
                     $plan = $client['plans'][0] ?? null;
                     $planName = parsePlanTitle($plan['name'])['text'];
 
-                    $msg = "\n\n👤 نام کاربری: <code>$clientUsername</code>\n📦 پلن:\n $planName";
+                    $msg = "\n\n👤 نام کاربری: `" . escapeMarkdown($clientUsername) . "`\n📦 پلن:\n $planName";
                     $message = "اکانت شما با موفقیت تمدید شد.\n\n";
-                    $message .= "🛍 شماره سفارش: <code>$orderNumber</code>\n"; 
+                    $message .= "🛍 شماره سفارش: `" . escapeMarkdown($orderNumber) . "`\n";
                     $message .= $msg;
                     $keyboard = [
                         'inline_keyboard' => [
@@ -2227,7 +2240,7 @@ function paycheck($query) {
                     tg ('sendMessage',[
                         'chat_id' => $chat_id,
                         'text' => $message,
-                        'parse_mode' => 'HTML',
+                        'parse_mode' => 'Markdown',
                         'reply_markup' => json_encode($keyboard)
                     ]);
                     break;
@@ -2247,7 +2260,7 @@ function paycheck($query) {
             $planName = parsePlanTitle($plan['title'])['text'];
             $planPrice = $payment['price'];
             // Update paycheck message for admin
-            $caption = "✅ سفارش شماره <code>$orderNumber</code> با موفقیت تایید شد\n\n👤 نام کاربری: <code>$clientUsername</code>\n📦 پلن:\n $planName\n💵 مبلغ: $planPrice";
+            $caption = "✅ سفارش شماره `" . escapeMarkdown($orderNumber) . "` با موفقیت تایید شد\n\n👤 نام کاربری: `" . escapeMarkdown($clientUsername) . "`\n📦 پلن:\n $planName\n💵 مبلغ: $planPrice";
             $keyboard = [
                 'inline_keyboard' => [
                     [
@@ -2270,7 +2283,7 @@ function paycheck($query) {
                     "0" => '❌',
                     "1" => '✅'
                 };
-                $caption = "⚠️ سفارش شماره <code>$orderNumber</code> در وضعیت $paidStatusName است. ";
+                $caption = "⚠️ سفارش شماره `" . escapeMarkdown($orderNumber) . "` در وضعیت $paidStatusName است.";
                 $keyboard = [
                     'inline_keyboard' => [
                         [
@@ -2298,8 +2311,8 @@ function paycheck($query) {
 
             tg('sendMessage',[
                 'chat_id' => $chat_id,
-                'text' => "❌پرداخت شما تایید نشد.\n🛍 شماره سفارش: <code>$orderNumber</code>\n\n جهت اطلاع از وضعیت پرداخت، لطفا با پشتیبانی تماس بگیرید.",
-                'parse_mode' => 'HTML',
+                'text' => "❌پرداخت شما تایید نشد.\n🛍 شماره سفارش: `" . escapeMarkdown($orderNumber) . "`\n\n جهت اطلاع از وضعیت پرداخت، لطفا با پشتیبانی تماس بگیرید.",
+                'parse_mode' => 'Markdown',
                 'reply_markup' => json_encode([
                     'inline_keyboard' => [
                         [
@@ -2310,7 +2323,7 @@ function paycheck($query) {
             ]);
 
             // Update paycheck message for admin
-            $caption = "❌ سفارش شماره <code>$orderNumber</code> تایید نشد\n\n📦 پلن:\n $planName\n💵 مبلغ: $planPrice";
+            $caption = "❌ سفارش شماره `" . escapeMarkdown($orderNumber) . "` تایید نشد\n\n📦 پلن:\n $planName\n💵 مبلغ: $planPrice";
             $keyboard = [
                 'inline_keyboard' => [
                     [
@@ -2375,27 +2388,27 @@ function showClient($cid) {
     // Create message
     $message = "📝 اطلاعات اکانت شما\n\n";
 
-    $message .= "👤 نام: <b>{$client['name']}</b>\n";
+    $message .= "👤 نام: *" . escapeMarkdown($client['name']) . "*\n";
     
     if (!empty($client['username'])) {
-        $message .= "📧 یوزرنیم: <code>{$client['username']}</code>\n";
+        $message .= "📧 یوزرنیم: `" . escapeMarkdown($client['username']) . "`\n";
     }
     if (!empty($client['password'])) {
-        $message .= "🔑 پسورد: <code>{$client['password']}</code>\n";
+        $message .= "🔑 پسورد: `" . escapeMarkdown($client['password']) . "`\n";
     }
 
-    $message .= "📱 تعداد دستگاه مجاز: <b>{$client['count_of_devices']}</b>\n\n";
+    $message .= "📱 تعداد دستگاه مجاز: *" . escapeMarkdown($client['count_of_devices']) . "*\n\n";
 
     if (!empty($subscription_link) && $subscription_link != null) {
-        $message .= "🔗 لینک سابسکریشن: <code>{$subscription_link}</code>\n";
+        $message .= "🔗 لینک سابسکریشن: `" . escapeMarkdown($subscription_link) . "`\n";
     }
 
     // Show active plan
     if ($activePlan) {
         $planName = parsePlanTitle($activePlan['name'])['text'];
-        $message .= "\n🎯 <b>اشتراک فعال فعلی</b>\n";
+        $message .= "\n🎯 *اشتراک فعال فعلی*\n";
         $message .= "📦 پلن: $planName\n";
-        $message .= "⏳ انقضا: <b>{$activePlan['expire_date']}</b>\n";
+        $message .= "⏳ انقضا: *" . escapeMarkdown($activePlan['expire_date']) . "*\n";
         $message .= "📊 مصرف ترافیک: {$activePlan['total_used_traffic']}\n";
         $message .= "🗓 فعال شده در: {$activePlan['activated_at']}\n";
     } else {
@@ -2404,7 +2417,7 @@ function showClient($cid) {
 
     // Show queued plans
     if (!empty($queuedPlans)) {
-        $message .= "\n\n⏳ <b>اشتراک‌های رزرو شده (در صف فعال‌سازی)</b>\n";
+        $message .= "\n\n⏳ *اشتراک‌های رزرو شده (در صف فعال‌سازی)*\n";
         foreach (array_reverse($queuedPlans) as $i => $plan) {
             $planName = parsePlanTitle($plan['name'])['text'];
             $message .= "\n" . ($i + 1) . ". پلن: $planName\n";
@@ -2810,9 +2823,9 @@ function getTest($type) {
         }
 
         // Send message to user
-        $msg = "\n\n👤 نام کاربری: <code>$clientUsername</code>\n🔑 رمز عبور: <code>$clientPassword</code>\n";
+        $msg = "\n\n👤 نام کاربری: `" . escapeMarkdown($clientUsername) . "`\n🔑 رمز عبور: `" . escapeMarkdown($clientPassword) . "`\n";
         if ($clientSublink) {
-            $msg .= "\n🔗 لینک سابسکریبشن: <code>$clientSublink</code>";
+            $msg .= "\n🔗 لینک سابسکریبشن: `" . escapeMarkdown($clientSublink) . "`";
         }
 
         // Uncomment the following line if you want to send the message to the user separately
@@ -3167,7 +3180,7 @@ function keyboard($keyboard) {
                         ],
                         $panelBtn,
                         [
-                            ['text' => '📣 | اخبار و اطلاعیه ها', 'url' => "t.me/$channelTelegram"]
+                            ['text' => '📣 | اخبار و اطلاعیه ها', 'url' => "ble.ir/$channelTelegram"]
                         ],
                     ]
                 );
@@ -3192,7 +3205,7 @@ function keyboard($keyboard) {
                 $keyboard = [];
 
                 if (empty($clients)) {
-                    $keyboard[] = [['text' => '🤷🏻 | اکانتی به تلگرام شما متصل نیست', 'callback_data' => 'not']];
+                    $keyboard[] = [['text' => '🤷🏻 | اکانتی به بله شما متصل نیست', 'callback_data' => 'not']];
                     $keyboard[] = [['text' => '🛍 | خرید اکانت جدید', 'callback_data' => 'group']];
                 } else {
                     foreach (array_reverse($clients) as $client) {
@@ -3324,7 +3337,7 @@ function keyboard($keyboard) {
                 $keyboard = [];
 
                 if (empty($clients)) {
-                    $keyboard[] = [['text' => '🤷🏻 | اکانتی به تلگرام شما متصل نیست', 'callback_data' => 'not']];
+                    $keyboard[] = [['text' => '🤷🏻 | اکانتی به بله شما متصل نیست', 'callback_data' => 'not']];
                 } else {
                     foreach (array_reverse($clients) as $client) {
                         $clientData = getClientData($client['id']);
@@ -3423,7 +3436,7 @@ function keyboard($keyboard) {
             case "support":
                 $keyboard = [
                     [
-                        ['text' => '📩 |  پیام به پشتیبانی', 'url' => "t.me/$supportTelegram"]
+                        ['text' => '📩 |  پیام به پشتیبانی', 'url' => "ble.ir/$supportTelegram"]
                     ],
                     [
                         ['text' => '↪️ | بازگشت', 'callback_data' => 'main_menu']
@@ -3486,19 +3499,19 @@ function message($message, $variables = []) {
     foreach ($groups as $group) {
         switch ($group['name']) {
             case "default":
-                $groupMessage .= "\n\n<b>📱 ویژه (پیشنهاد میشود):</b>\nدریافت نام کاربری و رمز عبور جهت ورود به نرم افزار Connectix و استفاده از 4 پروتکل و بیش از 10 کشور برای اتصال.";
+                $groupMessage .= "\n\n*📱 ویژه (پیشنهاد میشود):*\nدریافت نام کاربری و رمز عبور جهت ورود به نرم افزار Connectix و استفاده از 4 پروتکل و بیش از 10 کشور برای اتصال.";
                 break;
             case "Iran Access":
-                $groupMessage .= "\n\n<b>🏠 ایران اکسس</b>\nسرویس دسترسی به آیپی ایران برای هموطنان ایرانی مقیم خارج کشور";
+                $groupMessage .= "\n\n*🏠 ایران اکسس*\nسرویس دسترسی به آیپی ایران برای هموطنان ایرانی مقیم خارج کشور";
                 break;
             case "Sublink":
-                $groupMessage .= "\n\n<b>🔗 سابسکریبشن:</b>\nدریافت لینک سابسکریپشن جهت استفاده در نرم افزار هایی که از سرویس V2Ray پشتیبانی میکنند (مثل V2RayNG و V2Box)";
+                $groupMessage .= "\n\n*🔗 سابسکریبشن:*\nدریافت لینک سابسکریپشن جهت استفاده در نرم افزار هایی که از سرویس V2Ray پشتیبانی میکنند (مثل V2RayNG و V2Box)";
                 break;
             case "Static IP":
-                $groupMessage .= "\n\n<b>📍 آی‌پی ثابت:</b>\nدریافت نام کاربری و رمز عبور جهت ورود به نرم افزار Connectix و استفاده از آیپی ثابت.";
+                $groupMessage .= "\n\n*📍 آی‌پی ثابت:*\nدریافت نام کاربری و رمز عبور جهت ورود به نرم افزار Connectix و استفاده از آیپی ثابت.";
                 break;
             case "Business Class":
-                $groupMessage .= "\n\n<b>💼 بیزینس کلاس:</b>\nسرویسی با کیفیت بالاتر و پشتیبانی بهتر برای کاربران حرفه‌ای.";
+                $groupMessage .= "\n\n*💼 بیزینس کلاس:*\nسرویسی با کیفیت بالاتر و پشتیبانی بهتر برای کاربران حرفه‌ای.";
                 break;
             default:
                 $typeEmoji = "📱";
@@ -3510,19 +3523,19 @@ function message($message, $variables = []) {
 
     $msg = match ($message) {
         "welcome_message" => $welcomeMessage,
-        "accounts" => "📦 اکانت های متصل یه حساب تلگرام شما:\n\n* در صورت عدم مشاهده اکانت خود، آن را اضافه کنید.",
-        "get_test" => "🎁 لطفا نوع اکانت تست را انتخاب کنید:\n\n<b>📱 ویژه(پیشنهاد میشود):</b>\nدریافت نام کاربری و رمز عبور جهت ورود به نرم افزار Connectix و استفاده از 4 پروتکل و بیش از 10 کشور برای اتصال.\n\n<b>🔗 سابسکریبشن:</b>\nدریافت لینک سابسکریپشن جهت استفاده در نرم افزار هایی که از سرویس V2Ray پشتیبانی میکنند (مثل V2RayNG و V2Box)",
-        "count" => "$typeEmoji نوع سرویس $groupName انتخاب شد.\n\n🔢 این اکانت را برای چند کاربر (دستگاه) قابل استفاده باشد؟",
-        "buy" => "با تشکر از اعتماد و حسن انتخاب شما در خرید سرویس فیلترشکن {$appName} .\nلطفا نوع خرید خود را انتخاب کنید:\n\n<b>🔄️ تمدید اکانت فعلی:</b>\nاین دکمه برای خرید اشتراک برای اکانت قبلی استفاده میشود.\n\n<b>🛍️ خرید اکانت جدید:</b>\nاین دکمه برای خرید اکانت جدید استفاده میشود.",
+        "accounts" => "📦 اکانت های متصل یه حساب بله شما:\n\n* در صورت عدم مشاهده اکانت خود، آن را اضافه کنید.",
+        "get_test" => "🎁 لطفا نوع اکانت تست را انتخاب کنید:\n\n*📱 ویژه(پیشنهاد میشود):*\nدریافت نام کاربری و رمز عبور جهت ورود به نرم افزار Connectix و استفاده از 4 پروتکل و بیش از 10 کشور برای اتصال.\n\n*🔗 سابسکریبشن:*\nدریافت لینک سابسکریپشن جهت استفاده در نرم افزار هایی که از سرویس V2Ray پشتیبانی میکنند (مثل V2RayNG و V2Box)",
+        "count" => "$typeEmoji نوع سرویس " . escapeMarkdown($groupName) . " انتخاب شد.\n\n🔢 این اکانت را برای چند کاربر (دستگاه) قابل استفاده باشد؟",
+        "buy" => "با تشکر از اعتماد و حسن انتخاب شما در خرید سرویس فیلترشکن {$appName} .\nلطفا نوع خرید خود را انتخاب کنید:\n\n*🔄️ تمدید اکانت فعلی:*\nاین دکمه برای خرید اشتراک برای اکانت قبلی استفاده میشود.\n\n*🛍️ خرید اکانت جدید:*\nاین دکمه برای خرید اکانت جدید استفاده میشود.",
         "group" => $groupMessage,
         "renew" => "📦 لطفا اکانت مدنظر خود را جهت تمدید اشتراک انتخاب کنید:",
         "card" => "💸  لطفاً مبلغ لازمه را به شماره کارت زیر واریز و سپس سند پرداخت را به صورت تصویری در ادامه ارسال کنید:\n\n💴 مبلغ: " . $variables['amount'] . "\n💳 شماره کارت: " . $config['card_number'] . "\n👤 به نام: " . $config['card_name'] . "\n",
-        "add_account" => "🔗 شما در حال متصل کردن اکانت قبلی به حساب تلگرام خود هستید.\n\n👤 لطفا نام کاربری اکانت را وارد نمایید:",
+        "add_account" => "🔗 شما در حال متصل کردن اکانت قبلی به حساب بله خود هستید.\n\n👤 لطفا نام کاربری اکانت را وارد نمایید:",
         "apps" => "⚙ لطفا سیستم عامل مدنظر خود را انتخاب کنید:",
         "guide" => "📖 لطفا نحوه آموزش را انتحاب کنید.",
         "faq" => $faq,
         "support" => $supportMessage,
-        "wallet" => "🤑 موجودی کیف پول شما: \n💵 " . $variables['walletBalance'] . " تومان\n\n👤 نام: " . $variables['userName'] . "\n🔢 آیدی عددی: " . UID,
+        "wallet" => "🤑 موجودی کیف پول شما: \n💵 " . $variables['walletBalance'] . " تومان\n\n👤 نام: " . escapeMarkdown($variables['userName']) . "\n🔢 آیدی عددی: " . escapeMarkdown(UID),
         "wallet_increase" => "💰 لطفا مبلغ مدنظر جهت افزایش موجودی کیف پول خود به (تومان) را وارد نمایید.\n حداقل مبلغ واریزی 10,000 تومان میباشد.",
         default => "پیام پیشفرض",
     };

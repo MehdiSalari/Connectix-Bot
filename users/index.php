@@ -158,7 +158,7 @@ $appName = json_decode(file_get_contents('../setup/bot_config.json'), true)['app
                                 </div>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap username">
-                                <?= $user['telegram_id'] ? '<a href="https://t.me/' . $user['telegram_id'] . '" target="_blank"><span class="text-blue-600">@' . htmlspecialchars($user['telegram_id']) . '</span></a>' : '<span class="text-gray-400">ندارد</span>' ?>
+                                <?= $user['telegram_id'] ? '<a href="https://ble.ir/' . $user['telegram_id'] . '" target="_blank"><span class="text-blue-600">@' . htmlspecialchars($user['telegram_id']) . '</span></a>' : '<span class="text-gray-400">ندارد</span>' ?>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600 font-mono"><?= $user['chat_id'] ?></td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
@@ -347,7 +347,7 @@ $appName = json_decode(file_get_contents('../setup/bot_config.json'), true)['app
                         </div>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap username">
-                        ${user.telegram_id ? `<a href="https://t.me/${user.telegram_id}" target="_blank" class="text-blue-600 hover:underline">@${escapeHtml(user.telegram_id)}</a>` : '<span class="text-gray-400">ندارد</span>'}
+                        ${user.telegram_id ? `<a href="https://ble.ir/${user.telegram_id}" target="_blank" class="text-blue-600 hover:underline">@${escapeHtml(user.telegram_id)}</a>` : '<span class="text-gray-400">ندارد</span>'}
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600 font-mono">${escapeHtml(user.chat_id || '')}</td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">

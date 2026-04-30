@@ -10,7 +10,7 @@ if (!extension_loaded('zip')) {
 }
 
 // Get bot files from github
-$zipUrl = 'https://github.com/MehdiSalari/Connectix-Bot/archive/refs/heads/main.zip';
+$zipUrl = 'https://github.com/MehdiSalari/Connectix-Bot/archive/refs/heads/bale.zip';
 $zipFile = 'main.zip';
 
 // Download the zip file

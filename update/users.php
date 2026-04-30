@@ -42,7 +42,7 @@ $logs = [];
 $updateStmt = $conn->prepare("UPDATE users SET name = ?, avatar = ? WHERE id = ?");
 
 foreach ($users as $user) {
-    $telegramUsername = normalizeTelegramUsername($user['telegram_id']);
+    $telegramUsername = normalizeBaleUsername($user['telegram_id']);
     $currentName = $user['name'] ?? null;
     $currentAvatar = $user['avatar'] ?? null;
     $fallbackName = $currentName ?: 'No name';
@@ -53,7 +53,7 @@ foreach ($users as $user) {
         continue;
     }
 
-    $profile = fetchTelegramProfile($telegramUsername);
+    $profile = fetchBaleProfile($telegramUsername);
     if (!$profile['exists']) {
         $notUpdatedCount++;
         $logs[] = $fallbackName . ' (@' . $telegramUsername . ') -> Not found';

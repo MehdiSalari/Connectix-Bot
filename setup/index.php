@@ -169,7 +169,7 @@ if (file_exists('../config.php')) {
                     <div class="border-b border-gray-200 pb-8">
                         <h3 class="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-3">
                             <i class="fas fa-robot text-indigo-600"></i>
-                            توکن ربات تلگرام
+                            توکن ربات بله
                         </h3>
                         <input type="text" name="botToken" value="<?= $botToken ?? '' ?>" required
                             placeholder="123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11"
@@ -190,7 +190,7 @@ if (file_exists('../config.php')) {
                             </div>
                             <div>
                                 <label class="block text-sm font-bold text-gray-700 mb-2">چت آیدی ادمین <a
-                                        href="https://t.me/username_to_id_bot" target="_blank"
+                                        href="https://ble.ir/username_to_id_bot" target="_blank"
                                         class="text-blue-600 text-xs">(دریافت)</a></label>
                                 <input type="text" name="chatId" value="<?= $admin['chat_id'] ?? '' ?>" required
                                     class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-4 focus:ring-indigo-200 focus:border-indigo-500 transition">

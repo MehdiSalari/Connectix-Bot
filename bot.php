@@ -391,7 +391,7 @@ try {
                 'chat_id' => $callback_chat_id,
                 'message_id' => $callback_message_id,
                 'text' => message('get_test'),
-                'parse_mode' => 'html',
+                'parse_mode' => 'Markdown',
                 'reply_markup' => keyboard('get_test')
             ]);
             break;
@@ -417,7 +417,7 @@ try {
                 'chat_id' => $callback_chat_id,
                 'message_id' => $callback_message_id,
                 'text' => message('group'),
-                'parse_mode' => 'html',
+                'parse_mode' => 'Markdown',
                 'reply_markup' => keyboard('group')
             ]);
             break;
@@ -426,7 +426,7 @@ try {
                 'chat_id' => $callback_chat_id,
                 'message_id' => $callback_message_id,
                 'text' => message('count'),
-                'parse_mode' => 'html',
+                'parse_mode' => 'Markdown',
                 'reply_markup' => keyboard('count')
             ]);
             break;
@@ -436,7 +436,7 @@ try {
                 'chat_id' => $callback_chat_id,
                 'message_id' => $callback_message_id,
                 'text' => message('buy'),
-                'parse_mode' => 'html',
+                'parse_mode' => 'Markdown',
                 'reply_markup' => keyboard('buy')
             ]);
             break;
@@ -445,7 +445,7 @@ try {
                 'chat_id' => $callback_chat_id,
                 'message_id' => $callback_message_id,
                 'text' => message('renew'),
-                'parse_mode' => 'html',
+                'parse_mode' => 'Markdown',
                 'reply_markup' => keyboard('renew')
             ]);
             break;
@@ -454,7 +454,7 @@ try {
                 'chat_id' => $callback_chat_id,
                 'message_id' => $callback_message_id,
                 'text' => message('apps'),
-                'parse_mode' => 'html',
+                'parse_mode' => 'Markdown',
                 'reply_markup' => keyboard('apps')
             ]);
             break;
@@ -462,7 +462,7 @@ try {
             $result = tg('sendMessage',[
                 'chat_id' => $callback_chat_id,
                 'text' => message('guide'),
-                'parse_mode' => 'html',
+                'parse_mode' => 'Markdown',
                 'reply_markup' => keyboard('guide')
             ]);
             tg('deleteMessage',[
@@ -475,7 +475,7 @@ try {
                 'chat_id' => $callback_chat_id,
                 'message_id' => $callback_message_id,
                 'text' => message('faq'),
-                'parse_mode' => 'html',
+                'parse_mode' => 'Markdown',
                 'reply_markup' => keyboard('faq')
             ]);
             break;
@@ -484,7 +484,7 @@ try {
                 'chat_id' => $callback_chat_id,
                 'message_id' => $callback_message_id,
                 'text' => message('support'),
-                'parse_mode' => 'html',
+                'parse_mode' => 'Markdown',
                 'reply_markup' => keyboard('support')
             ]);
             break;
@@ -514,7 +514,7 @@ try {
                 'chat_id' => $callback_chat_id,
                 'message_id' => $callback_message_id,
                 'text' => message('wallet', $variables),
-                'parse_mode' => 'html',
+                'parse_mode' => 'Markdown',
                 'reply_markup' => keyboard('wallet')
             ]);
             break;
@@ -537,7 +537,7 @@ try {
                 $result = tg($method, params: array_merge([
                     'chat_id' => $callback_chat_id,
                     'message_id' => $callback_message_id,
-                    'parse_mode' => 'html'
+                    'parse_mode' => 'Markdown'
                 ], $params));
 
                 $result = json_decode($result);

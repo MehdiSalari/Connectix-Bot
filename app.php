@@ -12,9 +12,9 @@ $adminID = $config['admin_id'] ?? null;
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= $appName ?> | WebApp</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
+    <script src="https://tapi.bale.ai/miniapp.js?3"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;900&display=swap" rel="stylesheet">
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <link rel="icon" href="favicon.ico" type="image/x-icon">
     <style>
         html {background-color: #e7edff;}
@@ -72,14 +72,22 @@ $adminID = $config['admin_id'] ?? null;
     </div>
 
     <script>
-    Telegram.WebApp.ready();
-    Telegram.WebApp.expand();
-    Telegram.WebApp.BackButton.onClick(() => Telegram.WebApp.close());
+    const baleWebApp = window.Bale?.WebApp;
 
-    const user = Telegram.WebApp.initDataUnsafe.user;
+    if (!baleWebApp) {
+        document.body.innerHTML = 'Bale WebApp SDK not found';
+        window.location.href = 'index.php';
+    }
+
+    baleWebApp.ready();
+    baleWebApp.expand();
+    baleWebApp.BackButton.show();
+    baleWebApp.BackButton.onClick(() => baleWebApp.close());
+
+    const user = baleWebApp.initDataUnsafe.user;
 
     if (!user) {
-        document.body.innerHTML = 'No Telegram User';
+        document.body.innerHTML = 'No Bale User';
         window.location.href = 'index.php';
     }
 

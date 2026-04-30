@@ -112,11 +112,11 @@ if (!$smsResult) {
 if ($botNotice) {
     $tgResult = tg('sendMessage', [
         'chat_id' => $adminID,
-        'text' => "💰 <b>New SMS Payment Received</b>\n\n" .
-                  "🏦 <b>Bank:</b> " . htmlspecialchars($adminBank) . "\n" .
-                  "💵 <b>Amount:</b> " . number_format($amount) . " Toman\n\n" .
-                  "<i>Message:</i>\n" . htmlspecialchars($message),
-        'parse_mode' => 'HTML'
+        'text' => "💰 *New SMS Payment Received*\n\n" .
+                  "🏦 *Bank:* " . escapeMarkdown($adminBank) . "\n" .
+                  "💵 *Amount:* " . number_format($amount) . " Toman\n\n" .
+                  "*Message:*\n" . escapeMarkdown($message),
+        'parse_mode' => 'Markdown'
     ]);
 
     if ($tgResult && !($result = json_decode($tgResult))->ok) {

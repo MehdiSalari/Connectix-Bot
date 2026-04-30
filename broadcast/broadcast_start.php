@@ -47,28 +47,28 @@ if ($isTest) {
                 'chat_id' => $adminChatId,
                 'photo' => $mediaUrl,
                 'caption' => $message,
-                'parse_mode' => 'HTML'
+                'parse_mode' => 'Markdown'
             ]);
         } elseif ($ext === 'gif' || strpos($mime, 'image/gif') === 0) {
             $result = tg('sendAnimation', [
                 'chat_id' => $adminChatId,
                 'animation' => new CURLFile($mediaPath),
                 'caption' => $message,
-                'parse_mode' => 'HTML'
+                'parse_mode' => 'Markdown'
             ]);
         } elseif (strpos($mime, 'video/') === 0) {
             $result = tg('sendVideo', [
                 'chat_id' => $adminChatId,
                 'video' => new CURLFile($mediaPath),
                 'caption' => $message,
-                'parse_mode' => 'HTML'
+                'parse_mode' => 'Markdown'
             ]);
         } elseif (strpos($mime, 'audio/') === 0 || $ext === 'ogg') {
             $result = tg('sendVoice', [
                 'chat_id' => $adminChatId,
                 'voice' => new CURLFile($mediaPath),
                 'caption' => $message,
-                'parse_mode' => 'HTML'
+                'parse_mode' => 'Markdown'
             ]);
         } else {
             // For documents like .docx, .pdf, etc., use CURLFile with local path
@@ -76,14 +76,14 @@ if ($isTest) {
                 'chat_id' => $adminChatId,
                 'document' => new CURLFile($mediaPath),
                 'caption' => $message,
-                'parse_mode' => 'HTML'
+                'parse_mode' => 'Markdown'
             ]);
         }
     } else {
         $result = tg('sendMessage', [
             'chat_id' => $adminChatId,
             'text' => $message ?: 'تست موفق از پنل ادمین',
-                'parse_mode' => 'HTML'
+                'parse_mode' => 'Markdown'
         ]);
     }
 
@@ -96,7 +96,7 @@ if ($isTest) {
         echo json_encode([
             'success' => true,
             'message' => 'تست با موفقیت ارسال شد!',
-            'parse_mode' => 'HTML'
+                'parse_mode' => 'Markdown'
         ]);
     } else {
         $errorMsg = 'خطا در ارسال تست';

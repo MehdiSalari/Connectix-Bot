@@ -93,7 +93,7 @@ if (isset($_GET['create_wallet']) && $_GET['create_wallet'] == true && $walletDa
                         <div class="mt-3 space-y-2 text-gray-600">
                             <p>آیدی عددی: <code class="bg-gray-100 px-3 py-1 rounded font-mono"><?= $user['chat_id'] ?></code></p>
                             <?php if ($user['telegram_id']): ?>
-                                <p>یوزرنیم: <a href="https://t.me/<?= $user['telegram_id'] ?>" target="_blank" class="text-blue-600 hover:underline">@<?= htmlspecialchars($user['telegram_id']) ?></a></p>
+                                <p>یوزرنیم: <a href="https://ble.ir/<?= $user['telegram_id'] ?>" target="_blank" class="text-blue-600 hover:underline">@<?= htmlspecialchars($user['telegram_id']) ?></a></p>
                             <?php endif; ?>
                             <p class="text-sm">ثبت‌نام: <?= jdate($user['created_at'], true) ?></p>
                         </div>

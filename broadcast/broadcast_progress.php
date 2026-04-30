@@ -27,7 +27,7 @@ foreach ($userIds as $index => $chatId) {
     $params = ['chat_id' => $chatId];
     $method = 'sendMessage';
     $params['text'] = $message ?: ' ';
-    $params['parse_mode'] = 'HTML';
+    $params['parse_mode'] = 'Markdown';
 
     if ($mediaPath) {
         $ext = strtolower(pathinfo($mediaPath, PATHINFO_EXTENSION));
@@ -43,7 +43,7 @@ foreach ($userIds as $index => $chatId) {
         if ($message) $params['caption'] = $message;
     }
 
-    $params['parse_mode'] = 'HTML';
+    $params['parse_mode'] = 'Markdown';
     $params['reply_markup'] = json_encode(['remove_keyboard' => true]);
 
     $res = tg($method, $params);

@@ -234,14 +234,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $current_url = $protocol . "://" . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
         $full_url = str_replace("index.php", "bot.php", $current_url);
 
-        // If it's HTTP, throw an error and stop (Telegram only accepts HTTPS)
+        // If it's HTTP, throw an error and stop (Bale only accepts HTTPS)
         if ($protocol !== 'https') {
             $errorMsg = "خطا: وب‌هوک فقط با HTTPS کار می‌کند. لطفاً SSL را فعال کنید.";
             echo "<script>alert('$errorMsg')</script>";
             exit();
         }
 
-        $url = "https://api.telegram.org/bot{$botToken}/setWebhook?url={$full_url}";
+        $url = "https://tapi.bale.ai/bot{$botToken}/setWebhook?url={$full_url}";
 
         $ch = curl_init();
         curl_setopt_array($ch, [
@@ -545,7 +545,7 @@ $botAvatar = getBotProfiePhoto();
                                 class="hidden absolute left-0 mt-2 w-64 rounded-lg shadow-xl bg-white ring-1 ring-black ring-opacity-5 z-50 overflow-hidden">
                                 <div class="py-1" role="menu">
                                     <a href="#"
-                                        onclick="return confirm('Are you sure you want to update users? This will update users Name and Profile Picture from Telegram.') ? window.location.href='update/users.php?ok=true' : false"
+                                        onclick="return confirm('Are you sure you want to update users? This will update users Name and Profile Picture from Bale.') ? window.location.href='update/users.php?ok=true' : false"
                                         class="block px-5 py-3 text-sm font-medium text-gray-800 hover:bg-indigo-50 hover:text-indigo-600 transition flex items-center gap-3"
                                         role="menuitem">
                                         <i class="fas fa-users text-indigo-600"></i>
@@ -726,12 +726,12 @@ $botAvatar = getBotProfiePhoto();
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div class="input-group">
-                        <label class="block text-gray-700 font-semibold mb-2">نام کاربری پشتیبانی تلگرام</label>
+                        <label class="block text-gray-700 font-semibold mb-2">نام کاربری پشتیبانی بله</label>
                         <input type="text" placeholder="نمونه: Connectix_Support" id="telegram_support" name="telegram_support" value="<?= $telegramSupport ?>"
                             class="w-full px-4 py-3 border border-gray-300 rounded-lg file:mr-4 file:py-3 file:px-6 file:rounded-lg file:border-0 file:bg-blue-600 file:text-white hover:file:bg-blue-700">
                     </div>
                     <div class="input-group">
-                        <label class="block text-gray-700 font-semibold mb-2">نام کاربری کانال تلگرام</label>
+                        <label class="block text-gray-700 font-semibold mb-2">نام کاربری کانال بله</label>
                         <input type="text" placeholder="نمونه: Connectix_Channel" id="telegram_channel" name="telegram_channel" value="<?= $telegramChannel ?>"
                             class="w-full px-4 py-3 border border-gray-300 rounded-lg file:mr-4 file:py-3 file:px-6 file:rounded-lg file:border-0 file:bg-blue-600 file:text-white hover:file:bg-blue-700">
                     </div>

@@ -229,15 +229,15 @@ function setBotWebhook($token) {
     $current_url = $protocol . "://" . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
     $full_url = str_replace("setup/setup.php", "bot.php", $current_url);
 
-    // If it's HTTP, throw an error and stop (Telegram only accepts HTTPS)
+    // If it's HTTP, throw an error and stop (Bale only accepts HTTPS)
     if ($protocol !== 'https') {
-        logFlush("ERROR: Webhook URL is HTTP! Telegram only accepts HTTPS.");
+        logFlush("ERROR: Webhook URL is HTTP! Bale only accepts HTTPS.");
         logFlush("ERROR: Current URL detected: " . $full_url);
         logFlush("ERROR: Please use a valid SSL certificate (Let's Encrypt, Cloudflare, etc.)");
         throw new Exception("Webhook requires HTTPS. Current URL is HTTP.");
     }
 
-    $url = "https://api.telegram.org/bot{$token}/setWebhook?url={$full_url}";
+    $url = "https://tapi.bale.ai/bot{$token}/setWebhook?url={$full_url}";
     logFlush("Setting Webhook → {$full_url}");
 
     $ch = curl_init();

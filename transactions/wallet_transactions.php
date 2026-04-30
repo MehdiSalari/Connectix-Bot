@@ -115,7 +115,7 @@ $appName = json_decode(file_get_contents('../setup/bot_config.json'), true)['app
                                 <div class="text-sm font-bold text-gray-900">
                                     <?= htmlspecialchars($t['user_name'] ?? 'نامشخص') ?>
                                     <?php if (!empty($t['user_telegram'])): ?>
-                                        <br><a href="https://t.me/<?= htmlspecialchars($t['user_telegram']) ?>" target="_blank" class="text-blue-600 text-xs">@<?= htmlspecialchars($t['user_telegram']) ?></a>
+                                        <br><a href="https://ble.ir/<?= htmlspecialchars($t['user_telegram']) ?>" target="_blank" class="text-blue-600 text-xs">@<?= htmlspecialchars($t['user_telegram']) ?></a>
                                     <?php endif; ?>
                                     <div class="text-xs text-gray-500 mt-1">آیدی: <?= $t['chat_id'] ?></div>
                                 </div>
