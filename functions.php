@@ -2518,6 +2518,16 @@ function getSellerPlans($type) {
                 }
             }
             return $validPlans;
+        case "BCSublink":
+            $validPlans = [];
+            foreach ($data['seller_plan_group'] as $group) {
+                foreach ($group['seller_plans'] as $plan) {
+                    if ($plan['is_displayed_in_robot'] == true && $plan['type'] == "Premium" && stripos($plan['title'], 'BCSublink') !== false) {
+                        $validPlans[] = $plan;
+                    }
+                }
+            }
+            return $validPlans;
         case "free":
             $validPlans = [];
             foreach ($data['seller_plan_group'] as $group) {
@@ -2634,6 +2644,10 @@ function planMatchesGroup($plan, $groupName)
         case 'Business Class':
             return $plan['type'] === 'Premium'
                 && stripos($plan['title'], 'Business Class') !== false;
+
+        case 'BCSublink':
+            return $plan['type'] === 'Premium'
+                && stripos($plan['title'], 'BCSublink') !== false;
 
         default:
             return false;
@@ -2988,7 +3002,11 @@ function parsePlanTitle($title, $short = false) {
     // Parse extras
     $extras = [];
     if ($giftDays) $extras[] = "+$giftDays روز هدیه";
-    if (str_contains($extraText, 'Sublink')) $extras[] = 'ساب‌لینک';
+    if (str_contains($extraText, 'BCSublink')) {
+        $extras[] = 'بیزینس ساب‌لینک';
+    } elseif (str_contains($extraText, 'Sublink')) {
+        $extras[] = 'ساب‌لینک';
+    }
     if (str_contains($extraText, 'Static IP')) $extras[] = 'آی‌پی ثابت';
     if (str_contains($extraText, 'Iran Access')) $extras[] = 'ایران اکسس';
     if (str_contains($extraText, 'Business Class')) $extras[] = 'بیزینس کلاس';
@@ -3008,7 +3026,9 @@ function parsePlanTitle($title, $short = false) {
                 $text = "$devices دستگاه • $periodText";
             }
 
-            if (in_array('ساب‌لینک', $extras)) {
+            if (in_array('بیزینس ساب‌لینک', $extras)) {
+                $text .= " • بیزینس ساب‌لینک";
+            } elseif (in_array('ساب‌لینک', $extras)) {
                 $text .= " • ساب‌لینک";
             } elseif (in_array('آی‌پی ثابت', $extras)) {
                 $text .= " • آی‌پی ثابت";
@@ -3060,7 +3080,7 @@ function parsePlanTitle($title, $short = false) {
         'period_days'   => approximateDays($periodNum, $periodUnit),
         'gift_days'     => $giftDays ? (int)$giftDays : 0,
         'extras'        => $extras,
-        'has_sublink'   => in_array('ساب‌لینک', $extras),
+        'has_sublink'   => in_array('ساب‌لینک', $extras) || in_array('بیزینس ساب‌لینک', $extras),
         'has_static_ip' => in_array('آی‌پی ثابت', $extras),
         'is_unlimited'  => $isUnlimited,
         'short'         => false
@@ -3084,6 +3104,7 @@ function parseType($type) {
         "Iran Access" => "ایران اکسس",
         "Static IP" => "آی‌پی ثابت",
         "Business Class" => "بیزینس کلاس",
+        "BCSublink" => "بیزینس ساب‌لینک",
         default => $type
     };
     return $name;
@@ -3294,6 +3315,7 @@ function keyboard($keyboard) {
                         "Static IP" => "📍 | $name",
                         "Iran Access" => "🏠 | $name",
                         "Business Class" => "💼 | $name",
+                        "BCSublink" => "💼 | $name",
                         default => $group['name']
                     };
                     $keyboard[] = [
@@ -3475,6 +3497,7 @@ function message($message, $variables = []) {
             "آی‌پی ثابت" => "📍",
             "ایران اکسس" => "🏠",
             "بیزینس کلاس" => "💼",
+            "بیزینس ساب‌لینک" => "💼",
             default => "📱"
         };
         $groupName = $variables['groupName'];
@@ -3492,13 +3515,16 @@ function message($message, $variables = []) {
                 $groupMessage .= "\n\n<b>🏠 ایران اکسس</b>\nسرویس دسترسی به آیپی ایران برای هموطنان ایرانی مقیم خارج کشور";
                 break;
             case "Sublink":
-                $groupMessage .= "\n\n<b>🔗 سابسکریبشن:</b>\nدریافت لینک سابسکریپشن جهت استفاده در نرم افزار هایی که از سرویس V2Ray پشتیبانی میکنند (مثل V2RayNG و V2Box)";
+                $groupMessage .= "\n\n<b>🔗 ساب‌لینک:</b>\nدریافت لینک سابسکریپشن جهت استفاده در نرم افزار هایی که از V2Ray پشتیبانی میکنند (مثل V2RayNG و V2Box)";
                 break;
             case "Static IP":
                 $groupMessage .= "\n\n<b>📍 آی‌پی ثابت:</b>\nدریافت نام کاربری و رمز عبور جهت ورود به نرم افزار Connectix و استفاده از آیپی ثابت.";
                 break;
             case "Business Class":
-                $groupMessage .= "\n\n<b>💼 بیزینس کلاس:</b>\nسرویسی با کیفیت بالاتر و پشتیبانی بهتر برای کاربران حرفه‌ای.";
+                $groupMessage .= "\n\n<b>💼 بیزینس کلاس:</b>\nسرویسی با کیفیت بالاتر و متصل در شرایط اینترنت ملی برای کاربران حرفه‌ای.";
+                break;
+            case "BCSublink":
+                $groupMessage .= "\n\n<b>💼 بیزینس ساب‌لینک:</b>\nدریافت لینک سابسکریپشن سرویس بیزنس کلس جهت استفاده در نرم افزار هایی که از V2Ray پشتیبانی میکنند (مثل V2RayNG و V2Box)";
                 break;
             default:
                 $typeEmoji = "📱";
