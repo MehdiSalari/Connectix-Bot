@@ -2466,95 +2466,33 @@ function getSellerPlans($type) {
         return false;
     }
 
+    $allPlans = [];
+    foreach ($data['seller_plan_group'] as $group) {
+        foreach (($group['seller_plans'] ?? []) as $plan) {
+            $allPlans[] = $plan;
+        }
+    }
+
     switch ($type) {
         case "default":
-            $validPlans = [];
-            foreach ($data['seller_plan_group'] as $group) {
-                foreach ($group['seller_plans'] as $plan) {
-                    if ($plan['is_displayed_in_robot'] == true && $plan['type'] == "Premium" && stripos($plan['title'], 'Sublink') === false && stripos($plan['title'], 'Static IP') === false) {
-                        $validPlans[] = $plan;
-                    }
-                }
-            }
-            return $validPlans;
+            return array_values(array_filter($allPlans, static fn($plan) => planMatchesGroup($plan, 'default')));
         case "Sublink":
-            $validPlans = [];
-            foreach ($data['seller_plan_group'] as $group) {
-                foreach ($group['seller_plans'] as $plan) {
-                    if ($plan['is_displayed_in_robot'] == true && $plan['type'] == "Premium" && (stripos($plan['title'], '+ Sublink') !== false || stripos($plan['title'], '+Sublink') !== false)) {
-                        $validPlans[] = $plan;
-                    }
-                }
-            }
-            return $validPlans;
+            return array_values(array_filter($allPlans, static fn($plan) => planMatchesGroup($plan, 'Sublink')));
         case "Static IP":
-            $validPlans = [];
-            foreach ($data['seller_plan_group'] as $group) {
-                foreach ($group['seller_plans'] as $plan) {
-                    if ($plan['is_displayed_in_robot'] == true && $plan['type'] == "Premium" && stripos($plan['title'], 'Static IP') !== false) {
-                        $validPlans[] = $plan;
-                    }
-                }
-            }
-            return $validPlans;
+            return array_values(array_filter($allPlans, static fn($plan) => planMatchesGroup($plan, 'Static IP')));
         case "Iran Access":
-            $validPlans = [];
-            foreach ($data['seller_plan_group'] as $group) {
-                foreach ($group['seller_plans'] as $plan) {
-                    if ($plan['is_displayed_in_robot'] == true && $plan['type'] == "Premium" && stripos($plan['title'], 'Iran Access') !== false) {
-                        $validPlans[] = $plan;
-                    }
-                }
-            }
-            return $validPlans;
+            return array_values(array_filter($allPlans, static fn($plan) => planMatchesGroup($plan, 'Iran Access')));
 
         case "Business Class":
-            $validPlans = [];
-            foreach ($data['seller_plan_group'] as $group) {
-                foreach ($group['seller_plans'] as $plan) {
-                    if ($plan['is_displayed_in_robot'] == true && $plan['type'] == "Premium" && stripos($plan['title'], 'Business Class') !== false) {
-                        $validPlans[] = $plan;
-                    }
-                }
-            }
-            return $validPlans;
+            return array_values(array_filter($allPlans, static fn($plan) => planMatchesGroup($plan, 'Business Class')));
         case "BCSublink":
-            $validPlans = [];
-            foreach ($data['seller_plan_group'] as $group) {
-                foreach ($group['seller_plans'] as $plan) {
-                    if ($plan['is_displayed_in_robot'] == true && $plan['type'] == "Premium" && stripos($plan['title'], 'BCSublink') !== false) {
-                        $validPlans[] = $plan;
-                    }
-                }
-            }
-            return $validPlans;
+            return array_values(array_filter($allPlans, static fn($plan) => planMatchesGroup($plan, 'BCSublink')));
         case "free":
-            $validPlans = [];
-            foreach ($data['seller_plan_group'] as $group) {
-                foreach ($group['seller_plans'] as $plan) {
-                    if ($plan['is_displayed_in_robot'] == true && $plan['type'] == "Free") {
-                        $validPlans[] = $plan;
-                    }
-                }
-            }
-            return $validPlans;
+            return array_values(array_filter($allPlans, static fn($plan) => (($plan['is_displayed_in_robot'] ?? false) == true) && (($plan['type'] ?? '') === 'Free')));
         case "all-bot":
-            foreach ($data['seller_plan_group'] as $group) {
-                foreach ($group['seller_plans'] as $plan) {
-                    if ($plan['is_displayed_in_robot'] == true && $plan['type'] == "Premium") {
-                        $validPlans[] = $plan;
-                    }
-                }
-            }
-            return $validPlans;
+            return array_values(array_filter($allPlans, static fn($plan) => (($plan['is_displayed_in_robot'] ?? false) == true) && (($plan['type'] ?? '') === 'Premium')));
         case "all":
-            $validPlans = [];
-            foreach ($data['seller_plan_group'] as $group) {
-                foreach ($group['seller_plans'] as $plan) {
-                    $validPlans[] = $plan;
-                }
-            }
-            return $validPlans;
+            return $allPlans;
         case "all-group":
             $groups = $data['groups'] ?? null;
             if ($groups === null) {
@@ -2568,16 +2506,19 @@ function getSellerPlans($type) {
             }
 
             $resultGroups = [];
+            $supportedGroups = ['default', 'Sublink', 'Static IP', 'Iran Access', 'Business Class', 'BCSublink'];
 
             foreach ($groups as $group) {
+                if (!in_array($group['name'], $supportedGroups, true)) {
+                    continue;
+                }
+
                 $hasValidPlan = false;
 
-                foreach ($data['seller_plan_group'] as $planGroup) {
-                    foreach ($planGroup['seller_plans'] as $plan) {
-                        if (planMatchesGroup($plan, $group['name'])) {
-                            $hasValidPlan = true;
-                            break 2; // دیگه کافیه، این group پلن داره
-                        }
+                foreach ($allPlans as $plan) {
+                    if (planMatchesGroup($plan, $group['name'])) {
+                        $hasValidPlan = true;
+                        break;
                     }
                 }
 
@@ -2596,14 +2537,9 @@ function getSellerPlans($type) {
         default:
             // Search by id
             $validPlans = [];
-            foreach ($data['seller_plan_group'] as $group) {
-                foreach ($group['seller_plans'] as $plan) {
-                    if (
-                        // $plan['is_displayed_in_robot'] == false && 
-                        $plan['id'] == $type
-                        ) {
-                        $validPlans[] = $plan;
-                    }
+            foreach ($allPlans as $plan) {
+                if ($plan['id'] == $type) {
+                    $validPlans[] = $plan;
                 }
             }
             
@@ -2614,44 +2550,36 @@ function getSellerPlans($type) {
     }
 }
 
+function getSellerPlanGroupName($plan)
+{
+    $groupName = trim((string) ($plan['group_name_translations']['en'] ?? $plan['group_name'] ?? ''));
+    if ($groupName !== '') {
+        return $groupName;
+    }
+
+    $title = (string) ($plan['title'] ?? '');
+
+    return match (true) {
+        stripos($title, 'BCSublink') !== false => 'BCSublink',
+        stripos($title, 'Business Class') !== false => 'Business Class',
+        stripos($title, 'Static IP') !== false => 'Static IP',
+        stripos($title, 'Iran Access') !== false => 'Iran Access',
+        stripos($title, 'Sublink') !== false => 'Sublink',
+        default => 'default',
+    };
+}
+
 function planMatchesGroup($plan, $groupName)
 {
-    if ($plan['is_displayed_in_robot'] !== true) return false;
-
-    switch ($groupName) {
-        case 'default':
-            return $plan['type'] === 'Premium'
-                && stripos($plan['title'], 'Sublink') === false
-                && stripos($plan['title'], 'Static IP') === false
-                && stripos($plan['title'], 'Iran Access') === false
-                && stripos($plan['title'], 'Business Class') === false;
-
-        case 'Sublink':
-            return $plan['type'] === 'Premium'
-                && (
-                    stripos($plan['title'], '+ Sublink') !== false ||
-                    stripos($plan['title'], '+Sublink') !== false
-                );
-
-        case 'Static IP':
-            return $plan['type'] === 'Premium'
-                && stripos($plan['title'], 'Static IP') !== false;
-
-        case 'Iran Access':
-            return $plan['type'] === 'Premium'
-                && stripos($plan['title'], 'Iran Access') !== false;
-        
-        case 'Business Class':
-            return $plan['type'] === 'Premium'
-                && stripos($plan['title'], 'Business Class') !== false;
-
-        case 'BCSublink':
-            return $plan['type'] === 'Premium'
-                && stripos($plan['title'], 'BCSublink') !== false;
-
-        default:
-            return false;
+    if (($plan['is_displayed_in_robot'] ?? false) !== true) {
+        return false;
     }
+
+    if (($plan['type'] ?? '') !== 'Premium') {
+        return false;
+    }
+
+    return getSellerPlanGroupName($plan) === $groupName;
 }
 
 function getAvailableDeviceCountsFromPlans($plans) {
