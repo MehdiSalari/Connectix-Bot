@@ -2935,6 +2935,7 @@ function parsePlanTitle($title, $short = false) {
     } elseif (str_contains($extraText, 'Sublink')) {
         $extras[] = 'ساب‌لینک';
     }
+    if (str_contains($extraText, 'Economic')) $extras[] = 'اقتصادی';
     if (str_contains($extraText, 'Static IP')) $extras[] = 'آی‌پی ثابت';
     if (str_contains($extraText, 'Iran Access')) $extras[] = 'ایران اکسس';
     if (str_contains($extraText, 'Business Class')) $extras[] = 'بیزینس کلاس';
@@ -2962,6 +2963,8 @@ function parsePlanTitle($title, $short = false) {
                 $text .= " • آی‌پی ثابت";
             } elseif (in_array('بیزینس کلاس', $extras)) {
                 $text .= " • بیزینس کلاس";
+            } elseif (in_array('اقتصادی', $extras)) {
+                $text .= " • اقتصادی";
             } elseif (empty($extras) || (count($extras) === 1 && $extras[0] === "+$giftDays روز هدیه")) {
                 $text .= " • ویژه";
             }
@@ -3030,6 +3033,7 @@ function parseType($type) {
         "default" => "ویژه",
         "Sublink" => "ساب‌لینک",
         "Iran Access" => "ایران اکسس",
+        "Economic" => "اقتصادی",
         "Static IP" => "آی‌پی ثابت",
         "Business Class" => "بیزینس کلاس",
         "BCSublink" => "بیزینس ساب‌لینک",
@@ -3240,6 +3244,7 @@ function keyboard($keyboard) {
                     $name =  match($group['name']) {
                         "default" => "📱 | $name (پیشنهاد میشود)",
                         "Sublink" => "🔗 | $name",
+                        "Economic" => "💰 | $name",
                         "Static IP" => "📍 | $name",
                         "Iran Access" => "🏠 | $name",
                         "Business Class" => "💼 | $name",
@@ -3422,6 +3427,7 @@ function message($message, $variables = []) {
         $typeEmoji = match ($variables['groupName']) {
             "ویژه" => "📱",
             "ساب‌لینک" => "🔗",
+            "اقتصادی" => "💰",
             "آی‌پی ثابت" => "📍",
             "ایران اکسس" => "🏠",
             "بیزینس کلاس" => "💼",
@@ -3444,6 +3450,9 @@ function message($message, $variables = []) {
                 break;
             case "Sublink":
                 $groupMessage .= "\n\n<b>🔗 ساب‌لینک:</b>\nدریافت لینک سابسکریپشن جهت استفاده در نرم افزار هایی که از V2Ray پشتیبانی میکنند (مثل V2RayNG و V2Box)";
+                break;
+            case "Economic":
+                $groupMessage .= "\n\n<b>💰 اقتصادی:</b>\nسرویس اقتصادی با قیمت مناسب برای کاربرانی که به دنبال یک راه حل ارزان و کارآمد هستند.";
                 break;
             case "Static IP":
                 $groupMessage .= "\n\n<b>📍 آی‌پی ثابت:</b>\nدریافت نام کاربری و رمز عبور جهت ورود به نرم افزار Connectix و استفاده از آیپی ثابت.";
