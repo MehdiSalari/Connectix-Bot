@@ -63,8 +63,72 @@ if (is_array($updateUsersReport) && isset($updateUsersReport['total'], $updateUs
     $updateMessage .= " Total: {$updateUsersReport['total']} | Updated: {$updateUsersReport['updated']} | Not Updated: {$updateUsersReport['not_updated']}";
 }
 
+function safeGuideTitle($title) {
+    $safeTitle = preg_replace('/[\\\\\/:*?"<>|]+/u', '', trim($title));
+    return trim(preg_replace('/\s+/u', ' ', $safeTitle));
+}
+
+function saveGuideMedia($key, $basePath, $fileField, $linkField, $modeField = null) {
+    $mode = $_POST[$modeField] ?? '';
+    $link = trim($_POST[$linkField] ?? '');
+    $file = $_FILES[$fileField] ?? null;
+    $videoPath = $basePath . $key . '.mp4';
+    $linkPath = $basePath . $key . '.txt';
+
+    if ($mode === 'link') {
+        if ($link !== '' && filter_var($link, FILTER_VALIDATE_URL)) {
+            @unlink($videoPath);
+            file_put_contents($linkPath, $link);
+        }
+        return;
+    }
+
+    if ($mode === 'video' && !empty($file['name']) && $file['error'] === UPLOAD_ERR_OK) {
+        $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
+        if ($ext === 'mp4' && $file['type'] === 'video/mp4' && $file['size'] <= 10 * 1024 * 1024) {
+            @unlink($linkPath);
+            move_uploaded_file($file['tmp_name'], $videoPath);
+        }
+    }
+}
+
+function saveGuideUploads() {
+    $uploadBasePath = 'assets/videos/guide/';
+    if (!is_dir($uploadBasePath)) {
+        mkdir($uploadBasePath, 0755, true);
+    }
+
+    foreach (['use', 'android', 'ios', 'windows', 'mac', 'linux'] as $plat) {
+        saveGuideMedia($plat, $uploadBasePath, "video_$plat", "video_link_$plat", "video_type_$plat");
+    }
+
+    $customGuidePath = $uploadBasePath . 'custom/';
+    if (!is_dir($customGuidePath)) {
+        mkdir($customGuidePath, 0755, true);
+    }
+
+    foreach ($_POST['delete_custom_guides'] ?? [] as $deleteFile) {
+        $deleteFile = basename((string) $deleteFile);
+        $deletePath = realpath($customGuidePath . $deleteFile);
+        $customRoot = realpath($customGuidePath);
+
+        if ($deletePath && $customRoot && str_starts_with($deletePath, $customRoot) && preg_match('/\.(mp4|txt)$/i', $deletePath)) {
+            @unlink($deletePath);
+        }
+    }
+
+    $customTitle = safeGuideTitle($_POST['custom_video_title'] ?? '');
+    if ($customTitle !== '') {
+        saveGuideMedia($customTitle, $customGuidePath, 'custom_video_file', 'custom_video_link', 'custom_video_type');
+    }
+}
+
 // Handle Configuration Form Submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (isset($_POST['guide_media_submit'])) {
+        saveGuideUploads();
+        echo "<script>alert('ویدیوهای آموزشی با موفقیت ذخیره شدند!')</script>";
+    } else {
     // get data from request
     $appName = $_POST['app_name'] ?? '';
     $adminId = $_POST['admin_id'] ?? '';
@@ -262,35 +326,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             exit();
         }
 
-        $uploadBasePath = 'assets/videos/guide/';
-        if (!is_dir($uploadBasePath)) {
-            mkdir($uploadBasePath, 0755, true);
-        }
-
-        $platforms = ['android', 'ios', 'windows', 'mac', 'use'];
-        foreach ($platforms as $plat) {
-            if (!empty($_FILES["video_$plat"]['name'])) {
-                $file = $_FILES["video_$plat"];
-
-                // اعتبارسنجی دوباره در سرور
-                if ($file['error'] !== UPLOAD_ERR_OK)
-                    continue;
-
-                $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
-                if ($ext !== 'mp4' || $file['type'] !== 'video/mp4') {
-                    continue;
-                }
-
-                if ($file['size'] > 10 * 1024 * 1024)
-                    continue;
-
-                $targetPath = $uploadBasePath . $plat . '.mp4';
-                move_uploaded_file($file['tmp_name'], $targetPath);
-
-            }
-        }
-
         echo "<script>alert('تنظیمات با موفقیت ذخیره شد!')</script>";
+    }
     }
 }
 
@@ -775,19 +812,29 @@ $botAvatar = getBotProfiePhoto();
 
                         foreach ($platforms as $key => $label):
                             $videoPath = $uploadBasePath . $key . '.mp4';
+                            $linkPath = $uploadBasePath . $key . '.txt';
+                            $hasVideo = file_exists($videoPath);
+                            $hasLink = file_exists($linkPath);
+                            $guideMode = $hasLink ? 'link' : 'video';
+                            $guideLink = $hasLink ? trim(file_get_contents($linkPath)) : '';
                             $videoUrl = $videoPath . '?t=' . (file_exists($videoPath) ? filemtime($videoPath) : time());
                             ?>
-                            <div class="space-y-3">
+                            <div class="guide-media-card space-y-3">
                                 <label class="block text-gray-700 font-semibold"><?= $label ?></label>
 
                                 <!-- پیش‌نمایش ویدیو -->
                                 <div id="preview-<?= $key ?>"
                                     class="rounded-xl overflow-hidden shadow-lg bg-gray-50 aspect-video relative">
-                                    <?php if (file_exists($videoPath)): ?>
+                                    <?php if ($hasVideo): ?>
                                         <video controls class="w-full h-full object-cover">
                                             <source src="<?= $videoUrl ?>" type="video/mp4">
                                             مرورگر شما از ویدیو پشتیبانی نمی‌کند.
                                         </video>
+                                    <?php elseif ($hasLink): ?>
+                                        <div class="flex flex-col items-center justify-center h-full text-indigo-600 p-4 text-center">
+                                            <i class="fas fa-link text-5xl mb-3"></i>
+                                            <a href="<?= htmlspecialchars($guideLink) ?>" target="_blank" class="text-sm font-semibold break-all"><?= htmlspecialchars($guideLink) ?></a>
+                                        </div>
                                     <?php else: ?>
                                         <div class="flex flex-col items-center justify-center h-full text-gray-400">
                                             <i class="fas fa-video text-5xl mb-3"></i>
@@ -796,15 +843,134 @@ $botAvatar = getBotProfiePhoto();
                                     <?php endif; ?>
                                 </div>
 
-                                <!--  Just Upload mp4 -->
-                                <input type="file" name="video_<?= $key ?>" id="video_<?= $key ?>" accept="video/mp4" class="block w-full text-sm text-gray-600 
-                                    file:mr-4 file:py-3 file:px-6 file:rounded-lg file:border-0 
-                                    file:text-sm file:font-semibold file:bg-indigo-600 file:text-white 
-                                    hover:file:bg-indigo-700 cursor-pointer">
+                                <div class="grid grid-cols-2 gap-2 rounded-lg bg-gray-100 p-1">
+                                    <label class="guide-type-option flex items-center justify-center gap-2 rounded-md px-3 py-2 cursor-pointer <?= $guideMode === 'video' ? 'bg-white shadow text-indigo-700' : 'text-gray-600' ?>">
+                                        <input type="radio" name="video_type_<?= $key ?>" value="video" class="sr-only" <?= $guideMode === 'video' ? 'checked' : '' ?>>
+                                        <i class="fas fa-video"></i>
+                                        فایل
+                                    </label>
+                                    <label class="guide-type-option flex items-center justify-center gap-2 rounded-md px-3 py-2 cursor-pointer <?= $guideMode === 'link' ? 'bg-white shadow text-indigo-700' : 'text-gray-600' ?>">
+                                        <input type="radio" name="video_type_<?= $key ?>" value="link" class="sr-only" <?= $guideMode === 'link' ? 'checked' : '' ?>>
+                                        <i class="fas fa-link"></i>
+                                        لینک
+                                    </label>
+                                </div>
 
-                                <p class="text-xs text-gray-500 mt-1">فقط فایل MP4 (حداکثر ۱۰ مگابایت)</p>
+                                <div class="guide-video-field <?= $guideMode === 'link' ? 'hidden' : '' ?>">
+                                    <input type="file" name="video_<?= $key ?>" id="video_<?= $key ?>" accept="video/mp4" class="block w-full text-sm text-gray-600 
+                                        file:mr-4 file:py-3 file:px-6 file:rounded-lg file:border-0 
+                                        file:text-sm file:font-semibold file:bg-indigo-600 file:text-white 
+                                        hover:file:bg-indigo-700 cursor-pointer">
+                                </div>
+
+                                <div class="guide-link-field <?= $guideMode === 'video' ? 'hidden' : '' ?>">
+                                    <input type="url" name="video_link_<?= $key ?>" value="<?= htmlspecialchars($guideLink) ?>" placeholder="https://example.com/video.mp4"
+                                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-4 focus:ring-blue-200 focus:border-blue-500 outline-none transition">
+                                </div>
+
+                                <p class="text-xs text-gray-500 mt-1">فایل MP4 حداکثر ۱۰ مگابایت یا لینک دکمه‌ای برای باز شدن در تلگرام.</p>
                             </div>
                         <?php endforeach; ?>
+                    </div>
+
+                    <div class="guide-media-card mt-10 border-t border-gray-200 pt-6">
+                        <h4 class="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+                            <i class="fas fa-plus-circle text-indigo-600"></i>
+                            ویدیوهای سفارشی
+                        </h4>
+
+                        <?php
+                        $customGuidePath = $uploadBasePath . 'custom/';
+                        if (!is_dir($customGuidePath)) {
+                            mkdir($customGuidePath, 0755, true);
+                        }
+
+                        $customGuideFiles = array_merge(
+                            glob($customGuidePath . '*.mp4') ?: [],
+                            glob($customGuidePath . '*.txt') ?: []
+                        );
+                        usort($customGuideFiles, fn($a, $b) => strnatcasecmp(pathinfo($a, PATHINFO_FILENAME), pathinfo($b, PATHINFO_FILENAME)));
+                        ?>
+
+                        <?php if (!empty($customGuideFiles)): ?>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                                <?php foreach ($customGuideFiles as $customFile):
+                                    $customTitle = pathinfo($customFile, PATHINFO_FILENAME);
+                                    $customExt = strtolower(pathinfo($customFile, PATHINFO_EXTENSION));
+                                    $customUrl = $customFile . '?t=' . filemtime($customFile);
+                                    ?>
+                                    <div class="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                                        <div class="flex items-center justify-between gap-3 mb-3">
+                                            <strong class="text-gray-700"><?= htmlspecialchars($customTitle) ?></strong>
+                                            <span class="text-xs px-2 py-1 rounded bg-indigo-100 text-indigo-700"><?= strtoupper($customExt) ?></span>
+                                        </div>
+                                        <?php if ($customExt === 'mp4'): ?>
+                                            <video controls class="w-full aspect-video rounded-lg bg-black">
+                                                <source src="<?= htmlspecialchars($customUrl) ?>" type="video/mp4">
+                                                مرورگر شما از ویدیو پشتیبانی نمی‌کند.
+                                            </video>
+                                        <?php else: ?>
+                                            <?php $customLinkUrl = trim(file_get_contents($customFile)); ?>
+                                            <a href="<?= htmlspecialchars($customLinkUrl) ?>" target="_blank"
+                                                class="inline-flex items-center gap-2 text-indigo-700 hover:text-indigo-900 font-semibold break-all">
+                                                <i class="fas fa-link"></i>
+                                                <?= htmlspecialchars($customLinkUrl) ?>
+                                            </a>
+                                        <?php endif; ?>
+                                        <label class="mt-4 flex items-center gap-2 text-sm text-red-600 font-semibold cursor-pointer">
+                                            <input type="checkbox" name="delete_custom_guides[]" value="<?= htmlspecialchars(basename($customFile)) ?>"
+                                                class="w-4 h-4 rounded border-gray-300 text-red-600 focus:ring-red-500">
+                                            حذف این مورد
+                                        </label>
+                                    </div>
+                                <?php endforeach; ?>
+                            </div>
+                        <?php endif; ?>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-gray-700 font-semibold mb-2">عنوان کوتاه</label>
+                                <input type="text" name="custom_video_title" placeholder="مثلا: آموزش استفاده از سابلینک"
+                                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-4 focus:ring-blue-200 focus:border-blue-500 outline-none transition">
+                            </div>
+                            <div class="space-y-3">
+                                <label class="block text-gray-700 font-semibold mb-2">نوع رسانه</label>
+                                <div class="grid grid-cols-2 gap-2 rounded-lg bg-gray-100 p-1">
+                                    <label class="guide-type-option flex items-center justify-center gap-2 rounded-md bg-white shadow text-indigo-700 px-3 py-2 cursor-pointer">
+                                        <input type="radio" name="custom_video_type" value="video" class="sr-only" checked>
+                                        <i class="fas fa-video"></i>
+                                        فایل
+                                    </label>
+                                    <label class="guide-type-option flex items-center justify-center gap-2 rounded-md px-3 py-2 cursor-pointer text-gray-600">
+                                        <input type="radio" name="custom_video_type" value="link" class="sr-only">
+                                        <i class="fas fa-link"></i>
+                                        لینک
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="guide-video-field mt-4">
+                            <label class="block text-gray-700 font-semibold mb-2">یا فایل ویدیو</label>
+                            <input type="file" name="custom_video_file" id="custom_video_file" accept="video/mp4" class="block w-full text-sm text-gray-600 
+                                file:mr-4 file:py-3 file:px-6 file:rounded-lg file:border-0 
+                                file:text-sm file:font-semibold file:bg-indigo-600 file:text-white 
+                                hover:file:bg-indigo-700 cursor-pointer">
+                            <p class="text-xs text-gray-500 mt-1">فقط MP4 تا ۱۰ مگابایت.</p>
+                        </div>
+
+                        <div class="guide-link-field mt-4 hidden">
+                            <label class="block text-gray-700 font-semibold mb-2">لینک ویدیو</label>
+                            <input type="url" name="custom_video_link" placeholder="https://example.com/video.mp4"
+                                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-4 focus:ring-blue-200 focus:border-blue-500 outline-none transition">
+                            <p class="text-xs text-gray-500 mt-1">این لینک به صورت دکمه باز می‌شود و توسط ربات دانلود یا ارسال نمی‌شود.</p>
+                        </div>
+
+                        <button type="submit" name="guide_media_submit" value="1"
+                            class="mt-6 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-lg transition flex items-center justify-center gap-2">
+                            <i class="fas fa-save"></i>
+                            ذخیره ویدیوهای آموزشی
+                        </button>
                     </div>
                 </div>
 
@@ -961,7 +1127,7 @@ $botAvatar = getBotProfiePhoto();
                         <i class="fas fa-circle-xmark"></i>بستن
                     </button>
 
-                    <button type="submit" id="submitBtn"
+                    <button type="submit" id="submitBtn" name="config_submit" value="1"
                         class="bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white font-bold py-4 rounded-lg text-lg transition transform hover:scale-105 flex items-center justify-center gap-3">
                         <i class="fas fa-circle-check"></i>
                         <span id="btnText">ثبت اطلاعات</span>
@@ -1070,6 +1236,30 @@ $botAvatar = getBotProfiePhoto();
         const broadcastBtn = document.getElementById('broadcastBtn');
         broadcastBtn.addEventListener('click', function () {
             broadcastFormContainer.style.display = broadcastFormContainer.style.display === 'none' ? 'block' : 'none';
+        });
+
+        document.querySelectorAll('.guide-type-option input[type="radio"]').forEach(radio => {
+            const syncGuideType = (input) => {
+                const groupName = input.name;
+                const selectedValue = document.querySelector(`input[name="${groupName}"]:checked`)?.value || 'video';
+
+                document.querySelectorAll(`input[name="${groupName}"]`).forEach(item => {
+                    item.closest('.guide-type-option').classList.toggle('bg-white', item.checked);
+                    item.closest('.guide-type-option').classList.toggle('shadow', item.checked);
+                    item.closest('.guide-type-option').classList.toggle('text-indigo-700', item.checked);
+                    item.closest('.guide-type-option').classList.toggle('text-gray-600', !item.checked);
+                });
+
+                const mediaContainer = input.closest('.guide-media-card');
+                const videoField = mediaContainer?.querySelector('.guide-video-field');
+                const linkField = mediaContainer?.querySelector('.guide-link-field');
+                if (videoField && linkField) {
+                    videoField.classList.toggle('hidden', selectedValue !== 'video');
+                    linkField.classList.toggle('hidden', selectedValue !== 'link');
+                }
+            };
+
+            radio.addEventListener('change', () => syncGuideType(radio));
         });
 
 
@@ -1255,6 +1445,10 @@ $botAvatar = getBotProfiePhoto();
                 const file = this.files[0];
                 const previewId = 'preview-' + this.id.replace('video_', '');
                 const previewContainer = document.getElementById(previewId);
+
+                if (!previewContainer) {
+                    return;
+                }
 
                 if (file) {
                     const url = URL.createObjectURL(file);

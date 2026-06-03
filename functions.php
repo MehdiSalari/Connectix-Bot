@@ -1149,9 +1149,9 @@ function smsPayment($action, $data) {
 
 function callBackCheck($callback_data) {
     //check first part of data
-    $data = explode('_', $callback_data);
+    $data = explode('_', $callback_data, 2);
     $cmd = $data[0];
-    $query = $data[1];
+    $query = $data[1] ?? '';
 
     $result = match ($cmd) {
         "showClient" => showClient($query),
@@ -1171,12 +1171,133 @@ function callBackCheck($callback_data) {
     return $result;
 }
 
+function getCustomGuideItems() {
+    $customPath = 'assets/videos/guide/custom/';
+    if (!is_dir($customPath)) {
+        return [];
+    }
+
+    $files = array_merge(
+        glob($customPath . '*.mp4') ?: [],
+        glob($customPath . '*.txt') ?: []
+    );
+    usort($files, fn($a, $b) => strnatcasecmp(pathinfo($a, PATHINFO_FILENAME), pathinfo($b, PATHINFO_FILENAME)));
+
+    $items = [];
+    foreach ($files as $file) {
+        $title = pathinfo($file, PATHINFO_FILENAME);
+        $ext = strtolower(pathinfo($file, PATHINFO_EXTENSION));
+
+        if ($ext === 'mp4') {
+            $items[] = [
+                'title' => $title,
+                'type' => 'video',
+                'path' => $file,
+            ];
+            continue;
+        }
+
+        if ($ext === 'txt') {
+            $url = trim(file_get_contents($file));
+            if (filter_var($url, FILTER_VALIDATE_URL)) {
+                $items[] = [
+                    'title' => $title,
+                    'type' => 'link',
+                    'url' => $url,
+                ];
+            }
+        }
+    }
+
+    return $items;
+}
+
+function getGuideLink($action) {
+    $linkPath = "assets/videos/guide/$action.txt";
+    if (!is_file($linkPath)) {
+        return null;
+    }
+
+    $url = trim(file_get_contents($linkPath));
+    return filter_var($url, FILTER_VALIDATE_URL) ? $url : null;
+}
+
+function guideButton($text, $action) {
+    $url = getGuideLink($action);
+    if ($url) {
+        return ['text' => $text, 'url' => $url];
+    }
+
+    return ['text' => $text, 'callback_data' => "guide_$action"];
+}
+
 function guide($action) {
     $cbmid = CBMID;
     $cbid = CBID;
     $uid = UID;
+    if (preg_match('/^custom_(\d+)$/', $action, $matches)) {
+        $customItems = getCustomGuideItems();
+        $customItem = $customItems[(int) $matches[1]] ?? null;
+
+        if (!$customItem || $customItem['type'] !== 'video') {
+            tg('answerCallbackQuery', [
+                'callback_query_id' => $cbid,
+                'text' => '🙅🏻 فعلا ویدیو آموزشی در دسترس نمی باشد!',
+                'show_alert' => true
+            ]);
+            exit();
+        }
+
+        $videoPath = realpath($customItem['path']);
+        if (!$videoPath) {
+            tg('answerCallbackQuery', [
+                'callback_query_id' => $cbid,
+                'text' => '🙅🏻 فعلا ویدیو آموزشی در دسترس نمی باشد!',
+                'show_alert' => true
+            ]);
+            exit();
+        }
+
+        $result = tg('sendVideo',[
+            'chat_id' => $uid,
+            'video'   => new CURLFile($videoPath, 'video/mp4', 'guide.mp4'),
+            'reply_markup' => json_encode([
+                'inline_keyboard' => [
+                    [
+                        ['text' => '↪️ | بازگشت', 'callback_data' => 'guide']
+                    ],
+                ]
+            ])
+        ]);
+
+        tg('deleteMessage',[
+            'chat_id' => $uid,
+            'message_id' => $cbmid
+        ]);
+
+        if (!($result = json_decode($result))->ok) {
+            errorLog("Error in sending message to chat_id: $uid | Message: {$result->description}", "functions.php", 1021);
+            exit;
+        }
+        exit();
+    }
+
     switch ($action) {
         case 'use':
+            $link = getGuideLink('use');
+            if ($link) {
+                return ['text' => 'برای مشاهده آموزش از دکمه زیر استفاده کنید.', 'reply_markup' => [
+                    'inline_keyboard' => [
+                        [
+                            ['text' => '🎬 | مشاهده آموزش', 'url' => $link]
+                        ],
+                        [
+                            ['text' => '↪️ | بازگشت', 'callback_data' => 'guide']
+                        ],
+                    ]
+                ]];
+            }
+
             $videoPath = realpath('assets/videos/guide/use.mp4');
             if (!$videoPath) {
                 tg('answerCallbackQuery', [
@@ -1214,15 +1335,15 @@ function guide($action) {
             $keyboard = [
                 'inline_keyboard' => [
                     [
-                        ['text' => '📱 | آیفون (iOS)', 'callback_data' => 'guide_ios'],
-                        ['text' => '🤖 | اندروید', 'callback_data' => 'guide_android']
+                        guideButton('📱 | آیفون (iOS)', 'ios'),
+                        guideButton('🤖 | اندروید', 'android')
                     ],
                     [
-                        ['text' => '🖥 | مک', 'callback_data' => 'guide_mac'],
-                        ['text' => '💻 | ویندوز', 'callback_data' => 'guide_windows']
+                        guideButton('🖥 | مک', 'mac'),
+                        guideButton('💻 | ویندوز', 'windows')
                     ],
                     [
-                        ['text' => '🐧 | لینوکس (Debian)', 'callback_data' => 'guide_linux']
+                        guideButton('🐧 | لینوکس (Debian)', 'linux')
                     ],
                     [
                         ['text' => '↪️ | بازگشت', 'callback_data' => 'guide']
@@ -1232,6 +1353,20 @@ function guide($action) {
 
             return ['text' => $message, 'reply_markup' => $keyboard];
         default:
+            $link = getGuideLink($action);
+            if ($link) {
+                return ['text' => 'برای مشاهده آموزش از دکمه زیر استفاده کنید.', 'reply_markup' => [
+                    'inline_keyboard' => [
+                        [
+                            ['text' => '🎬 | مشاهده آموزش', 'url' => $link]
+                        ],
+                        [
+                            ['text' => '↪️ | بازگشت', 'callback_data' => 'guide']
+                        ],
+                    ]
+                ]];
+            }
+
             $videoPath = realpath("assets/videos/guide/$action.mp4");
             if (!$videoPath) {
                 tg('answerCallbackQuery', [
@@ -2478,6 +2613,8 @@ function getSellerPlans($type) {
             return array_values(array_filter($allPlans, static fn($plan) => planMatchesGroup($plan, 'default')));
         case "Sublink":
             return array_values(array_filter($allPlans, static fn($plan) => planMatchesGroup($plan, 'Sublink')));
+        case "Economic":
+            return array_values(array_filter($allPlans, static fn($plan) => planMatchesGroup($plan, 'Economic')));
         case "Static IP":
             return array_values(array_filter($allPlans, static fn($plan) => planMatchesGroup($plan, 'Static IP')));
         case "Iran Access":
@@ -2506,7 +2643,7 @@ function getSellerPlans($type) {
             }
 
             $resultGroups = [];
-            $supportedGroups = ['default', 'Sublink', 'Static IP', 'Iran Access', 'Business Class', 'BCSublink'];
+            $supportedGroups = ['default', 'Sublink', 'Economic', 'Static IP', 'Iran Access', 'Business Class', 'BCSublink'];
 
             foreach ($groups as $group) {
                 if (!in_array($group['name'], $supportedGroups, true)) {
@@ -2562,6 +2699,7 @@ function getSellerPlanGroupName($plan)
     return match (true) {
         stripos($title, 'BCSublink') !== false => 'BCSublink',
         stripos($title, 'Business Class') !== false => 'Business Class',
+        stripos($title, 'Economic') !== false => 'Economic',
         stripos($title, 'Static IP') !== false => 'Static IP',
         stripos($title, 'Iran Access') !== false => 'Iran Access',
         stripos($title, 'Sublink') !== false => 'Sublink',
@@ -3356,14 +3494,28 @@ function keyboard($keyboard) {
             case "guide":
                 $keyboard = [
                     [
-                        ['text' => '📲 | آموزش استفاده از نرم افزار', 'callback_data' => 'guide_use']
+                        guideButton('📲 | آموزش استفاده از نرم افزار', 'use')
                     ],
                     [
                         ['text' => '⚙ | آموزش نصب نرم افزار', 'callback_data' => 'guide_install'],
-                    ],
-                    [
-                        ['text' => '↪️ | بازگشت', 'callback_data' => 'main_menu']
                     ]
+                ];
+
+                foreach (getCustomGuideItems() as $index => $item) {
+                    if ($item['type'] === 'link') {
+                        $keyboard[] = [
+                            ['text' => "🎬 | {$item['title']}", 'url' => $item['url']]
+                        ];
+                        continue;
+                    }
+
+                    $keyboard[] = [
+                        ['text' => "🎬 | {$item['title']}", 'callback_data' => "guide_custom_$index"]
+                    ];
+                }
+
+                $keyboard[] = [
+                    ['text' => '↪️ | بازگشت', 'callback_data' => 'main_menu']
                 ];
                 break;
 
