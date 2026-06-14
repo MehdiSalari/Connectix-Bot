@@ -695,6 +695,8 @@ $botAvatar = getBotProfiePhoto();
                                         بروزرسانی ربات
                                         <?php if(!$isUpdated){ ?>  
                                             <div class="update"></div>
+                                        <?php } else { ?>
+                                            <i class="fas fa-check-circle text-green-600"></i>
                                         <?php } ?>
                                     </a>
                                 </div>
