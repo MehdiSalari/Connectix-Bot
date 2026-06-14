@@ -6,7 +6,7 @@ require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/gregorian_jalali.php';
 define('BOT_TOKEN', $botToken);  // Bot token for authentication with Telegram API
 define('TELEGRAM_URL', 'https://api.telegram.org/bot' . BOT_TOKEN . '/');  // Base URL for Telegram Bot API
-
+define('VERSION', file_exists(__DIR__ . '/version.txt') ? trim(file_get_contents(__DIR__ . '/version.txt')) : '0.0.1'); // Version of the bot
 function tg($method, $params = []) {
     if (!$params) {
         $params = array();
@@ -50,6 +50,29 @@ function tg($method, $params = []) {
     }
     curl_close($ch);
     return $result;
+}
+
+function updateCheck() {
+    // $ch = curl_init('https://api.github.com/repos/MehdiSalari/Connectix-Bot/releases/latest');
+    // curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    // curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36');
+    // $response = curl_exec($ch);
+    // if ($response === false) {
+    //     curl_close($ch);
+    //     return null;
+    // }
+    // curl_close($ch);
+    // $data = json_decode($response, true);
+    // return $data['tag_name'] ?? null;
+    $versionUrl = 'https://raw.githubusercontent.com/MehdiSalari/Connectix-Bot/refs/heads/main/version.txt';
+    $remoteVersion = trim(file_get_contents($versionUrl)) ?? '0.0.1';
+    $localVersion = VERSION;
+
+    if (version_compare($remoteVersion, $localVersion, '>')) {
+        return false;
+    } else {
+        return true;
+    }
 }
 
 function getUser($chat_id) {
@@ -672,7 +695,7 @@ function wallet($action, $user = null, $amount = null) {
     
 }
 
-function createWalletTransaction($transactionID = null, $status = null, $walletID = null, $amount = null, $operation = null, $chat_id = null, $type = null) {
+function createWalletTransaction($transactionID = null, $status = null, $walletID = null, $amount = null, $operation = null, $chat_id = null, $type = null, $announce = false) {
     global $db_host, $db_user, $db_pass, $db_name;
     $conn = new mysqli($db_host, $db_user, $db_pass, $db_name);
     if ($transactionID != null) {
@@ -691,6 +714,31 @@ function createWalletTransaction($transactionID = null, $status = null, $walletI
 
     if (!$result) {
         return false;
+    }
+
+    //announce to user
+    if($type == 'DONE_BY_ADMIN' && $announce === true) {
+        $amount = number_format($amount);
+        match($operation) {
+            "INCREASE" => $messageText = "💰 مبلغ $amount تومان به کیف پول شما اضافه شد. 📈",
+            "DECREASE" => $messageText = "💰 مبلغ $amount تومان از کیف پول شما کم شد. 📉",
+            default => $messageText = "💰 مشخص",
+        };
+
+        tg('sendMessage', [
+            'chat_id' => $chat_id,
+            'text' => $messageText,
+            'reply_markup' => json_encode([
+                'inline_keyboard' => [
+                    [
+                        ['text' => '👝 |  کیف پول', 'callback_data' => 'wallet']
+                    ],
+                    [
+                        ['text' => '🏡 | خانه', 'callback_data' => 'main_menu']
+                    ]
+                ]
+            ])
+        ]);
     }
 
     return $transactionID;

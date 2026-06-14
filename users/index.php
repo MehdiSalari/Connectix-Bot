@@ -216,7 +216,7 @@ $appName = json_decode(file_get_contents('../setup/bot_config.json'), true)['app
     </div>
 
     <div class="copyright">
-        <p>&copy; 2024 - <?= date('Y') ?> Connectix Bot designed by <a href="https://github.com/MehdiSalari" target="_blank">Mehdi Salari</a>. All rights reserved.</p>
+        <p>&copy; 2024 - <?= date('Y') ?> Connectix Bot designed by <a href="https://github.com/MehdiSalari" target="_blank">Mehdi Salari</a>. All rights reserved. (v<?= VERSION ?>)</p>
     </div>
 
     <script>

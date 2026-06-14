@@ -252,7 +252,7 @@ if (file_exists('../config.php')) {
 
         <div class="copyright">
             <p>&copy; 2024 - <?= date('Y') ?> Connectix Bot designed by <a href="https://github.com/MehdiSalari"
-                    target="_blank">Mehdi Salari</a>. All rights reserved.</p>
+                    target="_blank">Mehdi Salari</a>. All rights reserved. (v<?= VERSION ?>)</p>
         </div>
     </div>
 

@@ -50,7 +50,7 @@ if (isset($_POST['update_wallet'])) {
     $chat_id = $_POST['chat_id'];
     $amount  = str_replace(',', '', $_POST['amount']);
     $action  = $_POST['action'];
-
+    $announce = isset($_POST['announce']) && $_POST['announce'] == '1';
     $walletID = wallet($action, $chat_id, $amount);
 
     if ($walletID) {
@@ -61,7 +61,8 @@ if (isset($_POST['update_wallet'])) {
             $amount,
             $action,
             $chat_id,
-            'DONE_BY_ADMIN'
+            'DONE_BY_ADMIN',
+            $announce
         );
         $status = 'success';
     } else {
@@ -259,6 +260,14 @@ $backLink = match ($tab) {
                         </div>
                     </div>
 
+                    <!-- announce to user checkbox -->
+                    <div class="flex items-center gap-3">
+                        <label class="flex items-center gap-2 text-gray-700 font-medium">
+                            <input type="checkbox" name="announce" value="1" class="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500">
+                            اطلاع‌رسانی به کاربر در تلگرام
+                        </label>
+                    </div>
+
                     <div class="flex gap-4">
                         <button type="submit" name="update_wallet" 
                                 class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 rounded-xl transition shadow-lg">
@@ -361,7 +370,7 @@ $backLink = match ($tab) {
 </div>
 
 <div class="copyright">
-    <p>&copy; 2024 - <?= date('Y') ?> Connectix Bot designed by <a href="https://github.com/MehdiSalari" target="_blank">Mehdi Salari</a>. All rights reserved.</p>
+    <p>&copy; 2024 - <?= date('Y') ?> Connectix Bot designed by <a href="https://github.com/MehdiSalari" target="_blank">Mehdi Salari</a>. All rights reserved. (v<?= VERSION ?>)</p>
 </div>
 
 <script>

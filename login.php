@@ -271,7 +271,7 @@ $appName = $config['app_name'] ?? 'Connectix Bot';
 
     <div class="copyright">
         &copy; 2024 - <?= date('Y') ?> Connectix Bot designed by 
-        <a href="https://github.com/MehdiSalari" target="_blank">Mehdi Salari</a>. All rights reserved.
+        <a href="https://github.com/MehdiSalari" target="_blank">Mehdi Salari</a>. All rights reserved. (v<?= VERSION ?>)
     </div>
 
 </body>

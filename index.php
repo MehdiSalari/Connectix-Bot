@@ -40,6 +40,7 @@ $totalUsers = $conn->query("SELECT COUNT(*) as cnt FROM users")->fetch_assoc()['
 $adminChatId = $admin['chat_id'] ?? null; // chat_id ادمین
 $conn->close();
 
+$isUpdated = updateCheck();
 
 $updateMessage = '';
 $updateStatus = '';
@@ -530,6 +531,88 @@ $botAvatar = getBotProfiePhoto();
             font-weight: 500;
             margin-top: 8px;
         }
+
+        /* Loader */ 
+        .loader {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        border-radius: 50%;
+        height: 96px;
+        width: 96px;
+        animation: rotate_3922 1.2s linear infinite;
+        background-color: #9b59b6;
+        background-image: linear-gradient(#9b59b6, #84cdfa, #5ad1cd);
+        }
+
+        .loader span {
+        position: absolute;
+        border-radius: 50%;
+        height: 100%;
+        width: 100%;
+        background-color: #9b59b6;
+        background-image: linear-gradient(#9b59b6, #84cdfa, #5ad1cd);
+        }
+
+        .loader span:nth-of-type(1) {
+        filter: blur(5px);
+        }
+
+        .loader span:nth-of-type(2) {
+        filter: blur(10px);
+        }
+
+        .loader span:nth-of-type(3) {
+        filter: blur(25px);
+        }
+
+        .loader span:nth-of-type(4) {
+        filter: blur(50px);
+        }
+
+        .loader::after {
+        content: "";
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        right: 10px;
+        bottom: 10px;
+        background-color: #fff;
+        border: solid 5px #ffffff;
+        border-radius: 50%;
+        }
+
+        @keyframes rotate_3922 {
+            from {
+                transform: translate(-50%, -50%) rotate(0deg);
+            }
+
+            to {
+                transform: translate(-50%, -50%) rotate(360deg);
+            }
+        }
+
+        /* Update Dot */
+        .update {
+        width: 10px;
+        height: 10px;
+        background-color: orange;
+        border-radius: 50%;
+        box-shadow: -1px -1px 1px #ff6600, 1px -1px 1px #ff9100, 1px 1px 1px #ff5500, -1px 1px 1px #ffa600, -1px 0 1px #ff6600, 1px 0 1px #ffcc00;
+        animation: rotate 1s infinite;
+        transform: rotate(0) scale(0.8);
+        }
+
+        @keyframes rotate {
+            0% {
+                transform: rotate(-360deg) scale(0.8);
+            }
+
+            50% {
+                transform: rotate(0) scale(1.2);
+            }
+        }
+
     </style>
 </head>
 
@@ -576,20 +659,23 @@ $botAvatar = getBotProfiePhoto();
                                 class="bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-lg font-semibold transition flex items-center gap-2 w-fit">
                                 <i class="fas fa-sync"></i> بروزرسانی
                                 <i class="fas fa-chevron-down ml-2 text-sm"></i>
+                                <?php if(!$isUpdated){ ?>  
+                                    <div class="update"></div>
+                                <?php } ?>
                             </button>
 
                             <div id="updatesDropdown"
                                 class="hidden absolute left-0 mt-2 w-64 rounded-lg shadow-xl bg-white ring-1 ring-black ring-opacity-5 z-50 overflow-hidden">
                                 <div class="py-1" role="menu">
                                     <a href="#"
-                                        onclick="return confirm('Are you sure you want to update users? This will update users Name and Profile Picture from Telegram.') ? window.location.href='update/users.php?ok=true' : false"
+                                        onclick="return confirm('Are you sure you want to update users? This will update users Name and Profile Picture from Telegram.') ? update('users') : false"
                                         class="block px-5 py-3 text-sm font-medium text-gray-800 hover:bg-indigo-50 hover:text-indigo-600 transition flex items-center gap-3"
                                         role="menuitem">
                                         <i class="fas fa-users text-indigo-600"></i>
                                         بروزرسانی کاربران
                                     </a>
                                     <a href="#"
-                                        onclick="return confirm('Are you sure you want to sync accounts? This will import any missing Connectix clients into the bot database.') ? window.location.href='update/clients.php?ok=true' : false"
+                                        onclick="return confirm('Are you sure you want to sync accounts? This will import any missing Connectix clients into the bot database.') ? update('accounts') : false"
                                         class="block px-5 py-3 text-sm font-medium text-gray-800 hover:bg-yellow-50 hover:text-yellow-600 transition flex items-center gap-3"
                                         role="menuitem">
                                         <i class="fas fa-archive text-yellow-600"></i>
@@ -602,11 +688,14 @@ $botAvatar = getBotProfiePhoto();
                                         تنظیمات اولیه
                                     </a>
                                     <a href="#"
-                                        onclick="return confirm('Are you sure you want to update the bot? This will get new files and updates from GitHub and overwrite your current unnecessary files.') ? window.location.href='update/bot.php?ok=true' : false"
+                                        onclick="return confirm('Are you sure you want to update the bot? This will get new files and updates from GitHub and overwrite your current unnecessary files.') ? update('bot') : false"
                                         class="block px-5 py-3 text-sm font-medium text-gray-800 hover:bg-green-50 hover:text-green-600 transition flex items-center gap-3"
                                         role="menuitem">
                                         <i class="fas fa-download text-green-600"></i>
                                         بروزرسانی ربات
+                                        <?php if(!$isUpdated){ ?>  
+                                            <div class="update"></div>
+                                        <?php } ?>
                                     </a>
                                 </div>
                             </div>
@@ -1214,11 +1303,23 @@ $botAvatar = getBotProfiePhoto();
         </div>
     </div>
     </div>
+    <!-- Copyright -->
     <div class="copyright">
         <p>&copy; 2024 - <?= date('Y') ?> Connectix Bot designed by <a href="https://github.com/MehdiSalari"
-                target="_blank">Mehdi Salari</a>. All rights reserved.</p>
+                target="_blank">Mehdi Salari</a>. All rights reserved. (v<?= VERSION ?>)</p>
     </div>
 
+    <!-- Loader -->
+    <div class="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50 hidden" id="loader">
+         <div class="loader">
+             <span></span>
+             <span></span>
+             <span></span>
+             <span></span>
+         </div>
+    </div>
+
+    <!-- Scripts -->
     <script>
         const messageFormContainer = document.getElementById('messageFormContainer');
         const broadcastFormContainer = document.getElementById('broadcastFormContainer');
@@ -1584,6 +1685,29 @@ $botAvatar = getBotProfiePhoto();
 
         });
 
+
+        //Show Loader on
+        function showLoader() {
+            document.getElementById('loader').classList.remove('hidden');
+        }
+
+        //Update Function
+        function update(action) {
+            switch (action) {
+                case 'users':
+                    showLoader();
+                    window.location.href='update/users.php?ok=true'                    
+                    break;
+                case 'accounts':
+                    showLoader();
+                    window.location.href='update/clients.php?ok=true'                    
+                    break;
+                case 'bot':
+                    showLoader();
+                    window.location.href='update/bot.php?ok=true'                  
+                    break;
+            }
+        }
     </script>
 </body>
 
