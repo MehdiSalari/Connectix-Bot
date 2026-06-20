@@ -2803,9 +2803,9 @@ function getTest($type) {
     
         $selectedPlan = null;
     
-        if ($type === "sublink") {
+        if ($type === "economic") {
             foreach ($plans as $plan) {
-                if (stripos($plan['title'], '+ Sublink') !== false || stripos($plan['title'], '+Sublink') !== false) {
+                if (stripos($plan['title'], '+ Economic') !== false || stripos($plan['title'], '+Economic') !== false) {
                     if ($plan['type'] !== null && $plan['type'] == "Free") {
                         $selectedPlan = $plan;
                         break;
@@ -2814,7 +2814,7 @@ function getTest($type) {
             }
         } elseif ($type === "normal") {
             foreach ($plans as $plan) {
-                if (stripos($plan['title'], 'Sublink') === false) {
+                if (stripos($plan['title'], 'Economic') === false && stripos($plan['title'], 'Sublink') === false) {
                     if ($plan['type'] !== null && $plan['type'] == "Free") {
                         $selectedPlan = $plan;
                         break;
@@ -2833,6 +2833,7 @@ function getTest($type) {
         global $db_host, $db_user, $db_pass, $db_name, $panelToken;
         $uid = UID;
         $conn = new mysqli($db_host, $db_user, $db_pass, $db_name);
+        $conn->set_charset("utf8mb4");
         if ($conn->connect_error) {
             errorLog("Error: Database connection failed: " . $conn->connect_error, "functions.php", 2437);
             return ['text' => 'خطا در اتصال به دیتابیس', 'reply_markup' => []];
@@ -3382,8 +3383,8 @@ function keyboard($keyboard) {
             case "get_test":
                 $keyboard = [
                     [
-                        ['text' => '📱 | ویژه', 'callback_data' => 'getTest_normal'],
-                        ['text' => '🔗 | سابسکریبشن', 'callback_data' => 'getTest_sublink']
+                        ['text' => '📱 | ویژه', 'callback_data' => 'getTest_default'],
+                        ['text' => '💰 | اقتصادی', 'callback_data' => 'getTest_economic']
 
                     ],
                     [
@@ -3674,7 +3675,7 @@ function message($message, $variables = []) {
     $msg = match ($message) {
         "welcome_message" => $welcomeMessage,
         "accounts" => "📦 اکانت های متصل یه حساب تلگرام شما:\n\n* در صورت عدم مشاهده اکانت خود، آن را اضافه کنید.",
-        "get_test" => "🎁 لطفا نوع اکانت تست را انتخاب کنید:\n\n<b>📱 ویژه(پیشنهاد میشود):</b>\nدریافت نام کاربری و رمز عبور جهت ورود به نرم افزار Connectix و استفاده از 4 پروتکل و بیش از 10 کشور برای اتصال.\n\n<b>🔗 سابسکریبشن:</b>\nدریافت لینک سابسکریپشن جهت استفاده در نرم افزار هایی که از سرویس V2Ray پشتیبانی میکنند (مثل V2RayNG و V2Box)",
+        "get_test" => "🎁 لطفا نوع اکانت تست را انتخاب کنید:\n\n<b>📱 ویژه(پیشنهاد میشود):</b>\nدریافت نام کاربری و رمز عبور جهت ورود به نرم افزار Connectix و استفاده از 4 پروتکل و بیش از 10 کشور برای اتصال.\n\n<b>💰 اقتصادی:</b>\nسرویس اقتصادی با قیمت مناسب برای کاربرانی که به دنبال یک راه حل ارزان و کارآمد هستند.",
         "count" => "$typeEmoji نوع سرویس $groupName انتخاب شد.\n\n🔢 این اکانت را برای چند کاربر (دستگاه) قابل استفاده باشد؟",
         "buy" => "با تشکر از اعتماد و حسن انتخاب شما در خرید سرویس فیلترشکن {$appName} .\nلطفا نوع خرید خود را انتخاب کنید:\n\n<b>🔄️ تمدید اکانت فعلی:</b>\nاین دکمه برای خرید اشتراک برای اکانت قبلی استفاده میشود.\n\n<b>🛍️ خرید اکانت جدید:</b>\nاین دکمه برای خرید اکانت جدید استفاده میشود.",
         "group" => $groupMessage,
