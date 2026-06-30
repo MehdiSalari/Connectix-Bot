@@ -41,7 +41,7 @@ $adminChatId = $admin['chat_id'] ?? null; // chat_id ادمین
 $conn->close();
 
 $botUpdateStatus = updateCheck();
-
+$errorMessage = null;
 $updateMessage = '';
 $updateStatus = '';
 $updateUsersReport = $_SESSION['update_users_report'] ?? null;
@@ -128,8 +128,10 @@ function saveGuideUploads() {
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['guide_media_submit'])) {
         saveGuideUploads();
-        echo "<script>alert('ویدیوهای آموزشی با موفقیت ذخیره شدند!')</script>";
+        $updateMessage = "ویدیوهای آموزشی با موفقیت ذخیره شدند.";
+        $updateStatus = "success";
     } else {
+        $configError = false;
         // get data from request
         $appName = $_POST['app_name'] ?? '';
         $adminId = $_POST['admin_id'] ?? '';
@@ -158,138 +160,100 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($meResult && isset($meResult['result']['id'])) {
                     $botId = $meResult['result']['id'];
                 } else {
-                    $errorMsg = "خطا در دریافت اطلاعات ربات از تلگرام.";
-                    echo "<script>alert('$errorMsg')</script>";
-                    exit;
+                    $updateMessage = "خطا در دریافت اطلاعات ربات از تلگرام.";
+                    $updateStatus = "error";
+                    $configError = true;
                 }
 
-                // check if bot is admin in channel
-                $channelResult = json_decode(tg('getChatMember', [
-                    'chat_id' => $telegramChannel,
-                    'user_id' => $telegramSupport
-                ]), true);
+                if (!$configError) {
+                    // check if bot is admin in channel
+                    $channelResult = json_decode(tg('getChatMember', [
+                        'chat_id' => $telegramChannel,
+                        'user_id' => $telegramSupport
+                    ]), true);
 
-                if (!$channelResult || !isset($channelResult['result']['status']) || !$channelResult['result']['status'] == 'administrator') {
-                    $errorMsg = "ربات در کانال تلگرام ادمین نیست.";
-                    echo "<script>alert('$errorMsg')</script>";
-                    exit;
+                    if (!$channelResult || !isset($channelResult['result']['status']) || !$channelResult['result']['status'] == 'administrator') {
+                        $updateMessage = "ربات در کانال تلگرام ادمین نیست.";
+                        $updateStatus = "error";
+                        $configError = true;
+                    }
                 }
             } else {
-                $errorMsg = "وارد کردن آیدی عددی کانال تلگرام اجباری میباشد.";
-                echo "<script>alert('$errorMsg')</script>";
-                exit;
+                $updateMessage = "وارد کردن آیدی عددی کانال تلگرام اجباری میباشد.";
+                $updateStatus = "error";
+                $configError = true;
             }
         }
 
-        // update config file
-        $botConfig = [
-            'app_name' => $appName,
-            'admin_id' => $adminId,
-            'admin_id_2' => $adminId2,
-            'admin_id_3' => $adminId3,
-            'support_telegram' => $telegramSupport,
-            'channel_telegram' => $telegramChannel,
-            'telegram_channel_id' => $telegramChannelId,
-            'card_number' => $cardNumber,
-            'card_name' => $cardName,
-            'messages' => [
-                'welcome_text' => $welcomeMessage,
-                'contact_support' => $supportMessage,
-                'questions_and_answers' => $faqMessage,
-                'free_test_account_created' => $freeTrialMessage
-            ],
-            'bank' => [
-                'name' => $bank,
-                'bot_notice' => $botNotice
-            ],
-            'test' => $test,
-            'bot_active' => $botActive,
-            'force_channel_join' => $forceChannelJoin
-        ];
-
-        $config = json_encode($botConfig, JSON_PRETTY_PRINT);
-        file_put_contents('setup/bot_config.json', $config);
-
-        if (!empty($bank)) {
-            // Check for sms_payments table in DB
-            $conn = new mysqli($db_host, $db_user, $db_pass, $db_name);
-            if ($conn->connect_error)
-                die("Connection failed: {$conn->connect_error}");
-
-            $result = $conn->query("SHOW TABLES LIKE 'sms_payments'");
-            if ($result->num_rows === 0) {
-                // Create sms_payments table
-                $sql = "CREATE TABLE IF NOT EXISTS sms_payments (
-                    id INT AUTO_INCREMENT PRIMARY KEY,
-                    message TEXT NOT NULL,
-                    amount INT DEFAULT 0,
-                    bank VARCHAR(255) DEFAULT NULL,
-                    payment_id VARCHAR(255) DEFAULT NULL,
-                    payment_type VARCHAR(255) DEFAULT NULL,
-                    expired_at TIMESTAMP NULL DEFAULT NULL,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )";
-                if (!$conn->query($sql))
-                    die("Failed to create sms table: {$conn->error}");
-            }
-            $conn->close();
-        }
-
-        //update config in main panel
-        //get data from api
-        $endpoint = "https://api.connectix.vip/v1/seller/telegram-bot";
-
-        $ch = curl_init();
-        curl_setopt_array($ch, [
-            CURLOPT_URL => $endpoint,
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_TIMEOUT => 30,
-            CURLOPT_CONNECTTIMEOUT => 10,
-            CURLOPT_SSL_VERIFYPEER => false, // Connectix sometimes has SSL issues
-            CURLOPT_SSL_VERIFYHOST => false,
-            CURLOPT_HTTPHEADER => [
-                "Authorization: Bearer {$panelToken}",
-                "Accept: application/json",
-                "Content-Type: application/json",
-                "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36",
-                "Origin: https://connectix.vip",
-                "Referer: https://connectix.vip/"
-            ],
-        ]);
-
-        $response = curl_exec($ch);
-        $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
-
-        if ($http_code != 200) {
-            $errorMsg = "خطا در ارتباط با پنل مدیریت. کد خطا: $http_code | پاسخ: $response";
-            echo "<script>alert('$errorMsg')</script>";
-            exit();
-        }
-
-        $data = json_decode($response, true);
-
-        if (isset($data['bot']) && !empty($data['bot'])) {
-            // Update local config file
-            $updateData = [
+        if (!$configError) {
+            // update config file
+            $botConfig = [
                 'app_name' => $appName,
-                'support_telegram' => $telegramSupport,
-                'channel_id' => $telegramChannelId,
-                'channel_telegram' => "@$telegramChannel",
-                'token' => $data['bot']['token'],
-                'card_number' => $cardNumber,
-                'card_name' => $cardName,
-                'is_enabled' => $data['bot']['is_enabled'],
                 'admin_id' => $adminId,
                 'admin_id_2' => $adminId2,
                 'admin_id_3' => $adminId3,
-                'is_90_percent_plan_notifications_enabled' => $data['bot']['is_90_percent_plan_notifications_enabled'],
-                'is_expired_plan_notifications_enabled' => $data['bot']['is_expired_plan_notifications_enabled'],
-                'sell_mode' => $data['bot']['sell_mode']
+                'support_telegram' => $telegramSupport,
+                'channel_telegram' => $telegramChannel,
+                'telegram_channel_id' => $telegramChannelId,
+                'card_number' => $cardNumber,
+                'card_name' => $cardName,
+                'messages' => [
+                    'welcome_text' => $welcomeMessage,
+                    'contact_support' => $supportMessage,
+                    'questions_and_answers' => $faqMessage,
+                    'free_test_account_created' => $freeTrialMessage
+                ],
+                'bank' => [
+                    'name' => $bank,
+                    'bot_notice' => $botNotice
+                ],
+                'test' => $test,
+                'bot_active' => $botActive,
+                'force_channel_join' => $forceChannelJoin
             ];
 
-            $newConfig = json_encode($updateData, JSON_PRETTY_PRINT);
-            $endpoint = "https://api.connectix.vip/v1/seller/telegram-bot/update-bot";
+            $config = json_encode($botConfig, JSON_PRETTY_PRINT);
+            file_put_contents('setup/bot_config.json', $config);
+
+            if (!empty($bank)) {
+                // Check for sms_payments table in DB
+                $conn = new mysqli($db_host, $db_user, $db_pass, $db_name);
+                if ($conn->connect_error) {
+                    $updateMessage = "خطا در اتصال به پایگاه داده: {$conn->connect_error}";
+                    $updateStatus = "error";
+                    $configError = true;
+                }
+
+                if (!$configError) {
+                    $result = $conn->query("SHOW TABLES LIKE 'sms_payments'");
+                    if ($result->num_rows === 0) {
+                        // Create sms_payments table
+                        $sql = "CREATE TABLE IF NOT EXISTS sms_payments (
+                            id INT AUTO_INCREMENT PRIMARY KEY,
+                            message TEXT NOT NULL,
+                            amount INT DEFAULT 0,
+                            bank VARCHAR(255) DEFAULT NULL,
+                            payment_id VARCHAR(255) DEFAULT NULL,
+                            payment_type VARCHAR(255) DEFAULT NULL,
+                            expired_at TIMESTAMP NULL DEFAULT NULL,
+                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                        )";
+                        if (!$conn->query($sql)) {
+                            $updateMessage = "خطا در ایجاد جدول sms_payments: {$conn->error}";
+                            $updateStatus = "error";
+                            $configError = true;
+                        }
+                    }
+                    $conn->close();
+                }
+            }
+        }
+
+        if (!$configError) {
+            //update config in main panel
+            //get data from api
+            $endpoint = "https://api.connectix.vip/v1/seller/telegram-bot";
+
             $ch = curl_init();
             curl_setopt_array($ch, [
                 CURLOPT_URL => $endpoint,
@@ -306,8 +270,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     "Origin: https://connectix.vip",
                     "Referer: https://connectix.vip/"
                 ],
-                CURLOPT_POST => true,
-                CURLOPT_POSTFIELDS => $newConfig
             ]);
 
             $response = curl_exec($ch);
@@ -315,54 +277,117 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             curl_close($ch);
 
             if ($http_code != 200) {
-                $errorMsg = "خطا در ارتباط با پنل مدیریت. کد خطا: $http_code | پاسخ: $response";
-                echo "<script>alert('$errorMsg')</script>";
-                exit();
+                $updateMessage = "خطا در ارتباط با پنل مدیریت. کد خطا: $http_code | پاسخ: $response";
+                $updateStatus = "error";
+                $configError = true;
             }
 
-            // Set bot webhook again after updating config with 2 seconds delay
-            sleep(2);
-            
-            if ((!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on') 
-                || (!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https')
-                || (!empty($_SERVER['HTTP_X_FORWARDED_SSL']) && $_SERVER['HTTP_X_FORWARDED_SSL'] === 'on')) {
-                $protocol = "https";
-            } else {
-                $protocol = "http";
+            if (!$configError) {
+                $data = json_decode($response, true);
+
+                if (isset($data['bot']) && !empty($data['bot'])) {
+                    // Update local config file
+                    $updateData = [
+                        'app_name' => $appName,
+                        'support_telegram' => $telegramSupport,
+                        'channel_id' => $telegramChannelId,
+                        'channel_telegram' => "@$telegramChannel",
+                        'token' => $data['bot']['token'],
+                        'card_number' => $cardNumber,
+                        'card_name' => $cardName,
+                        'is_enabled' => $data['bot']['is_enabled'],
+                        'admin_id' => $adminId,
+                        'admin_id_2' => $adminId2,
+                        'admin_id_3' => $adminId3,
+                        'is_90_percent_plan_notifications_enabled' => $data['bot']['is_90_percent_plan_notifications_enabled'],
+                        'is_expired_plan_notifications_enabled' => $data['bot']['is_expired_plan_notifications_enabled'],
+                        'sell_mode' => $data['bot']['sell_mode']
+                    ];
+
+                    $newConfig = json_encode($updateData, JSON_PRETTY_PRINT);
+                    $endpoint = "https://api.connectix.vip/v1/seller/telegram-bot/update-bot";
+                    $ch = curl_init();
+                    curl_setopt_array($ch, [
+                        CURLOPT_URL => $endpoint,
+                        CURLOPT_RETURNTRANSFER => true,
+                        CURLOPT_TIMEOUT => 30,
+                        CURLOPT_CONNECTTIMEOUT => 10,
+                        CURLOPT_SSL_VERIFYPEER => false, // Connectix sometimes has SSL issues
+                        CURLOPT_SSL_VERIFYHOST => false,
+                        CURLOPT_HTTPHEADER => [
+                            "Authorization: Bearer {$panelToken}",
+                            "Accept: application/json",
+                            "Content-Type: application/json",
+                            "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36",
+                            "Origin: https://connectix.vip",
+                            "Referer: https://connectix.vip/"
+                        ],
+                        CURLOPT_POST => true,
+                        CURLOPT_POSTFIELDS => $newConfig
+                    ]);
+
+                    $response = curl_exec($ch);
+                    $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                    curl_close($ch);
+
+                    if ($http_code != 200) {
+                        $updateMessage = "خطا در ارتباط با پنل مدیریت. کد خطا: $http_code | پاسخ: $response";
+                        $updateStatus = "error";
+                        $configError = true;
+                    }
+
+                    if (!$configError) {
+                        // Set bot webhook again after updating config with 2 seconds delay
+                        sleep(2);
+
+                        if ((!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] === 'on')
+                            || (!empty($_SERVER['HTTP_X_FORWARDED_PROTO']) && $_SERVER['HTTP_X_FORWARDED_PROTO'] === 'https')
+                            || (!empty($_SERVER['HTTP_X_FORWARDED_SSL']) && $_SERVER['HTTP_X_FORWARDED_SSL'] === 'on')) {
+                            $protocol = "https";
+                        } else {
+                            $protocol = "http";
+                        }
+
+                        $current_url = $protocol . "://" . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
+                        $full_url = str_replace("index.php", "bot.php", $current_url);
+
+                        // If it's HTTP, throw an error and stop (Telegram only accepts HTTPS)
+                        if ($protocol !== 'https') {
+                            $updateMessage = "خطا: وب‌هوک فقط با HTTPS کار می‌کند. لطفاً SSL را فعال کنید.";
+                            $updateStatus = "error";
+                            $configError = true;
+                        }
+
+                        if (!$configError) {
+                            $url = "https://api.telegram.org/bot{$botToken}/setWebhook?url={$full_url}";
+
+                            $ch = curl_init();
+                            curl_setopt_array($ch, [
+                                CURLOPT_URL => $url,
+                                CURLOPT_RETURNTRANSFER => true,
+                                CURLOPT_TIMEOUT => 30,
+                            ]);
+
+                            $response = curl_exec($ch);
+                            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                            $result = json_decode($response, true);
+                            curl_close($ch);
+
+                            if ($httpCode !== 200 || empty($result['ok'])) {
+                                $error = $result['description'] ?? 'Unknown error';
+                                $updateMessage = "خطا در تنظیم وب‌هوک: $error";
+                                $updateStatus = "error";
+                                $configError = true;
+                            }
+
+                            if (!$configError) {
+                                $updateMessage = "تنظیمات با موفقیت ذخیره شد!";
+                                $updateStatus = "success";
+                            }
+                        }
+                    }
+                }
             }
-
-            $current_url = $protocol . "://" . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
-            $full_url = str_replace("index.php", "bot.php", $current_url);
-
-            // If it's HTTP, throw an error and stop (Telegram only accepts HTTPS)
-            if ($protocol !== 'https') {
-                $errorMsg = "خطا: وب‌هوک فقط با HTTPS کار می‌کند. لطفاً SSL را فعال کنید.";
-                echo "<script>alert('$errorMsg')</script>";
-                exit();
-            }
-
-            $url = "https://api.telegram.org/bot{$botToken}/setWebhook?url={$full_url}";
-
-            $ch = curl_init();
-            curl_setopt_array($ch, [
-                CURLOPT_URL => $url,
-                CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_TIMEOUT => 30,
-            ]);
-
-            $response = curl_exec($ch);
-            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            $result = json_decode($response, true);
-            curl_close($ch);
-
-            if ($httpCode !== 200 || empty($result['ok'])) {
-                $error = $result['description'] ?? 'Unknown error';
-                $errorMsg = "خطا در تنظیم وب‌هوک: $error";
-                echo "<script>alert('$errorMsg')</script>";
-                exit();
-            }
-
-            echo "<script>alert('تنظیمات با موفقیت ذخیره شد!')</script>";
         }
     }
 }
