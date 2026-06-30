@@ -160,7 +160,7 @@ function fetchBotConfig($panelToken) {
                 $adminId3 = $data['bot']['admin_id_3'] ?? null;
                 $telegramSupport = $data['bot']['support_telegram'] ?? null;
                 $telegramChannel = $data['bot']['channel_telegram'] ?? null;
-                $telegramChannelId = $data['bot']['channel_id'] ?? null;
+                $telegramChannelId = $data['bot']['channel_id'] ?? "null";
                 $cardNumber = $data['bot']['card_number'] ?? null;
                 $cardName = $data['bot']['card_name'] ?? null;
 

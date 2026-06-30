@@ -151,10 +151,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $test = isset($_POST['test']) && $_POST['test'] == '1' ? true : false;
         $botActive = isset($_POST['bot_active']) && $_POST['bot_active'] == '1' ? true : false;
         $forceChannelJoin = isset($_POST['force_channel_join']) && $_POST['force_channel_join'] == '1' ? true : false;
-        $telegramChannelId = ($_POST['telegram_channel_id'] && $_POST['telegram_channel_id'] != '' && $forceChannelJoin) ? $_POST['telegram_channel_id'] : null;
+        $telegramChannelId = ($_POST['telegram_channel_id'] && $_POST['telegram_channel_id'] != '') ? $_POST['telegram_channel_id'] : "null";
 
         if ($forceChannelJoin) {
-            if ($telegramChannelId != null) {
+            if ($telegramChannelId != "null") {
                 //get bot id
                 $meResult = json_decode(tg('getMe'), true);
                 if ($meResult && isset($meResult['result']['id'])) {
@@ -168,8 +168,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if (!$configError) {
                     // check if bot is admin in channel
                     $channelResult = json_decode(tg('getChatMember', [
-                        'chat_id' => $telegramChannel,
-                        'user_id' => $telegramSupport
+                        'chat_id' => $telegramChannelId,
+                        'user_id' => $botId
                     ]), true);
 
                     if (!$channelResult || !isset($channelResult['result']['status']) || !$channelResult['result']['status'] == 'administrator') {
@@ -277,7 +277,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             curl_close($ch);
 
             if ($http_code != 200) {
-                $updateMessage = "خطا در ارتباط با پنل مدیریت. کد خطا: $http_code | پاسخ: $response";
+                $updateMessage = "خطا در ارتباط با پنل Connectix. کد خطا: $http_code | پاسخ: $response";
                 $updateStatus = "error";
                 $configError = true;
             }
@@ -286,7 +286,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $data = json_decode($response, true);
 
                 if (isset($data['bot']) && !empty($data['bot'])) {
-                    // Update local config file
+                    // Update Connectix panel bot config
                     $updateData = [
                         'app_name' => $appName,
                         'support_telegram' => $telegramSupport,
@@ -331,7 +331,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     curl_close($ch);
 
                     if ($http_code != 200) {
-                        $updateMessage = "خطا در ارتباط با پنل مدیریت. کد خطا: $http_code | پاسخ: $response";
+                        $updateMessage = "خطا در ذخیره تنظیمات در پنل Connectix. کد خطا: $http_code | پاسخ: $response";
                         $updateStatus = "error";
                         $configError = true;
                     }
@@ -840,7 +840,7 @@ $botAvatar = getBotProfiePhoto();
                 $adminId3 = $config['admin_id_3'] ?? '';
                 $telegramSupport = $config['support_telegram'] ?? '';
                 $telegramChannel = $config['channel_telegram'] ?? '';
-                $telegramChannelId = $config['channel_id'] ?? '';
+                $telegramChannelId = ($config['telegram_channel_id'] && $config['telegram_channel_id'] != "null") ? $config['telegram_channel_id'] : '';
                 $cardNumber = $config['card_number'] ?? '';
                 $cardName = $config['card_name'] ?? '';
 
@@ -960,7 +960,7 @@ $botAvatar = getBotProfiePhoto();
                     <div>
                         <div class="input-group" id="telegram_channel_id_input">
                             <label class="block text-gray-700 font-semibold mb-2">آیدی عددی کانال تلگرام <small style="color: red;">*</small></label>
-                            <input type="text" placeholder="نمونه: -10098765432106" id="telegram_channel_id" name="telegram_channel_id" value="<?= $config['telegram_channel_id'] ?? '' ?>"
+                            <input type="text" placeholder="نمونه: -10098765432106" id="telegram_channel_id" name="telegram_channel_id" value="<?= $telegramChannelId ?>"
                                 class="w-full px-4 py-3 border border-gray-300 rounded-lg file:mr-4 file:py-3 file:px-6 file:rounded-lg file:border-0 file:bg-blue-600 file:text-white hover:file:bg-blue-700">
                                 <p class="text-sm text-gray-500 mt-3">جهت استفاده از این قابلیت، حتما باید ربات را ادمین کانال خود کنید. <a style="color: #9b59b6; font-style: italic; font-weight: bold;" href="https://t.me/username_to_id_bot">دریافت آیدی کانال</a></p>
                         </div>

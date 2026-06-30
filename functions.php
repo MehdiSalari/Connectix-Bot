@@ -264,19 +264,23 @@ function getBotProfiePhoto($update = false) {
 }
 
 function checkUserChannelJoin($uid, $ChannelId) {
-    if ($ChannelId) {
-        $result = tg('getChatMember', [
-          'chat_id' => $ChannelId,
-          'user_id' => $uid
-        ]);
-
-        $status = $result['result']['status'];
-                if (in_array($status, ['member', 'administrator', 'creator'])) {
-            return true;
+    try {
+        if ($ChannelId) {
+            $result = json_decode(tg('getChatMember', [
+              'chat_id' => $ChannelId,
+              'user_id' => $uid
+            ]), true);
+    
+            $status = $result['result']['status'];
+            if (in_array($status, ['member', 'administrator', 'creator'])) {
+                return true;
+            }
+            return false;
         }
         return false;
+    } catch (Exception $e) {
+        errorLog("Exception: " . $e->getMessage(), "functions.php", 143);
     }
-    return false;
 }
 
 function actionStep($cmd, $uid, $data = null) {
