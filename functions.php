@@ -53,25 +53,14 @@ function tg($method, $params = []) {
 }
 
 function updateCheck() {
-    // $ch = curl_init('https://api.github.com/repos/MehdiSalari/Connectix-Bot/releases/latest');
-    // curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    // curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36');
-    // $response = curl_exec($ch);
-    // if ($response === false) {
-    //     curl_close($ch);
-    //     return null;
-    // }
-    // curl_close($ch);
-    // $data = json_decode($response, true);
-    // return $data['tag_name'] ?? null;
     $versionUrl = 'https://raw.githubusercontent.com/MehdiSalari/Connectix-Bot/refs/heads/main/version.txt';
     $remoteVersion = trim(file_get_contents($versionUrl)) ?? '0.0.1';
     $localVersion = VERSION;
 
     if (version_compare($remoteVersion, $localVersion, '>')) {
-        return false;
+        return [false, $remoteVersion];
     } else {
-        return true;
+        return [true, $localVersion];
     }
 }
 

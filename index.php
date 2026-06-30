@@ -40,7 +40,7 @@ $totalUsers = $conn->query("SELECT COUNT(*) as cnt FROM users")->fetch_assoc()['
 $adminChatId = $admin['chat_id'] ?? null; // chat_id ادمین
 $conn->close();
 
-$isUpdated = updateCheck();
+$botUpdateStatus = updateCheck();
 
 $updateMessage = '';
 $updateStatus = '';
@@ -154,7 +154,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($forceChannelJoin) {
             if ($telegramChannelId != null) {
                 //get bot id
-                $meResult = tg('getMe');
+                $meResult = json_decode(tg('getMe'), true);
                 if ($meResult && isset($meResult['result']['id'])) {
                     $botId = $meResult['result']['id'];
                 } else {
@@ -164,10 +164,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
 
                 // check if bot is admin in channel
-                $channelResult = tg('getChatMember', [
+                $channelResult = json_decode(tg('getChatMember', [
                     'chat_id' => $telegramChannel,
                     'user_id' => $telegramSupport
-                ]);
+                ]), true);
 
                 if (!$channelResult || !isset($channelResult['result']['status']) || !$channelResult['result']['status'] == 'administrator') {
                     $errorMsg = "ربات در کانال تلگرام ادمین نیست.";
@@ -694,7 +694,7 @@ $botAvatar = getBotProfiePhoto();
                                 class="bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-lg font-semibold transition flex items-center gap-2 w-fit">
                                 <i class="fas fa-sync"></i> بروزرسانی
                                 <i class="fas fa-chevron-down ml-2 text-sm"></i>
-                                <?php if(!$isUpdated){ ?>  
+                                <?php if(!$botUpdateStatus[0]){ ?>  
                                     <div class="update"></div>
                                 <?php } ?>
                             </button>
@@ -728,8 +728,9 @@ $botAvatar = getBotProfiePhoto();
                                         role="menuitem">
                                         <i class="fas fa-download text-green-600"></i>
                                         بروزرسانی ربات
-                                        <?php if(!$isUpdated){ ?>  
+                                        <?php if(!$botUpdateStatus[0]){ ?>  
                                             <div class="update"></div>
+                                            <small>(v<?= $botUpdateStatus[1]?>)</small>
                                         <?php } else { ?>
                                             <i class="fas fa-check-circle text-green-600"></i>
                                         <?php } ?>
