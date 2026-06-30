@@ -216,7 +216,7 @@ if ($ok !== 'true') {
                 .catch(() => {});
         }, 2000);
 
-        fetch("clients_setup.php", {
+        fetch("clients_update.php", {
             method: "POST",
             body: formData
         })

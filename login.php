@@ -52,7 +52,7 @@ if (isset($_COOKIE['token'])) {
 }
 
 // Get Bot Profile
-$botAvatar = getBotProfiePhoto();
+$botAvatar = getBotProfiePhoto(true);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Process login form submission

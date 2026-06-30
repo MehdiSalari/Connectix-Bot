@@ -160,6 +160,7 @@ function fetchBotConfig($panelToken) {
                 $adminId3 = $data['bot']['admin_id_3'] ?? null;
                 $telegramSupport = $data['bot']['support_telegram'] ?? null;
                 $telegramChannel = $data['bot']['channel_telegram'] ?? null;
+                $telegramChannelId = $data['bot']['channel_id'] ?? null;
                 $cardNumber = $data['bot']['card_number'] ?? null;
                 $cardName = $data['bot']['card_name'] ?? null;
 
@@ -188,6 +189,7 @@ function fetchBotConfig($panelToken) {
                 'admin_id_3' => $adminId3,
                 'support_telegram' => $telegramSupport,
                 'channel_telegram' => $telegramChannel,
+                'telegram_channel_id' => $telegramChannelId,
                 'card_number' => $cardNumber,
                 'card_name' => $cardName,
                 'messages' => [
@@ -201,7 +203,8 @@ function fetchBotConfig($panelToken) {
                     'bot_notice' => false
                 ],
                 'test' => true,
-                'bot_active' => true
+                'bot_active' => true,
+                'force_channel_join' => false
             ];
 
             $botConfigJson = json_encode($botConfig, JSON_PRETTY_PRINT);

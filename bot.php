@@ -52,6 +52,31 @@ if (file_exists(__DIR__ . '/setup/bot_config.json')) {
     $botConfig = json_decode(file_get_contents(__DIR__ . '/setup/bot_config.json'), true) ?: [];
 }
 
+$forceChannelJoin = $botConfig['force_channel_join'] ?? false;
+$telegramChannelId = $botConfig['telegram_channel_id'] ?? null;
+
+if ($forceChannelJoin && $telegramChannelId != null) {
+    $checkUserChannelJoin = checkUserChannelJoin($uid, $telegramChannelId);
+    if (!$checkUserChannelJoin) {
+        tg('sendMessage', [
+            'text' => 'لطفا برای استفاده از ربات، عضو کانال اطلاع رسانی شوید. 🙏🏼',
+            'chat_id' => $uid,
+            'reply_markup' => json_encode([
+                'inline_keyboard' => [
+                    [
+                        ['text' => '🔗 | عضویت در کانال', 'url' => 'https://t.me/' . $config['channel_telegram']]
+                    ],
+                    [
+                        ['text' => '✅ | بررسی عضویت', 'data' => 'home']
+                    ]
+                ]
+            ])
+        ]);
+        exit;
+    }
+}
+
+
 $adminIds = array_map('strval', array_filter([
     $botConfig['admin_id'] ?? null,
     $botConfig['admin_id_2'] ?? null,

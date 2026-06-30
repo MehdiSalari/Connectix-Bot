@@ -250,10 +250,10 @@ function userInfo($chat_id, $user_id, $user_name) {
     }
 }
 
-function getBotProfiePhoto($dir = '') {
-    $avatarsPath = "{$dir}assets/images/avatars";
+function getBotProfiePhoto($update = false) {
+    $avatarsPath = "assets/images/avatars";
     $botAvatarPath = "$avatarsPath/bot-avatar.jpg";
-    if (!file_exists($botAvatarPath)) {
+    if (!file_exists($botAvatarPath) || $update) {
 
         $bot = json_decode(tg('getMe'), true);
         $username = $bot['result']['username'];
@@ -272,6 +272,22 @@ function getBotProfiePhoto($dir = '') {
         }   
     }
     return $botAvatarPath;
+}
+
+function checkUserChannelJoin($uid, $ChannelId) {
+    if ($ChannelId) {
+        $result = tg('getChatMember', [
+          'chat_id' => $ChannelId,
+          'user_id' => $uid
+        ]);
+
+        $status = $result['result']['status'];
+                if (in_array($status, ['member', 'administrator', 'creator'])) {
+            return true;
+        }
+        return false;
+    }
+    return false;
 }
 
 function actionStep($cmd, $uid, $data = null) {

@@ -148,6 +148,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $botNotice = isset($_POST['bot_notice']) && $_POST['bot_notice'] == '1' && $bank ? true : false;
         $test = isset($_POST['test']) && $_POST['test'] == '1' ? true : false;
         $botActive = isset($_POST['bot_active']) && $_POST['bot_active'] == '1' ? true : false;
+        $forceChannelJoin = isset($_POST['force_channel_join']) && $_POST['force_channel_join'] == '1' ? true : false;
+        $telegramChannelId = ($_POST['telegram_channel_id'] && $_POST['telegram_channel_id'] != '' && $forceChannelJoin) ? $_POST['telegram_channel_id'] : null;
+
+        if ($forceChannelJoin) {
+            if ($telegramChannelId != null) {
+                //get bot id
+                $meResult = tg('getMe');
+                if ($meResult && isset($meResult['result']['id'])) {
+                    $botId = $meResult['result']['id'];
+                } else {
+                    $errorMsg = "خطا در دریافت اطلاعات ربات از تلگرام.";
+                    echo "<script>alert('$errorMsg')</script>";
+                    exit;
+                }
+
+                // check if bot is admin in channel
+                $channelResult = tg('getChatMember', [
+                    'chat_id' => $telegramChannel,
+                    'user_id' => $telegramSupport
+                ]);
+
+                if (!$channelResult || !isset($channelResult['result']['status']) || !$channelResult['result']['status'] == 'administrator') {
+                    $errorMsg = "ربات در کانال تلگرام ادمین نیست.";
+                    echo "<script>alert('$errorMsg')</script>";
+                    exit;
+                }
+            } else {
+                $errorMsg = "وارد کردن آیدی عددی کانال تلگرام اجباری میباشد.";
+                echo "<script>alert('$errorMsg')</script>";
+                exit;
+            }
+        }
 
         // update config file
         $botConfig = [
@@ -157,6 +189,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'admin_id_3' => $adminId3,
             'support_telegram' => $telegramSupport,
             'channel_telegram' => $telegramChannel,
+            'telegram_channel_id' => $telegramChannelId,
             'card_number' => $cardNumber,
             'card_name' => $cardName,
             'messages' => [
@@ -170,7 +203,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'bot_notice' => $botNotice
             ],
             'test' => $test,
-            'bot_active' => $botActive
+            'bot_active' => $botActive,
+            'force_channel_join' => $forceChannelJoin
         ];
 
         $config = json_encode($botConfig, JSON_PRETTY_PRINT);
@@ -240,7 +274,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $updateData = [
                 'app_name' => $appName,
                 'support_telegram' => $telegramSupport,
-                'channel_id' => $data['bot']['channel_id'],
+                'channel_id' => $telegramChannelId,
                 'channel_telegram' => "@$telegramChannel",
                 'token' => $data['bot']['token'],
                 'card_number' => $cardNumber,
@@ -780,6 +814,7 @@ $botAvatar = getBotProfiePhoto();
                 $adminId3 = $config['admin_id_3'] ?? '';
                 $telegramSupport = $config['support_telegram'] ?? '';
                 $telegramChannel = $config['channel_telegram'] ?? '';
+                $telegramChannelId = $config['channel_id'] ?? '';
                 $cardNumber = $config['card_number'] ?? '';
                 $cardName = $config['card_name'] ?? '';
 
@@ -792,6 +827,7 @@ $botAvatar = getBotProfiePhoto();
                 $botNotice = $config['bank']['bot_notice'] ?? false;
                 $test = $config['test'] ?? false;
                 $botActive = $config['bot_active'] ?? true;
+                $forceChannelJoin = $config['force_channel_join'] ?? false;
 
                 $banksFile = @file_get_contents('https://raw.githubusercontent.com/MehdiSalari/Connectix-Bot/main/bank/banks.json');
                 if ($banksFile === false) {
@@ -812,12 +848,12 @@ $botAvatar = getBotProfiePhoto();
                 <!-- Main Settings -->
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div class="input-group">
-                        <label class="block text-gray-700 font-semibold mb-2">نام برنامه</label>
+                        <label class="block text-gray-700 font-semibold mb-2">نام برنامه <small style="color: red;">*</small></label>
                         <input type="text" placeholder="نمونه: Connectix" id="app_name" name="app_name" value="<?= $appName ?>"
                             class="w-full px-4 py-3 border border-gray-300 rounded-lg file:mr-4 file:py-3 file:px-6 file:rounded-lg file:border-0 file:bg-blue-600 file:text-white hover:file:bg-blue-700">
                     </div>
                     <div class="input-group">
-                        <label class="block text-gray-700 font-semibold mb-2"> آیدی عددی ادمین اصلی</label>
+                        <label class="block text-gray-700 font-semibold mb-2"> آیدی عددی ادمین اصلی <small style="color: red;">*</small></label>
                         <input type="text" placeholder="نمونه: 123456789" id="admin_id" name="admin_id" value="<?= $adminId ?>"
                             class="w-full px-4 py-3 border border-gray-300 rounded-lg file:mr-4 file:py-3 file:px-6 file:rounded-lg file:border-0 file:bg-blue-600 file:text-white hover:file:bg-blue-700">
                     </div>
@@ -851,16 +887,16 @@ $botAvatar = getBotProfiePhoto();
                     </div>
                     <label class="block text-gray-700 font-semibold mb-2">فعال بودن ربات برای کاربران</label>
                 </div>
-                <p class="text-sm text-gray-500 -mt-3">در صورت غیرفعال بودن، فقط ادمین‌ها می‌توانند از ربات استفاده کنند.</p>
+                <p class="text-sm text-gray-500">در صورت غیرفعال بودن، فقط ادمین‌ها می‌توانند از ربات استفاده کنند.</p>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div class="input-group">
-                        <label class="block text-gray-700 font-semibold mb-2">نام کاربری پشتیبانی تلگرام</label>
+                        <label class="block text-gray-700 font-semibold mb-2">نام کاربری پشتیبانی تلگرام <small style="color: red;">*</small></label>
                         <input type="text" placeholder="نمونه: Connectix_Support" id="telegram_support" name="telegram_support" value="<?= $telegramSupport ?>"
                             class="w-full px-4 py-3 border border-gray-300 rounded-lg file:mr-4 file:py-3 file:px-6 file:rounded-lg file:border-0 file:bg-blue-600 file:text-white hover:file:bg-blue-700">
                     </div>
                     <div class="input-group">
-                        <label class="block text-gray-700 font-semibold mb-2">نام کاربری کانال تلگرام</label>
+                        <label class="block text-gray-700 font-semibold mb-2">نام کاربری کانال تلگرام <small style="color: red;">*</small></label>
                         <input type="text" placeholder="نمونه: Connectix_Channel" id="telegram_channel" name="telegram_channel" value="<?= $telegramChannel ?>"
                             class="w-full px-4 py-3 border border-gray-300 rounded-lg file:mr-4 file:py-3 file:px-6 file:rounded-lg file:border-0 file:bg-blue-600 file:text-white hover:file:bg-blue-700">
                     </div>
@@ -868,16 +904,43 @@ $botAvatar = getBotProfiePhoto();
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div class="input-group">
-                        <label class="block text-gray-700 font-semibold mb-2">نام دارنده کارت</label>
+                        <label class="block text-gray-700 font-semibold mb-2">نام دارنده کارت <small style="color: red;">*</small></label>
                         <input type="text" placeholder="نمونه: علی راد" id="card_name" name="card_name" value="<?= $cardName ?>"
                             class="w-full px-4 py-3 border border-gray-300 rounded-lg file:mr-4 file:py-3 file:px-6 file:rounded-lg file:border-0 file:bg-blue-600 file:text-white hover:file:bg-blue-700">
                     </div>
                     <div class="input-group">
-                        <label class="block text-gray-700 font-semibold mb-2">شماره کارت</label>
+                        <label class="block text-gray-700 font-semibold mb-2">شماره کارت <small style="color: red;">*</small></label>
                         <input type="text" placeholder="نمونه: 1234123412341234" id="card_number" name="card_number" value="<?= $cardNumber ?>"
                             class="w-full px-4 py-3 border border-gray-300 rounded-lg file:mr-4 file:py-3 file:px-6 file:rounded-lg file:border-0 file:bg-blue-600 file:text-white hover:file:bg-blue-700">
                     </div>
                 </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="flex items-center gap-2">
+                        <div class="toggler">
+                            <input id="toggler-5" name="force_channel_join" type="checkbox" value="<?= $forceChannelJoin ? '1' : '0' ?>" <?= $forceChannelJoin ? 'checked' : '' ?>>
+                            <label for="toggler-5">
+                                <svg class="toggler-on" version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 130.2 130.2">
+                                    <polyline class="path check" points="100.2,40.2 51.5,88.8 29.8,67.5"></polyline>
+                                </svg>
+                                <svg class="toggler-off" version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 130.2 130.2">
+                                    <line class="path line" x1="34.4" y1="34.4" x2="95.8" y2="95.8"></line>
+                                    <line class="path line" x1="95.8" y1="34.4" x2="34.4" y2="95.8"></line>
+                                </svg>
+                            </label>
+                        </div>
+                        <label class="block text-gray-700 font-semibold mb-2">اجباری بودن عضویت کاربران در کانال تلگرام</label>
+                    </div>
+                    <div>
+                        <div class="input-group" id="telegram_channel_id_input">
+                            <label class="block text-gray-700 font-semibold mb-2">آیدی عددی کانال تلگرام <small style="color: red;">*</small></label>
+                            <input type="text" placeholder="نمونه: -10098765432106" id="telegram_channel_id" name="telegram_channel_id" value="<?= $config['telegram_channel_id'] ?? '' ?>"
+                                class="w-full px-4 py-3 border border-gray-300 rounded-lg file:mr-4 file:py-3 file:px-6 file:rounded-lg file:border-0 file:bg-blue-600 file:text-white hover:file:bg-blue-700">
+                                <p class="text-sm text-gray-500 mt-3">جهت استفاده از این قابلیت، حتما باید ربات را ادمین کانال خود کنید. <a style="color: #9b59b6; font-style: italic; font-weight: bold;" href="https://t.me/username_to_id_bot">دریافت آیدی کانال</a></p>
+                        </div>
+                    </div>
+                </div>
+
 
                 <!-- Guide Videos -->
                 <div class="border-t-2 border-gray-200 pt-8">
@@ -1073,7 +1136,7 @@ $botAvatar = getBotProfiePhoto();
                     پیام های بات
                 </h3>
                 <div>
-                    <label class="block text-gray-700 font-semibold mb-2">پیام خوش آمد گویی</label>
+                    <label class="block text-gray-700 font-semibold mb-2">پیام خوش آمد گویی <small style="color: red;">*</small></label>
                     <textarea id="welcome_message" name="welcome_message" rows="5"
                         class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-4 focus:ring-blue-200 focus:border-blue-500 outline-none transition"
                         placeholder="متن پیام خوش آمد گویی را اینجا بنویسید..."><?= htmlspecialchars($welcomeMessage) ?>
@@ -1081,7 +1144,7 @@ $botAvatar = getBotProfiePhoto();
                 </div>
 
                 <div>
-                    <label class="block text-gray-700 font-semibold mb-2">پیام پشتیبانی</label>
+                    <label class="block text-gray-700 font-semibold mb-2">پیام پشتیبانی <small style="color: red;">*</small></label>
                     <textarea id="support_message" name="support_message" rows="5"
                         class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-4 focus:ring-blue-200 focus:border-blue-500 outline-none transition"
                         placeholder="متن پیام خوش آمد گویی را اینجا بنویسید..."><?= htmlspecialchars($supportMessage) ?>
@@ -1089,7 +1152,7 @@ $botAvatar = getBotProfiePhoto();
                 </div>
 
                 <div>
-                    <label class="block text-gray-700 font-semibold mb-2">سوالات متداول</label>
+                    <label class="block text-gray-700 font-semibold mb-2">سوالات متداول <small style="color: red;">*</small></label>
                     <textarea id="faq_message" name="faq_message" rows="5"
                         class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-4 focus:ring-blue-200 focus:border-blue-500 outline-none transition"
                         placeholder="متن پیام خوش آمد گویی را اینجا بنویسید..."><?= htmlspecialchars($faqMessage) ?>
@@ -1113,7 +1176,7 @@ $botAvatar = getBotProfiePhoto();
                 </div>
 
                 <div id="free_trial_message_div">
-                    <label class="block text-gray-700 font-semibold mb-2">متن پیام دریافت اکانت تست</label>
+                    <label class="block text-gray-700 font-semibold mb-2">متن پیام دریافت اکانت تست <small style="color: red;">*</small></label>
                     <textarea id="free_trial_message" name="free_trial_message" rows="5"
                         class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-4 focus:ring-blue-200 focus:border-blue-500 outline-none transition"
                         placeholder="متن پیام خوش آمد گویی را اینجا بنویسید..."><?= htmlspecialchars($freeTrialMessage) ?>
@@ -1164,7 +1227,7 @@ $botAvatar = getBotProfiePhoto();
                     </div>
 
                     <div class="bg-gray-100 p-4 mb-4 rounded-lg">
-                        <p class="text-gray-700">بانک خود را انتخاب کنید:</p>
+                        <p class="text-gray-700">بانک خود را انتخاب کنید: <small style="color: red;">*</small></p>
                         <select name="bank" id="bank" style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 8px; margin-top: 8px;">
                             <option value="">انتخاب کنید</option>
                             <?php foreach ($banks as $b): ?> <!-- Load avaliable banks -->
@@ -1621,14 +1684,17 @@ $botAvatar = getBotProfiePhoto();
             const botNotice = <?= (!empty($botNotice)) ? 'true' : 'false' ?>;
             const test = <?= $test ? 'true' : 'false' ?>;
             const botActive = <?= $botActive ? 'true' : 'false' ?>;
+            const forceChannelJoin = <?= $config['force_channel_join'] ? 'true' : 'false' ?>;
 
             const toggler1 = document.getElementById('toggler-1');
             const toggler2 = document.getElementById('toggler-2');
             const toggler3 = document.getElementById('toggler-3');
             const toggler4 = document.getElementById('toggler-4');
+            const toggler5 = document.getElementById('toggler-5');
             const container = document.getElementById('autoPaymentContainer');
             const bankSelector = document.getElementById('bank');
             const freeTrialMessageBox = document.getElementById('free_trial_message_div');
+            const telegramChannelIdInput = document.getElementById('telegram_channel_id_input');
 
             if (!hasBank) {
                 // bank خالی یا null
@@ -1663,6 +1729,19 @@ $botAvatar = getBotProfiePhoto();
             toggler4.checked = botActive;
             toggler4.value = botActive ? '1' : '0';
 
+            if (forceChannelJoin) {
+                toggler5.checked = true;
+                toggler5.value = '1';
+                telegramChannelIdInput.style.display = 'block';
+            } else {
+                toggler5.checked = false;
+                toggler5.value = '0';
+                telegramChannelIdInput.style.display = 'none';
+            }
+
+            toggler5.checked = forceChannelJoin;
+            toggler5.value = forceChannelJoin ? '1' : '0';
+
             // on change toggler1
             toggler1.addEventListener('change', function () {
                 this.value = this.checked ? '1' : '0';
@@ -1682,8 +1761,15 @@ $botAvatar = getBotProfiePhoto();
                 freeTrialMessageBox.style.display = this.checked ? 'block' : 'none';
             });
 
+            // on change toggler4
             toggler4.addEventListener('change', function () {
                 this.value = this.checked ? '1' : '0';
+            });
+
+            // on change toggler5
+            toggler5.addEventListener('change', function () {
+                this.value = this.checked ? '1' : '0';
+                telegramChannelIdInput.style.display = this.checked ? 'block' : 'none';
             });
 
         });
