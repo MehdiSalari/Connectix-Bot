@@ -57,21 +57,11 @@ $telegramChannelId = $botConfig['telegram_channel_id'] ?? null;
 
 if ($forceChannelJoin && $telegramChannelId != null) {
     $checkUserChannelJoin = checkUserChannelJoin($uid, $telegramChannelId);
-    // errorLog('checkUserChannelJoin: (' . $checkUserChannelJoin . ')', 'bot.php', __LINE__);
-    if (!$checkUserChannelJoin) {
+    if ($checkUserChannelJoin != true) {
         tg('sendMessage', [
             'text' => 'لطفا برای استفاده از ربات، عضو کانال اطلاع رسانی شوید. 🙏🏼',
             'chat_id' => $uid,
-            'reply_markup' => json_encode([
-                'inline_keyboard' => [
-                    [
-                        ['text' => '🔗 | عضویت در کانال', 'url' => 'https://t.me/' . $config['channel_telegram']]
-                    ],
-                    [
-                        ['text' => '✅ | بررسی عضویت', 'data' => 'home']
-                    ]
-                ]
-            ])
+            'reply_markup' => keyboard('join_channel')
         ]);
         exit;
     }

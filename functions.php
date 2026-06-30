@@ -266,11 +266,14 @@ function getBotProfiePhoto($update = false) {
 function checkUserChannelJoin($uid, $ChannelId) {
     try {
         if ($ChannelId) {
-            $result = json_decode(tg('getChatMember', [
-              'chat_id' => $ChannelId,
-              'user_id' => $uid
-            ]), true);
-    
+            $result = tg('getChatMember', [
+                'chat_id' => $ChannelId,
+                'user_id' => $uid
+            ]);
+
+            $result = json_decode($result, true);
+            
+            
             $status = $result['result']['status'];
             if (in_array($status, ['member', 'administrator', 'creator'])) {
                 return true;
@@ -3615,6 +3618,16 @@ function keyboard($keyboard) {
                 ];
                 break;
                 
+            case "join_channel":
+                $keyboard = [
+                    [
+                        ['text' => '🔗 | عضویت در کانال', 'url' => "t.me/$channelTelegram"]
+                    ],
+                    [
+                        ['text' => '✅ | بررسی عضویت', 'callback_data' => 'main_menu']
+                    ]
+                ];
+                break;
             default:
                 return json_encode(['ok' => true]);
         }

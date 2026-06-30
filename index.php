@@ -673,6 +673,14 @@ $botAvatar = getBotProfiePhoto();
             }
         }
 
+        .settings-btns {
+            position: sticky;
+            bottom: 15px;
+            background: #f3f4f6;
+            padding: 15px;
+            z-index: 10;
+        }
+
     </style>
 </head>
 
@@ -782,7 +790,7 @@ $botAvatar = getBotProfiePhoto();
                         </a>
 
                         <a href="users"
-                            class="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-5 py-3 rounded-lg font-semibold transition flex items-center gap-2 whitespace-nowrap shadow-md">
+                            class="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-5 py-3 rounded-lg font-semibold transition flex items-center gap-2 whitespace-nowrap shadow-md hover:from-indigo-700 hover:to-purple-700 focus:outline-none">
                             <i class="fas fa-users"></i> لیست کاربران
                         </a>
 
@@ -1293,30 +1301,28 @@ $botAvatar = getBotProfiePhoto();
                         <p class="text-gray-700">پارامتر مورد نیاز:</p>
                         <pre dir="ltr" style="display: flex;">
                             <span>
-                                {
-                                    "msg" : "متن پیامک دریافتی از بانک"
-                                }
+{
+    "msg" : "متن پیامک دریافتی از بانک"
+}
                             </span>
                         </pre>
                     </div>
                 </div>
 
                 <!-- Buttons -->
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 rounded-xl shadow-xl settings-btns">
+                    <button onclick="showLoader()" type="submit" id="submitBtn" name="config_submit" value="1"
+                        class="bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white font-bold py-4 rounded-lg text-lg transition transform hover:scale-105 flex items-center justify-center gap-3">
+                        <i class="fas fa-circle-check"></i>
+                        <span id="btnText">ذخیره تنظیمات</span>
+                    </button>
                     <button type="button" id="closeBtn"
                         class="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold py-4 rounded-lg text-lg transition transform hover:scale-105 flex items-center justify-center gap-3">
                         <i class="fas fa-circle-xmark"></i>بستن
                     </button>
-
-                    <button type="submit" id="submitBtn" name="config_submit" value="1"
-                        class="bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white font-bold py-4 rounded-lg text-lg transition transform hover:scale-105 flex items-center justify-center gap-3">
-                        <i class="fas fa-circle-check"></i>
-                        <span id="btnText">ثبت اطلاعات</span>
-                    </button>
                 </div>
+            </form>
         </div>
-        </form>
-        <!-- </div> -->
 
         <!-- Broadcast Form -->
         <div id="broadcastFormContainer" class="bg-white rounded-xl shadow-xl p-8 mb-8" style="display: none;">
