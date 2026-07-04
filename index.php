@@ -1249,36 +1249,36 @@ $botAvatar = getBotProfiePhoto();
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div class="input-group">
                             <label class="block text-gray-700 font-semibold mb-2">ویژه <small style="color: red;">*</small></label>
-                            <input type="text" placeholder="نمونه: ویژه (پیشنهاد میشود)" id="plan_default" name="plan_default" value="<?= $planGroupsNames['default'] ?>"
+                            <input type="text" placeholder="نمونه: ویژه (پیشنهادی)" id="plan_group_default" name="plan_group_default" value="<?= $planGroupsNames['default'] ?>"
                                 class="w-full px-4 py-3 border border-gray-300 rounded-lg file:mr-4 file:py-3 file:px-6 file:rounded-lg file:border-0 file:bg-blue-600 file:text-white hover:file:bg-blue-700">
                         </div>
                         <div class="input-group">
                             <label class="block text-gray-700 font-semibold mb-2">سابلینک <small style="color: red;">*</small></label>
-                            <input type="text" placeholder="نمونه: سابلینک" id="plan_sublink" name="plan_sublink" value="<?= $planGroupsNames['Sublink'] ?>"
+                            <input type="text" placeholder="نمونه: سابلینک" id="plan_group_sublink" name="plan_group_sublink" value="<?= $planGroupsNames['Sublink'] ?>"
                                 class="w-full px-4 py-3 border border-gray-300 rounded-lg file:mr-4 file:py-3 file:px-6 file:rounded-lg file:border-0 file:bg-blue-600 file:text-white hover:file:bg-blue-700">
                         </div>
                     </div>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div class="input-group">
                             <label class="block text-gray-700 font-semibold mb-2">اقتصادی <small style="color: red;">*</small></label>
-                            <input type="text" placeholder="نمونه: ارزان " id="plan_economic" name="plan_economic" value="<?= $planGroupsNames['Economic'] ?>"
+                            <input type="text" placeholder="نمونه: ارزان " id="plan_group_economic" name="plan_group_economic" value="<?= $planGroupsNames['Economic'] ?>"
                                 class="w-full px-4 py-3 border border-gray-300 rounded-lg file:mr-4 file:py-3 file:px-6 file:rounded-lg file:border-0 file:bg-blue-600 file:text-white hover:file:bg-blue-700">
                         </div>
                         <div class="input-group">
                             <label class="block text-gray-700 font-semibold mb-2">ایران اکسس <small style="color: red;">*</small></label>
-                            <input type="text" placeholder="نمونه: ایران اکسس" id="plan_iran_access" name="plan_iran_access" value="<?= $planGroupsNames['Iran Access'] ?>"
+                            <input type="text" placeholder="نمونه: ایران اکسس" id="plan_group_iran_access" name="plan_group_iran_access" value="<?= $planGroupsNames['Iran Access'] ?>"
                                 class="w-full px-4 py-3 border border-gray-300 rounded-lg file:mr-4 file:py-3 file:px-6 file:rounded-lg file:border-0 file:bg-blue-600 file:text-white hover:file:bg-blue-700">
                         </div>
                     </div>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div class="input-group">
                             <label class="block text-gray-700 font-semibold mb-2">بیزنیس کلس <small style="color: red;">*</small></label>
-                            <input type="text" placeholder="نمونه: بیزنیس کلس" id="plan_business_class" name="plan_business_class" value="<?= $planGroupsNames['Business Class'] ?>"
+                            <input type="text" placeholder="نمونه: بیزنیس کلس" id="plan_group_business_class" name="plan_group_business_class" value="<?= $planGroupsNames['Business Class'] ?>"
                                 class="w-full px-4 py-3 border border-gray-300 rounded-lg file:mr-4 file:py-3 file:px-6 file:rounded-lg file:border-0 file:bg-blue-600 file:text-white hover:file:bg-blue-700">
                         </div>
                         <div class="input-group">
                             <label class="block text-gray-700 font-semibold mb-2">بیزنیس سابلنک <small style="color: red;">*</small></label>
-                            <input type="text" placeholder="نمونه: بیزنیس سابلنک" id="plan_business_sublink" name="plan_business_sublink" value="<?= $planGroupsNames['BCSublink'] ?>"
+                            <input type="text" placeholder="نمونه: بیزنیس سابلنک" id="plan_group_bcsublink" name="plan_group_bcsublink" value="<?= $planGroupsNames['BCSublink'] ?>"
                                 class="w-full px-4 py-3 border border-gray-300 rounded-lg file:mr-4 file:py-3 file:px-6 file:rounded-lg file:border-0 file:bg-blue-600 file:text-white hover:file:bg-blue-700">
                         </div>
                     </div>
