@@ -418,6 +418,27 @@ $botAvatar = getBotProfiePhoto();
     <title><?= $config['app_name'] ?> | پنل مدیریت</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        function checkCurrentPage() {
+
+            const currentHash = window.location.hash;
+            const menuItems = document.querySelectorAll('#botSettingsMenu a');
+
+            menuItems.forEach(item => {
+
+                item.classList.remove('active');
+
+                if (item.getAttribute('href') === currentHash) {
+                    item.classList.add('active');
+                }
+
+            });
+        }
+
+        // window.addEventListener("load", checkCurrentPage);
+        window.addEventListener("hashchange", checkCurrentPage);
+
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@100..900&display=swap" rel="stylesheet">
@@ -426,6 +447,7 @@ $botAvatar = getBotProfiePhoto();
         html,
         body {
             height: 100%;
+            scroll-behavior: smooth;
         }
 
         html {
@@ -690,6 +712,92 @@ $botAvatar = getBotProfiePhoto();
             z-index: 10;
         }
 
+        #botSettingsMenu {
+            /* display: none; */
+            position: fixed;
+            top: 35%; right:
+            10%; width:
+            max-content;
+            z-index: 1000;
+        }
+
+        #botSettingsMenu a {
+            padding: 6px 10px;
+        }
+
+        #botSettingsMenu a.active {
+            border-radius: 8px;
+            --tw-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+            --tw-shadow-colored: 0 20px 25px -5px var(--tw-shadow-color), 0 8px 10px -6px var(--tw-shadow-color);
+            box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow);
+            background: #f3f4f6;
+            transform: scale(1.05);
+        }
+
+        #botSettingsMenu a:hover {
+            border-radius: 8px;
+            --tw-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+            --tw-shadow-colored: 0 20px 25px -5px var(--tw-shadow-color), 0 8px 10px -6px var(--tw-shadow-color);
+            box-shadow: var(--tw-ring-offset-shadow, 0 0 #0000), var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow);
+            background: #f3f4f6;
+            transform: scale(1.10);
+        }
+
+        #botSettingsMenu .submenu {
+            margin: 5px 15px 10px 0;
+        }
+
+        .mobile {
+            display: none;
+        }
+
+        /* Responsive - mobile and tablet */
+        @media (max-width: 1024px)  {
+            #botSettingsMenu {
+                top: auto;
+                bottom: 0;
+                right: -5px;
+                overflow-x: auto;
+                padding: 5px;
+                align-self: center;
+                margin-bottom: 100px;
+                border-radius: 0.75rem 0 0 0.75rem;
+            }
+
+            #botSettingsMenu ul {
+                display: flex;
+                flex-direction: column;
+                gap: 10px;
+            }
+
+            #botSettingsMenu ul li {
+                margin: 0;
+            }
+
+            #botSettingsMenu a {
+                padding: 15px 20px;
+            }
+
+            #botSettingsMenu a span {
+                display: none;
+            }
+
+            #botSettingsMenu .submenu {
+                margin: auto;
+            }
+
+            #botSettingsMenu a i {
+                font-size: 12px;
+            }
+
+            .settings-btns {
+                position: static;
+            }
+
+            .mobile {
+                display: block;
+            }
+        }
     </style>
 </head>
 
@@ -788,8 +896,8 @@ $botAvatar = getBotProfiePhoto();
 
                     <div class="flex flex-wrap gap-3 justify-end w-full">
 
-                        <a id="settingsBtn" href="#"
-                            class="bg-blue-500 hover:bg-blue-600 text-white px-5 py-3 rounded-lg font-semibold transition flex items-center gap-2 whitespace-nowrap">
+                        <a id="settingsBtn" href="#botSettingsContainer"
+                            class="bg-blue-500 hover:bg-blue-600 text-white px-5 py-3 rounded-lg font-semibold transition flex items-center gap-2 whitespace-nowrap cursor-pointer">
                             <i class="fas fa-cog"></i> تنظیمات بات
                         </a>
 
@@ -996,7 +1104,7 @@ $botAvatar = getBotProfiePhoto();
                 </div>
 
                 <!-- Guide Videos -->
-                <div class="border-t-2 border-gray-200 pt-8 space-y-6" id="videosContainer">
+                <div class="border-t-2 border-gray-200 pt-8 space-y-6" id="guideVideosSection">
                     <h3 class="text-xl font-bold text-gray-800 mb-6 flex items-center gap-3">
                         <i class="fas fa-video text-purple-600"></i>
                         ویدیوهای آموزشی
@@ -1081,7 +1189,7 @@ $botAvatar = getBotProfiePhoto();
                         <?php endforeach; ?>
                     </div>
 
-                    <div class="guide-media-card mt-10 border-t border-gray-200 pt-6" id="customGuidesContainer">
+                    <div class="guide-media-card mt-10 border-t border-gray-200 pt-6" id="customGuidesVideoSection">
                         <h4 class="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
                             <i class="fas fa-plus-circle text-indigo-600"></i>
                             ویدیوهای سفارشی
@@ -1183,7 +1291,7 @@ $botAvatar = getBotProfiePhoto();
                 </div>
 
                 <!-- Messages -->
-                <div class="border-t-2 border-gray-200 pt-8 space-y-6" id="messagesContainer">
+                <div class="border-t-2 border-gray-200 pt-8 space-y-6" id="botMessagesSection">
                     <h3 class="text-xl font-bold text-gray-800 mb-6 flex items-center gap-3">
                         <i class="fas fa-comments text-blue-600"></i>
                         پیام های بات
@@ -1310,7 +1418,6 @@ $botAvatar = getBotProfiePhoto();
 
                     <!-- Auto Payment Container -->
                     <div style="margin-top: 5px;" id="autoPaymentContainer" style="display: none;">
-
                         <div class="flex items-center gap-2 mb-2">
                             <div class="toggler">
                                 <input id="toggler-2" name="bot_notice" type="checkbox" value="<?= $botNotice ? '1' : '0' ?>" <?= $botNotice ? 'checked' : '' ?>>
@@ -1378,7 +1485,7 @@ $botAvatar = getBotProfiePhoto();
                 </div>
 
                 <!-- Buttons -->
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 rounded-xl shadow-xl settings-btns">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 rounded-xl shadow-xl settings-btns" id="settingsBtns">
                     <button onclick="showLoader()" type="submit" id="submitBtn" name="config_submit" value="1"
                         class="bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white font-bold py-4 rounded-lg text-lg transition transform hover:scale-105 flex items-center justify-center gap-3">
                         <i class="fas fa-circle-check"></i>
@@ -1485,9 +1592,64 @@ $botAvatar = getBotProfiePhoto();
          </div>
     </div>
 
+    <div id="botSettingsMenu" class="bg-white rounded-xl shadow-xl p-4" style="display: none;">
+        <ul class="space-y-4">
+
+            <li>
+                <a href="#botSettingsContainer" class="menu-item flex items-center gap-3 text-gray-600 hover:text-gray-800 transition active">
+                    <i class="fas fa-cogs"></i>
+                    <span>مدیریت تنظیمات بات</span>
+                </a>
+            </li>
+
+            <li>
+                <a href="#guideVideosSection" class="menu-item flex items-center gap-3 text-purple-600 hover:text-purple-800 transition">
+                    <i class="fas fa-video"></i>
+                    <span>ویدیوهای آموزشی</span>
+                </a>
+            </li>
+
+            <li class="submenu">
+                <a href="#customGuidesVideoSection" class="menu-item flex items-center gap-3 text-indigo-600 hover:text-indigo-800 transition">
+                    <i class="fas fa-plus-circle"></i>
+                    <span>ویدیوهای سفارشی</span>
+                </a>
+            </li>
+
+            <li>
+                <a href="#botMessagesSection" class="menu-item flex items-center gap-3 text-blue-600 hover:text-blue-800 transition">
+                    <i class="fas fa-comments"></i>
+                    <span>پیام های بات</span>
+                </a>
+            </li>
+
+            <li>
+                <a href="#serviceNames" class="menu-item flex items-center gap-3 text-yellow-600 hover:text-yellow-800 transition">
+                    <i class="fas fa-list"></i>
+                    <span>نام گروه سرویس ها</span>
+                </a>
+            </li>
+
+            <li>
+                <a href="#autoPayment" class="menu-item flex items-center gap-3 text-green-600 hover:text-green-800 transition">
+                    <i class="fas fa-credit-card"></i>
+                    <span>تایید خودکار پرداخت</span>
+                </a>
+            </li>
+
+            <li class="mobile">
+                <a href="#settingsBtns" class="menu-item flex items-center gap-3 text-green-600 hover:text-green-800 transition">
+                    <i class="fas fa-circle-check"></i>
+                </a>
+            </li>
+
+        </ul>
+    </div>
+
     <!-- Scripts -->
     <script>
         const botSettingsContainer = document.getElementById('botSettingsContainer');
+        const botSettingsMenu = document.getElementById('botSettingsMenu');
         const broadcastFormContainer = document.getElementById('broadcastFormContainer');
         const closeBtn = document.getElementById('closeBtn');
 
@@ -1495,17 +1657,20 @@ $botAvatar = getBotProfiePhoto();
         const settingsBtn = document.getElementById('settingsBtn');
         settingsBtn.addEventListener('click', function () {
             botSettingsContainer.style.display = botSettingsContainer.style.display === 'none' ? 'block' : 'none';
+            botSettingsMenu.style.display = botSettingsMenu.style.display === 'none' ? 'block' : 'none';
             broadcastFormContainer.style.display = 'none';
         });
 
         closeBtn.addEventListener('click', function () {
             botSettingsContainer.style.display = 'none';
+            botSettingsMenu.style.display = 'none';
         });
 
         const broadcastBtn = document.getElementById('broadcastBtn');
         broadcastBtn.addEventListener('click', function () {
             broadcastFormContainer.style.display = broadcastFormContainer.style.display === 'none' ? 'block' : 'none';
             botSettingsContainer.style.display = 'none';
+            botSettingsMenu.style.display = 'none';
         });
 
         document.querySelectorAll('.guide-type-option input[type="radio"]').forEach(radio => {
