@@ -204,7 +204,15 @@ function fetchBotConfig($panelToken) {
                 ],
                 'test' => true,
                 'bot_active' => true,
-                'force_channel_join' => false
+                'force_channel_join' => false,
+                'plan_group_names' => [
+                    'default' => 'ویژه',
+                    'Sublink' => 'سابلینک',
+                    'Economic' => 'اقتصادی',
+                    'Iran Access' => 'ایران اکسس',
+                    'Business Class' => 'بیزینس کلس',
+                    'BCSublink' => 'بیزنیس سابلنک'
+                ]
             ];
 
             $botConfigJson = json_encode($botConfig, JSON_PRETTY_PRINT);

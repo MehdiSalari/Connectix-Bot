@@ -152,6 +152,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $botActive = isset($_POST['bot_active']) && $_POST['bot_active'] == '1' ? true : false;
         $forceChannelJoin = isset($_POST['force_channel_join']) && $_POST['force_channel_join'] == '1' ? true : false;
         $telegramChannelId = ($_POST['telegram_channel_id'] && $_POST['telegram_channel_id'] != '') ? $_POST['telegram_channel_id'] : "null";
+        $planGroupsNames = [
+            'default' => $_POST['plan_group_default'] ?? 'ویژه',
+            'Sublink' => $_POST['plan_group_sublink'] ?? 'سابلینک',
+            'Economic' => $_POST['plan_group_economic'] ?? 'اقتصادی',
+            'Iran Access' => $_POST['plan_group_iran_access'] ?? 'ایران اکسس',
+            'Business Class' => $_POST['plan_group_business_class'] ?? 'بیزینس کلس',
+            'BCSublink' => $_POST['plan_group_bcsublink'] ?? 'بیزنیس سابلنک'
+        ];
 
         if ($forceChannelJoin) {
             if ($telegramChannelId != "null") {
@@ -209,7 +217,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ],
                 'test' => $test,
                 'bot_active' => $botActive,
-                'force_channel_join' => $forceChannelJoin
+                'force_channel_join' => $forceChannelJoin,
+                'plan_group_names' => $planGroupsNames
             ];
 
             $config = json_encode($botConfig, JSON_PRETTY_PRINT);
@@ -779,7 +788,7 @@ $botAvatar = getBotProfiePhoto();
 
                     <div class="flex flex-wrap gap-3 justify-end w-full">
 
-                        <a id="messagesBtn" href="#"
+                        <a id="settingsBtn" href="#"
                             class="bg-blue-500 hover:bg-blue-600 text-white px-5 py-3 rounded-lg font-semibold transition flex items-center gap-2 whitespace-nowrap">
                             <i class="fas fa-cog"></i> تنظیمات بات
                         </a>
@@ -833,8 +842,8 @@ $botAvatar = getBotProfiePhoto();
                 </div>
             </div>
         </div>
-        <!-- Bot Settings Form -->
-        <div id="messageFormContainer" class="bg-white rounded-xl shadow-xl p-8 mb-8" style="display: none;">
+        <!-- Bot Settings Container -->
+        <div id="botSettingsContainer" class="bg-white rounded-xl shadow-xl p-8 mb-8" style="display: none;">
             <h2 class="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-3">
                 <i class="fas fa-cog text-gray-600"></i>
                 مدیریت تنظیمات بات
@@ -863,6 +872,15 @@ $botAvatar = getBotProfiePhoto();
                 $botActive = $config['bot_active'] ?? true;
                 $forceChannelJoin = $config['force_channel_join'] ?? false;
 
+                $planGroupsNames = $config['plan_group_names'] ?? [
+                    'default' => 'ویژه',
+                    'Sublink' => 'سابلینک',
+                    'Economic' => 'اقتصادی',
+                    'Iran Access' => 'ایران اکسس',
+                    'Business Class' => 'بیزینس کلس',
+                    'BCSublink' => 'بیزنیس سابلنک'
+                ];
+
                 $banksFile = @file_get_contents('https://raw.githubusercontent.com/MehdiSalari/Connectix-Bot/main/bank/banks.json');
                 if ($banksFile === false) {
                     $banksFile = file_get_contents('bank/banks.json');
@@ -880,80 +898,37 @@ $botAvatar = getBotProfiePhoto();
                 ];
                 ?>
                 <!-- Main Settings -->
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div class="input-group">
-                        <label class="block text-gray-700 font-semibold mb-2">نام برنامه <small style="color: red;">*</small></label>
-                        <input type="text" placeholder="نمونه: Connectix" id="app_name" name="app_name" value="<?= $appName ?>"
-                            class="w-full px-4 py-3 border border-gray-300 rounded-lg file:mr-4 file:py-3 file:px-6 file:rounded-lg file:border-0 file:bg-blue-600 file:text-white hover:file:bg-blue-700">
+                <div id="mainSettings" class="space-y-6" id="mainSettings">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="input-group">
+                            <label class="block text-gray-700 font-semibold mb-2">نام برنامه <small style="color: red;">*</small></label>
+                            <input type="text" placeholder="نمونه: Connectix" id="app_name" name="app_name" value="<?= $appName ?>"
+                                class="w-full px-4 py-3 border border-gray-300 rounded-lg file:mr-4 file:py-3 file:px-6 file:rounded-lg file:border-0 file:bg-blue-600 file:text-white hover:file:bg-blue-700">
+                        </div>
+                        <div class="input-group">
+                            <label class="block text-gray-700 font-semibold mb-2"> آیدی عددی ادمین اصلی <small style="color: red;">*</small></label>
+                            <input type="text" placeholder="نمونه: 123456789" id="admin_id" name="admin_id" value="<?= $adminId ?>"
+                                class="w-full px-4 py-3 border border-gray-300 rounded-lg file:mr-4 file:py-3 file:px-6 file:rounded-lg file:border-0 file:bg-blue-600 file:text-white hover:file:bg-blue-700">
+                        </div>
                     </div>
-                    <div class="input-group">
-                        <label class="block text-gray-700 font-semibold mb-2"> آیدی عددی ادمین اصلی <small style="color: red;">*</small></label>
-                        <input type="text" placeholder="نمونه: 123456789" id="admin_id" name="admin_id" value="<?= $adminId ?>"
-                            class="w-full px-4 py-3 border border-gray-300 rounded-lg file:mr-4 file:py-3 file:px-6 file:rounded-lg file:border-0 file:bg-blue-600 file:text-white hover:file:bg-blue-700">
-                    </div>
-                </div>
 
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div class="input-group">
-                        <label class="block text-gray-700 font-semibold mb-2">آیدی عددی ادمین دوم</label>
-                        <input type="text" placeholder="نمونه: 123456789" id="admin_id_2" name="admin_id_2" value="<?= $adminId2 ?>"
-                            class="w-full px-4 py-3 border border-gray-300 rounded-lg file:mr-4 file:py-3 file:px-6 file:rounded-lg file:border-0 file:bg-blue-600 file:text-white hover:file:bg-blue-700">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="input-group">
+                            <label class="block text-gray-700 font-semibold mb-2">آیدی عددی ادمین دوم</label>
+                            <input type="text" placeholder="نمونه: 123456789" id="admin_id_2" name="admin_id_2" value="<?= $adminId2 ?>"
+                                class="w-full px-4 py-3 border border-gray-300 rounded-lg file:mr-4 file:py-3 file:px-6 file:rounded-lg file:border-0 file:bg-blue-600 file:text-white hover:file:bg-blue-700">
+                        </div>
+                        <div class="input-group">
+                            <label class="block text-gray-700 font-semibold mb-2">آیدی عددی ادمین سوم</label>
+                            <input type="text" placeholder="نمونه: 123456789" id="admin_id_3" name="admin_id_3" value="<?= $adminId3 ?>"
+                                class="w-full px-4 py-3 border border-gray-300 rounded-lg file:mr-4 file:py-3 file:px-6 file:rounded-lg file:border-0 file:bg-blue-600 file:text-white hover:file:bg-blue-700">
+                        </div>
                     </div>
-                    <div class="input-group">
-                        <label class="block text-gray-700 font-semibold mb-2">آیدی عددی ادمین سوم</label>
-                        <input type="text" placeholder="نمونه: 123456789" id="admin_id_3" name="admin_id_3" value="<?= $adminId3 ?>"
-                            class="w-full px-4 py-3 border border-gray-300 rounded-lg file:mr-4 file:py-3 file:px-6 file:rounded-lg file:border-0 file:bg-blue-600 file:text-white hover:file:bg-blue-700">
-                    </div>
-                </div>
 
-                <div class="flex items-center gap-2">
-                    <div class="toggler">
-                        <input id="toggler-4" name="bot_active" type="checkbox" value="<?= $botActive ? '1' : '0' ?>" <?= $botActive ? 'checked' : '' ?>>
-                        <label for="toggler-4">
-                            <svg class="toggler-on" version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 130.2 130.2">
-                                <polyline class="path check" points="100.2,40.2 51.5,88.8 29.8,67.5"></polyline>
-                            </svg>
-                            <svg class="toggler-off" version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 130.2 130.2">
-                                <line class="path line" x1="34.4" y1="34.4" x2="95.8" y2="95.8"></line>
-                                <line class="path line" x1="95.8" y1="34.4" x2="34.4" y2="95.8"></line>
-                            </svg>
-                        </label>
-                    </div>
-                    <label class="block text-gray-700 font-semibold mb-2">فعال بودن ربات برای کاربران</label>
-                </div>
-                <p class="text-sm text-gray-500">در صورت غیرفعال بودن، فقط ادمین‌ها می‌توانند از ربات استفاده کنند.</p>
-
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div class="input-group">
-                        <label class="block text-gray-700 font-semibold mb-2">نام کاربری پشتیبانی تلگرام <small style="color: red;">*</small></label>
-                        <input type="text" placeholder="نمونه: Connectix_Support" id="telegram_support" name="telegram_support" value="<?= $telegramSupport ?>"
-                            class="w-full px-4 py-3 border border-gray-300 rounded-lg file:mr-4 file:py-3 file:px-6 file:rounded-lg file:border-0 file:bg-blue-600 file:text-white hover:file:bg-blue-700">
-                    </div>
-                    <div class="input-group">
-                        <label class="block text-gray-700 font-semibold mb-2">نام کاربری کانال تلگرام <small style="color: red;">*</small></label>
-                        <input type="text" placeholder="نمونه: Connectix_Channel" id="telegram_channel" name="telegram_channel" value="<?= $telegramChannel ?>"
-                            class="w-full px-4 py-3 border border-gray-300 rounded-lg file:mr-4 file:py-3 file:px-6 file:rounded-lg file:border-0 file:bg-blue-600 file:text-white hover:file:bg-blue-700">
-                    </div>
-                </div>
-
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div class="input-group">
-                        <label class="block text-gray-700 font-semibold mb-2">نام دارنده کارت <small style="color: red;">*</small></label>
-                        <input type="text" placeholder="نمونه: علی راد" id="card_name" name="card_name" value="<?= $cardName ?>"
-                            class="w-full px-4 py-3 border border-gray-300 rounded-lg file:mr-4 file:py-3 file:px-6 file:rounded-lg file:border-0 file:bg-blue-600 file:text-white hover:file:bg-blue-700">
-                    </div>
-                    <div class="input-group">
-                        <label class="block text-gray-700 font-semibold mb-2">شماره کارت <small style="color: red;">*</small></label>
-                        <input type="text" placeholder="نمونه: 1234123412341234" id="card_number" name="card_number" value="<?= $cardNumber ?>"
-                            class="w-full px-4 py-3 border border-gray-300 rounded-lg file:mr-4 file:py-3 file:px-6 file:rounded-lg file:border-0 file:bg-blue-600 file:text-white hover:file:bg-blue-700">
-                    </div>
-                </div>
-
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div class="flex items-center gap-2">
                         <div class="toggler">
-                            <input id="toggler-5" name="force_channel_join" type="checkbox" value="<?= $forceChannelJoin ? '1' : '0' ?>" <?= $forceChannelJoin ? 'checked' : '' ?>>
-                            <label for="toggler-5">
+                            <input id="toggler-4" name="bot_active" type="checkbox" value="<?= $botActive ? '1' : '0' ?>" <?= $botActive ? 'checked' : '' ?>>
+                            <label for="toggler-4">
                                 <svg class="toggler-on" version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 130.2 130.2">
                                     <polyline class="path check" points="100.2,40.2 51.5,88.8 29.8,67.5"></polyline>
                                 </svg>
@@ -963,21 +938,65 @@ $botAvatar = getBotProfiePhoto();
                                 </svg>
                             </label>
                         </div>
-                        <label class="block text-gray-700 font-semibold mb-2">اجباری بودن عضویت کاربران در کانال تلگرام</label>
+                        <label class="block text-gray-700 font-semibold mb-2">فعال بودن ربات برای کاربران</label>
                     </div>
-                    <div>
-                        <div class="input-group" id="telegram_channel_id_input">
-                            <label class="block text-gray-700 font-semibold mb-2">آیدی عددی کانال تلگرام <small style="color: red;">*</small></label>
-                            <input type="text" placeholder="نمونه: -10098765432106" id="telegram_channel_id" name="telegram_channel_id" value="<?= $telegramChannelId ?>"
+                    <p class="text-sm text-gray-500">در صورت غیرفعال بودن، فقط ادمین‌ها می‌توانند از ربات استفاده کنند.</p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="input-group">
+                            <label class="block text-gray-700 font-semibold mb-2">نام کاربری پشتیبانی تلگرام <small style="color: red;">*</small></label>
+                            <input type="text" placeholder="نمونه: Connectix_Support" id="telegram_support" name="telegram_support" value="<?= $telegramSupport ?>"
                                 class="w-full px-4 py-3 border border-gray-300 rounded-lg file:mr-4 file:py-3 file:px-6 file:rounded-lg file:border-0 file:bg-blue-600 file:text-white hover:file:bg-blue-700">
-                                <p class="text-sm text-gray-500 mt-3">جهت استفاده از این قابلیت، حتما باید ربات را ادمین کانال خود کنید. <a style="color: #9b59b6; font-style: italic; font-weight: bold;" href="https://t.me/username_to_id_bot">دریافت آیدی کانال</a></p>
+                        </div>
+                        <div class="input-group">
+                            <label class="block text-gray-700 font-semibold mb-2">نام کاربری کانال تلگرام <small style="color: red;">*</small></label>
+                            <input type="text" placeholder="نمونه: Connectix_Channel" id="telegram_channel" name="telegram_channel" value="<?= $telegramChannel ?>"
+                                class="w-full px-4 py-3 border border-gray-300 rounded-lg file:mr-4 file:py-3 file:px-6 file:rounded-lg file:border-0 file:bg-blue-600 file:text-white hover:file:bg-blue-700">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="input-group">
+                            <label class="block text-gray-700 font-semibold mb-2">نام دارنده کارت <small style="color: red;">*</small></label>
+                            <input type="text" placeholder="نمونه: علی راد" id="card_name" name="card_name" value="<?= $cardName ?>"
+                                class="w-full px-4 py-3 border border-gray-300 rounded-lg file:mr-4 file:py-3 file:px-6 file:rounded-lg file:border-0 file:bg-blue-600 file:text-white hover:file:bg-blue-700">
+                        </div>
+                        <div class="input-group">
+                            <label class="block text-gray-700 font-semibold mb-2">شماره کارت <small style="color: red;">*</small></label>
+                            <input type="text" placeholder="نمونه: 1234123412341234" id="card_number" name="card_number" value="<?= $cardNumber ?>"
+                                class="w-full px-4 py-3 border border-gray-300 rounded-lg file:mr-4 file:py-3 file:px-6 file:rounded-lg file:border-0 file:bg-blue-600 file:text-white hover:file:bg-blue-700">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="flex items-center gap-2">
+                            <div class="toggler">
+                                <input id="toggler-5" name="force_channel_join" type="checkbox" value="<?= $forceChannelJoin ? '1' : '0' ?>" <?= $forceChannelJoin ? 'checked' : '' ?>>
+                                <label for="toggler-5">
+                                    <svg class="toggler-on" version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 130.2 130.2">
+                                        <polyline class="path check" points="100.2,40.2 51.5,88.8 29.8,67.5"></polyline>
+                                    </svg>
+                                    <svg class="toggler-off" version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 130.2 130.2">
+                                        <line class="path line" x1="34.4" y1="34.4" x2="95.8" y2="95.8"></line>
+                                        <line class="path line" x1="95.8" y1="34.4" x2="34.4" y2="95.8"></line>
+                                    </svg>
+                                </label>
+                            </div>
+                            <label class="block text-gray-700 font-semibold mb-2">اجباری بودن عضویت کاربران در کانال تلگرام</label>
+                        </div>
+                        <div>
+                            <div class="input-group" id="telegram_channel_id_input">
+                                <label class="block text-gray-700 font-semibold mb-2">آیدی عددی کانال تلگرام <small style="color: red;">*</small></label>
+                                <input type="text" placeholder="نمونه: -10098765432106" id="telegram_channel_id" name="telegram_channel_id" value="<?= $telegramChannelId ?>"
+                                    class="w-full px-4 py-3 border border-gray-300 rounded-lg file:mr-4 file:py-3 file:px-6 file:rounded-lg file:border-0 file:bg-blue-600 file:text-white hover:file:bg-blue-700">
+                                    <p class="text-sm text-gray-500 mt-3">جهت استفاده از این قابلیت، حتما باید ربات را ادمین کانال خود کنید. <a style="color: #9b59b6; font-style: italic; font-weight: bold;" href="https://t.me/username_to_id_bot">دریافت آیدی کانال</a></p>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-
                 <!-- Guide Videos -->
-                <div class="border-t-2 border-gray-200 pt-8">
+                <div class="border-t-2 border-gray-200 pt-8 space-y-6" id="videosContainer">
                     <h3 class="text-xl font-bold text-gray-800 mb-6 flex items-center gap-3">
                         <i class="fas fa-video text-purple-600"></i>
                         ویدیوهای آموزشی
@@ -1062,7 +1081,7 @@ $botAvatar = getBotProfiePhoto();
                         <?php endforeach; ?>
                     </div>
 
-                    <div class="guide-media-card mt-10 border-t border-gray-200 pt-6">
+                    <div class="guide-media-card mt-10 border-t border-gray-200 pt-6" id="customGuidesContainer">
                         <h4 class="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
                             <i class="fas fa-plus-circle text-indigo-600"></i>
                             ویدیوهای سفارشی
@@ -1164,90 +1183,39 @@ $botAvatar = getBotProfiePhoto();
                 </div>
 
                 <!-- Messages -->
-                <div class="border-t-2 border-gray-200 pt-8"></div>
-                <h3 class="text-xl font-bold text-gray-800 mb-6 flex items-center gap-3">
-                    <i class="fas fa-comments text-blue-600"></i>
-                    پیام های بات
-                </h3>
-                <div>
-                    <label class="block text-gray-700 font-semibold mb-2">پیام خوش آمد گویی <small style="color: red;">*</small></label>
-                    <textarea id="welcome_message" name="welcome_message" rows="5"
-                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-4 focus:ring-blue-200 focus:border-blue-500 outline-none transition"
-                        placeholder="متن پیام خوش آمد گویی را اینجا بنویسید..."><?= htmlspecialchars($welcomeMessage) ?>
-                        </textarea>
-                </div>
-
-                <div>
-                    <label class="block text-gray-700 font-semibold mb-2">پیام پشتیبانی <small style="color: red;">*</small></label>
-                    <textarea id="support_message" name="support_message" rows="5"
-                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-4 focus:ring-blue-200 focus:border-blue-500 outline-none transition"
-                        placeholder="متن پیام خوش آمد گویی را اینجا بنویسید..."><?= htmlspecialchars($supportMessage) ?>
-                        </textarea>
-                </div>
-
-                <div>
-                    <label class="block text-gray-700 font-semibold mb-2">سوالات متداول <small style="color: red;">*</small></label>
-                    <textarea id="faq_message" name="faq_message" rows="5"
-                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-4 focus:ring-blue-200 focus:border-blue-500 outline-none transition"
-                        placeholder="متن پیام خوش آمد گویی را اینجا بنویسید..."><?= htmlspecialchars($faqMessage) ?>
-                        </textarea>
-                </div>
-
-                <div class="flex items-center gap-2 mb-2">
-                    <div class="toggler">
-                        <input id="toggler-3" name="test" type="checkbox" value="<?= $test ? '1' : '0' ?>" <?= $test ? 'checked' : '' ?>>
-                        <label for="toggler-3">
-                            <svg class="toggler-on" version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 130.2 130.2">
-                                <polyline class="path check" points="100.2,40.2 51.5,88.8 29.8,67.5"></polyline>
-                            </svg>
-                            <svg class="toggler-off" version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 130.2 130.2">
-                                <line class="path line" x1="34.4" y1="34.4" x2="95.8" y2="95.8"></line>
-                                <line class="path line" x1="95.8" y1="34.4" x2="34.4" y2="95.8"></line>
-                            </svg>
-                        </label>
+                <div class="border-t-2 border-gray-200 pt-8 space-y-6" id="messagesContainer">
+                    <h3 class="text-xl font-bold text-gray-800 mb-6 flex items-center gap-3">
+                        <i class="fas fa-comments text-blue-600"></i>
+                        پیام های بات
+                    </h3>
+                    <div>
+                        <label class="block text-gray-700 font-semibold mb-2">پیام خوش آمد گویی <small style="color: red;">*</small></label>
+                        <textarea id="welcome_message" name="welcome_message" rows="5"
+                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-4 focus:ring-blue-200 focus:border-blue-500 outline-none transition"
+                            placeholder="متن پیام خوش آمد گویی را اینجا بنویسید..."><?= htmlspecialchars($welcomeMessage) ?>
+                            </textarea>
                     </div>
-                    <label class="block text-gray-700 font-semibold mb-2">فعال سازی اکانت تست رایگان</label>
-                </div>
 
-                <div id="free_trial_message_div">
-                    <label class="block text-gray-700 font-semibold mb-2">متن پیام دریافت اکانت تست <small style="color: red;">*</small></label>
-                    <textarea id="free_trial_message" name="free_trial_message" rows="5"
-                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-4 focus:ring-blue-200 focus:border-blue-500 outline-none transition"
-                        placeholder="متن پیام خوش آمد گویی را اینجا بنویسید..."><?= htmlspecialchars($freeTrialMessage) ?>
-                        </textarea>
-                </div>
-
-                <!-- Auto Payment -->
-                <div class="border-t-2 border-gray-200 pt-8"></div>
-                <h3 class="text-xl font-bold text-gray-800 mb-6 flex items-center gap-3">
-                    <i class="fas fa-credit-card text-green-600"></i>
-                    تنظیمات تایید خودکار پرداخت
-                </h3>
-                
-                <p class="text-gray-600 mb-4">تایید خودکار پرداخت از طریق بررسی پیامک واریزی</p>
-                <div class="flex items-center gap-2">
-                    <div class="toggler">
-                        <input id="toggler-1" name="auto_payment" type="checkbox" value="<?= $bank ? '1' : '0' ?>" <?= $bank ? 'checked' : '' ?>>
-                        <label for="toggler-1">
-                            <svg class="toggler-on" version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 130.2 130.2">
-                                <polyline class="path check" points="100.2,40.2 51.5,88.8 29.8,67.5"></polyline>
-                            </svg>
-                            <svg class="toggler-off" version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 130.2 130.2">
-                                <line class="path line" x1="34.4" y1="34.4" x2="95.8" y2="95.8"></line>
-                                <line class="path line" x1="95.8" y1="34.4" x2="34.4" y2="95.8"></line>
-                            </svg>
-                        </label>
+                    <div>
+                        <label class="block text-gray-700 font-semibold mb-2">پیام پشتیبانی <small style="color: red;">*</small></label>
+                        <textarea id="support_message" name="support_message" rows="5"
+                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-4 focus:ring-blue-200 focus:border-blue-500 outline-none transition"
+                            placeholder="متن پیام خوش آمد گویی را اینجا بنویسید..."><?= htmlspecialchars($supportMessage) ?>
+                            </textarea>
                     </div>
-                    <label class="block text-gray-700 font-semibold mb-2">فعال سازی تایید خودکار پرداخت</label>
-                </div>
 
-                <!-- Auto Payment Container -->
-                <div style="margin-top: 5px;" id="autoPaymentContainer" style="display: none;">
+                    <div>
+                        <label class="block text-gray-700 font-semibold mb-2">سوالات متداول <small style="color: red;">*</small></label>
+                        <textarea id="faq_message" name="faq_message" rows="5"
+                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-4 focus:ring-blue-200 focus:border-blue-500 outline-none transition"
+                            placeholder="متن پیام خوش آمد گویی را اینجا بنویسید..."><?= htmlspecialchars($faqMessage) ?>
+                            </textarea>
+                    </div>
 
                     <div class="flex items-center gap-2 mb-2">
                         <div class="toggler">
-                            <input id="toggler-2" name="bot_notice" type="checkbox" value="<?= $botNotice ? '1' : '0' ?>" <?= $botNotice ? 'checked' : '' ?>>
-                            <label for="toggler-2">
+                            <input id="toggler-3" name="test" type="checkbox" value="<?= $test ? '1' : '0' ?>" <?= $test ? 'checked' : '' ?>>
+                            <label for="toggler-3">
                                 <svg class="toggler-on" version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 130.2 130.2">
                                     <polyline class="path check" points="100.2,40.2 51.5,88.8 29.8,67.5"></polyline>
                                 </svg>
@@ -1257,55 +1225,155 @@ $botAvatar = getBotProfiePhoto();
                                 </svg>
                             </label>
                         </div>
-                        <label class="block text-gray-700 font-semibold mb-2">دریافت پیامک واریزی از طریق ربات</label>
+                        <label class="block text-gray-700 font-semibold mb-2">فعال سازی اکانت تست رایگان</label>
                     </div>
 
-                    <div class="bg-gray-100 p-4 mb-4 rounded-lg">
-                        <p class="text-gray-700">بانک خود را انتخاب کنید: <small style="color: red;">*</small></p>
-                        <select name="bank" id="bank" style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 8px; margin-top: 8px;">
-                            <option value="">انتخاب کنید</option>
-                            <?php foreach ($banks as $b): ?> <!-- Load avaliable banks -->
-                            <option <?= $bank === $b['name'] ? 'selected' : '' ?> value="<?= htmlspecialchars($b['name']) ?>"><?= htmlspecialchars($b['title']) ?></option>
-                            <?php endforeach ?>
-                        </select>
+                    <div id="free_trial_message_div">
+                        <label class="block text-gray-700 font-semibold mb-2">متن پیام دریافت اکانت تست <small style="color: red;">*</small></label>
+                        <textarea id="free_trial_message" name="free_trial_message" rows="5"
+                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-4 focus:ring-blue-200 focus:border-blue-500 outline-none transition"
+                            placeholder="متن پیام خوش آمد گویی را اینجا بنویسید..."><?= htmlspecialchars($freeTrialMessage) ?>
+                            </textarea>
+                    </div>
+                </div>
+
+                <!-- Service Names  -->
+                <div class="border-t-2 border-gray-200 pt-8 space-y-6" id="serviceNames">
+                    <h3 class="text-xl font-bold text-yellow-800 mb-6 flex items-center gap-3">
+                        <i class="fas fa-list text-yellow-600"></i>
+                        نام گروه سرویس ها
+                    </h3>
+
+                    <p>با استفاده از این قسمت می توانید نام هر گروه سرویس را تغییر دهید</p>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="input-group">
+                            <label class="block text-gray-700 font-semibold mb-2">ویژه <small style="color: red;">*</small></label>
+                            <input type="text" placeholder="نمونه: ویژه (پیشنهاد میشود)" id="plan_default" name="plan_default" value="<?= $planGroupsNames['default'] ?>"
+                                class="w-full px-4 py-3 border border-gray-300 rounded-lg file:mr-4 file:py-3 file:px-6 file:rounded-lg file:border-0 file:bg-blue-600 file:text-white hover:file:bg-blue-700">
+                        </div>
+                        <div class="input-group">
+                            <label class="block text-gray-700 font-semibold mb-2">سابلینک <small style="color: red;">*</small></label>
+                            <input type="text" placeholder="نمونه: سابلینک" id="plan_sublink" name="plan_sublink" value="<?= $planGroupsNames['Sublink'] ?>"
+                                class="w-full px-4 py-3 border border-gray-300 rounded-lg file:mr-4 file:py-3 file:px-6 file:rounded-lg file:border-0 file:bg-blue-600 file:text-white hover:file:bg-blue-700">
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="input-group">
+                            <label class="block text-gray-700 font-semibold mb-2">اقتصادی <small style="color: red;">*</small></label>
+                            <input type="text" placeholder="نمونه: ارزان " id="plan_economic" name="plan_economic" value="<?= $planGroupsNames['Economic'] ?>"
+                                class="w-full px-4 py-3 border border-gray-300 rounded-lg file:mr-4 file:py-3 file:px-6 file:rounded-lg file:border-0 file:bg-blue-600 file:text-white hover:file:bg-blue-700">
+                        </div>
+                        <div class="input-group">
+                            <label class="block text-gray-700 font-semibold mb-2">ایران اکسس <small style="color: red;">*</small></label>
+                            <input type="text" placeholder="نمونه: ایران اکسس" id="plan_iran_access" name="plan_iran_access" value="<?= $planGroupsNames['Iran Access'] ?>"
+                                class="w-full px-4 py-3 border border-gray-300 rounded-lg file:mr-4 file:py-3 file:px-6 file:rounded-lg file:border-0 file:bg-blue-600 file:text-white hover:file:bg-blue-700">
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="input-group">
+                            <label class="block text-gray-700 font-semibold mb-2">بیزنیس کلس <small style="color: red;">*</small></label>
+                            <input type="text" placeholder="نمونه: بیزنیس کلس" id="plan_business_class" name="plan_business_class" value="<?= $planGroupsNames['Business Class'] ?>"
+                                class="w-full px-4 py-3 border border-gray-300 rounded-lg file:mr-4 file:py-3 file:px-6 file:rounded-lg file:border-0 file:bg-blue-600 file:text-white hover:file:bg-blue-700">
+                        </div>
+                        <div class="input-group">
+                            <label class="block text-gray-700 font-semibold mb-2">بیزنیس سابلنک <small style="color: red;">*</small></label>
+                            <input type="text" placeholder="نمونه: بیزنیس سابلنک" id="plan_business_sublink" name="plan_business_sublink" value="<?= $planGroupsNames['BCSublink'] ?>"
+                                class="w-full px-4 py-3 border border-gray-300 rounded-lg file:mr-4 file:py-3 file:px-6 file:rounded-lg file:border-0 file:bg-blue-600 file:text-white hover:file:bg-blue-700">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Auto Payment -->
+                <div class="border-t-2 border-gray-200 pt-8 space-y-6" id="autoPayment">
+                    <h3 class="text-xl font-bold text-gray-800 mb-6 flex items-center gap-3">
+                        <i class="fas fa-credit-card text-green-600"></i>
+                        تنظیمات تایید خودکار پرداخت
+                    </h3>
+                    
+                    <p class="text-gray-600 mb-4">تایید خودکار پرداخت از طریق بررسی پیامک واریزی</p>
+                    <div class="flex items-center gap-2">
+                        <div class="toggler">
+                            <input id="toggler-1" name="auto_payment" type="checkbox" value="<?= $bank ? '1' : '0' ?>" <?= $bank ? 'checked' : '' ?>>
+                            <label for="toggler-1">
+                                <svg class="toggler-on" version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 130.2 130.2">
+                                    <polyline class="path check" points="100.2,40.2 51.5,88.8 29.8,67.5"></polyline>
+                                </svg>
+                                <svg class="toggler-off" version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 130.2 130.2">
+                                    <line class="path line" x1="34.4" y1="34.4" x2="95.8" y2="95.8"></line>
+                                    <line class="path line" x1="95.8" y1="34.4" x2="34.4" y2="95.8"></line>
+                                </svg>
+                            </label>
+                        </div>
+                        <label class="block text-gray-700 font-semibold mb-2">فعال سازی تایید خودکار پرداخت</label>
                     </div>
 
-                    <div class="bg-gray-100 p-4 mb-4 rounded-lg">
-                        <p class="text-gray-700">نرم افزار مورد نیاز جهت فروارد پیامک های دریافتی:</p>
-                        <p style="display: flex; justify-content: center;" class="text-gray-600 mb-2"><strong>SMS Forwarder</strong></p>
-                        <p style="display: flex; justify-content: center;" class="text-gray-600 mb-2">
-                            <!-- Google Play -->
-                            <a href="https://play.google.com/store/apps/details?id=com.frzinapps.smsforward" target="_blank" class="text-blue-600 underline">
-                                <img src="assets/images/components/play-store.png" style="width: 200px;">
-                            </a>
-                            <!-- App Store -->
-                            <a href="https://apps.apple.com/pk/app/sms-forwarder-forward-sms/id6693285061" target="_blank" class="text-blue-600 underline px-4 pt-3">
-                                <img src="assets/images/components/apple-store.svg" style="height: 55px;">
-                            </a>
-                            <!-- farsroid -->
-                            <a href="https://www.farsroid.com/sms-forwarder-android/" target="_blank" class="text-blue-600 underline">
-                                <img src="assets/images/components/farsroid.png" alt="" style="width: 200px;">
-                            </a>
-                        </p>
-                    </div>
+                    <!-- Auto Payment Container -->
+                    <div style="margin-top: 5px;" id="autoPaymentContainer" style="display: none;">
 
-                    <div class="bg-gray-100 p-4 mb-4 rounded-lg">
-                        <p class="text-gray-700">آدرس API جهت ارسال متن پیامک:</p>
-                        <p dir="ltr" class="text-gray-600 mb-2"><strong>Method:</strong> POST</p>
-                        <pre dir="ltr" style="display: flex;">
-                            <code>https://<?= $_SERVER['HTTP_HOST'] . dirname($_SERVER['REQUEST_URI']) ?>/bank/sms.php</code>
-                        </pre>
-                    </div>
+                        <div class="flex items-center gap-2 mb-2">
+                            <div class="toggler">
+                                <input id="toggler-2" name="bot_notice" type="checkbox" value="<?= $botNotice ? '1' : '0' ?>" <?= $botNotice ? 'checked' : '' ?>>
+                                <label for="toggler-2">
+                                    <svg class="toggler-on" version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 130.2 130.2">
+                                        <polyline class="path check" points="100.2,40.2 51.5,88.8 29.8,67.5"></polyline>
+                                    </svg>
+                                    <svg class="toggler-off" version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 130.2 130.2">
+                                        <line class="path line" x1="34.4" y1="34.4" x2="95.8" y2="95.8"></line>
+                                        <line class="path line" x1="95.8" y1="34.4" x2="34.4" y2="95.8"></line>
+                                    </svg>
+                                </label>
+                            </div>
+                            <label class="block text-gray-700 font-semibold mb-2">دریافت پیامک واریزی از طریق ربات</label>
+                        </div>
 
-                    <div class="bg-gray-100 p-4 mb-4 rounded-lg">
-                        <p class="text-gray-700">پارامتر مورد نیاز:</p>
-                        <pre dir="ltr" style="display: flex;">
-                            <span>
-{
-    "msg" : "متن پیامک دریافتی از بانک"
-}
-                            </span>
-                        </pre>
+                        <div class="bg-gray-100 p-4 mb-4 rounded-lg">
+                            <p class="text-gray-700">بانک خود را انتخاب کنید: <small style="color: red;">*</small></p>
+                            <select name="bank" id="bank" style="width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 8px; margin-top: 8px;">
+                                <option value="">انتخاب کنید</option>
+                                <?php foreach ($banks as $b): ?> <!-- Load avaliable banks -->
+                                <option <?= $bank === $b['name'] ? 'selected' : '' ?> value="<?= htmlspecialchars($b['name']) ?>"><?= htmlspecialchars($b['title']) ?></option>
+                                <?php endforeach ?>
+                            </select>
+                        </div>
+
+                        <div class="bg-gray-100 p-4 mb-4 rounded-lg">
+                            <p class="text-gray-700">نرم افزار مورد نیاز جهت فروارد پیامک های دریافتی:</p>
+                            <p style="display: flex; justify-content: center;" class="text-gray-600 mb-2"><strong>SMS Forwarder</strong></p>
+                            <p style="display: flex; justify-content: center;" class="text-gray-600 mb-2">
+                                <!-- Google Play -->
+                                <a href="https://play.google.com/store/apps/details?id=com.frzinapps.smsforward" target="_blank" class="text-blue-600 underline">
+                                    <img src="assets/images/components/play-store.png" style="width: 200px;">
+                                </a>
+                                <!-- App Store -->
+                                <a href="https://apps.apple.com/pk/app/sms-forwarder-forward-sms/id6693285061" target="_blank" class="text-blue-600 underline px-4 pt-3">
+                                    <img src="assets/images/components/apple-store.svg" style="height: 55px;">
+                                </a>
+                                <!-- farsroid -->
+                                <a href="https://www.farsroid.com/sms-forwarder-android/" target="_blank" class="text-blue-600 underline">
+                                    <img src="assets/images/components/farsroid.png" alt="" style="width: 200px;">
+                                </a>
+                            </p>
+                        </div>
+
+                        <div class="bg-gray-100 p-4 mb-4 rounded-lg">
+                            <p class="text-gray-700">آدرس API جهت ارسال متن پیامک:</p>
+                            <p dir="ltr" class="text-gray-600 mb-2"><strong>Method:</strong> POST</p>
+                            <pre dir="ltr" style="display: flex;">
+                                <code>https://<?= $_SERVER['HTTP_HOST'] . dirname($_SERVER['REQUEST_URI']) ?>/bank/sms.php</code>
+                            </pre>
+                        </div>
+
+                        <div class="bg-gray-100 p-4 mb-4 rounded-lg">
+                            <p class="text-gray-700">پارامتر مورد نیاز:</p>
+                            <pre dir="ltr" style="display: flex;">
+                                <span>
+    {
+        "msg" : "متن پیامک دریافتی از بانک"
+    }
+                                </span>
+                            </pre>
+                        </div>
                     </div>
                 </div>
 
@@ -1419,22 +1487,25 @@ $botAvatar = getBotProfiePhoto();
 
     <!-- Scripts -->
     <script>
-        const messageFormContainer = document.getElementById('messageFormContainer');
+        const botSettingsContainer = document.getElementById('botSettingsContainer');
         const broadcastFormContainer = document.getElementById('broadcastFormContainer');
+        const closeBtn = document.getElementById('closeBtn');
 
 
-        const messagesBtn = document.getElementById('messagesBtn');
-        messagesBtn.addEventListener('click', function () {
-            messageFormContainer.style.display = messageFormContainer.style.display === 'none' ? 'block' : 'none';
+        const settingsBtn = document.getElementById('settingsBtn');
+        settingsBtn.addEventListener('click', function () {
+            botSettingsContainer.style.display = botSettingsContainer.style.display === 'none' ? 'block' : 'none';
+            broadcastFormContainer.style.display = 'none';
         });
 
         closeBtn.addEventListener('click', function () {
-            messageFormContainer.style.display = 'none';
+            botSettingsContainer.style.display = 'none';
         });
 
         const broadcastBtn = document.getElementById('broadcastBtn');
         broadcastBtn.addEventListener('click', function () {
             broadcastFormContainer.style.display = broadcastFormContainer.style.display === 'none' ? 'block' : 'none';
+            botSettingsContainer.style.display = 'none';
         });
 
         document.querySelectorAll('.guide-type-option input[type="radio"]').forEach(radio => {

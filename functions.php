@@ -363,7 +363,7 @@ function errorLog($message, $file, $line) {
         $chat_id = $row['chat_id'];
         tg('sendMessage',[
             'chat_id' => $chat_id,
-            'text' => $message . " in file: " . $file . " at line: " . $line
+            'text' => "$message | in file: $file | at line: $line"
         ]);
     }
     $stmt->close();
@@ -3155,17 +3155,19 @@ function parsePlanTitle($title, $short = false) {
             }
 
             if (in_array('بیزینس ساب‌لینک', $extras)) {
-                $text .= " • بیزینس ساب‌لینک";
+                $text .= " • " . parseType('BCSublink');
             } elseif (in_array('ساب‌لینک', $extras)) {
-                $text .= " • ساب‌لینک";
+                $text .= " • " . parseType('Sublink');
             } elseif (in_array('آی‌پی ثابت', $extras)) {
-                $text .= " • آی‌پی ثابت";
+                $text .= " • " . parseType('Static IP');
             } elseif (in_array('بیزینس کلاس', $extras)) {
-                $text .= " • بیزینس کلاس";
+                $text .= " • " . parseType('Business Class');
             } elseif (in_array('اقتصادی', $extras)) {
-                $text .= " • اقتصادی";
+                $text .= " • " . parseType('Economic');
+            } elseif (in_array('ایران اکسس', $extras)) {
+                $text .= " • " . parseType('Iran Access');
             } elseif (empty($extras) || (count($extras) === 1 && $extras[0] === "+$giftDays روز هدیه")) {
-                $text .= " • ویژه";
+                $text .= " • " . parseType('default');
             }
         }
 
@@ -3197,7 +3199,7 @@ function parsePlanTitle($title, $short = false) {
 
     // Add "ویژه" if there are no extras
     if (empty($extras) && !$isFree && !$isUnlimited) {
-        $finalText .= " • ویژه";
+        $finalText .= " • " . parseType('default');
     }
 
     return [
@@ -3228,14 +3230,17 @@ function approximateDays($num, $unit) {
 }
 
 function parseType($type) {
+    $configFile = file_get_contents('setup/bot_config.json');
+    $config = json_decode($configFile, true);
+    $planGroups = $config['plan_group_names'] ?? [];
     $name = match($type) {
-        "default" => "ویژه",
-        "Sublink" => "ساب‌لینک",
-        "Iran Access" => "ایران اکسس",
-        "Economic" => "اقتصادی",
-        "Static IP" => "آی‌پی ثابت",
-        "Business Class" => "بیزینس کلاس",
-        "BCSublink" => "بیزینس ساب‌لینک",
+        "default" => $planGroups['default'] ?? "ویژه",
+        "Sublink" => $planGroups['Sublink'] ?? "ساب‌لینک",
+        "Iran Access" => $planGroups['Iran Access'] ?? "ایران اکسس",
+        "Economic" => $planGroups['Economic'] ?? "اقتصادی",
+        "Static IP" => $planGroups['Static IP'] ?? "آی‌پی ثابت",
+        "Business Class" => $planGroups['Business Class'] ?? "بیزینس کلاس",
+        "BCSublink" => $planGroups['BCSublink'] ?? "بیزینس ساب‌لینک",
         default => $type
     };
     return $name;
@@ -3395,9 +3400,8 @@ function keyboard($keyboard) {
             case "get_test":
                 $keyboard = [
                     [
-                        ['text' => '📱 | ویژه', 'callback_data' => 'getTest_default'],
-                        ['text' => '💰 | اقتصادی', 'callback_data' => 'getTest_economic']
-
+                        ['text' => '📱 | ' . parseType('default'), 'callback_data' => 'getTest_default'],
+                        ['text' => '💰 | ' . parseType('Economic'), 'callback_data' => 'getTest_economic']
                     ],
                     [
                         ['text' => '↪️ | بازگشت', 'callback_data' => 'main_menu']
@@ -3406,7 +3410,7 @@ function keyboard($keyboard) {
                 break;
 
             case "buy":
-                // Check if user account
+                // Check if user has any accounts
                 $conn = new mysqli($db_host, $db_user, $db_pass, $db_name);
                 $stmt = $conn->prepare("SELECT * FROM clients WHERE chat_id = ?");
                 $stmt->bind_param("s", $uid);
@@ -3441,7 +3445,7 @@ function keyboard($keyboard) {
                 foreach ($groups as $group) {
                     $name = parseType($group['name']);
                     $name =  match($group['name']) {
-                        "default" => "📱 | $name (پیشنهاد میشود)",
+                        "default" => "📱 | $name",
                         "Sublink" => "🔗 | $name",
                         "Economic" => "💰 | $name",
                         "Static IP" => "📍 | $name",
@@ -3666,25 +3670,25 @@ function message($message, $variables = []) {
     foreach ($groups as $group) {
         switch ($group['name']) {
             case "default":
-                $groupMessage .= "\n\n<b>📱 ویژه (پیشنهاد میشود):</b>\nدریافت نام کاربری و رمز عبور جهت ورود به نرم افزار Connectix و استفاده از 4 پروتکل و بیش از 10 کشور برای اتصال.";
-                break;
-            case "Iran Access":
-                $groupMessage .= "\n\n<b>🏠 ایران اکسس</b>\nسرویس دسترسی به آیپی ایران برای هموطنان ایرانی مقیم خارج کشور";
+                $groupMessage .= "\n\n<b>📱 " . parseType($group['name']) . ":</b>\nدریافت نام کاربری و رمز عبور جهت ورود به نرم افزار Connectix و استفاده از 4 پروتکل و بیش از 10 کشور برای اتصال.";
                 break;
             case "Sublink":
-                $groupMessage .= "\n\n<b>🔗 ساب‌لینک:</b>\nدریافت لینک سابسکریپشن جهت استفاده در نرم افزار هایی که از V2Ray پشتیبانی میکنند (مثل V2RayNG و V2Box)";
+                $groupMessage .= "\n\n<b>🔗 " . parseType($group['name']) . ":</b>\nدریافت لینک سابسکریپشن جهت استفاده در نرم افزار هایی که از V2Ray پشتیبانی میکنند (مثل V2RayNG و V2Box)";
                 break;
             case "Economic":
-                $groupMessage .= "\n\n<b>💰 اقتصادی:</b>\nسرویس اقتصادی با قیمت مناسب برای کاربرانی که به دنبال یک راه حل ارزان و کارآمد هستند.";
+                $groupMessage .= "\n\n<b>💰 " . parseType($group['name']) . ":</b>\nسرویس اقتصادی با قیمت مناسب برای کاربرانی که به دنبال یک راه حل ارزان و کارآمد هستند.";
+                break;
+            case "Iran Access":
+                $groupMessage .= "\n\n<b>🏠 " . parseType($group['name']) . "</b>\nسرویس دسترسی به آیپی ایران برای هموطنان ایرانی مقیم خارج کشور";
                 break;
             case "Static IP":
-                $groupMessage .= "\n\n<b>📍 آی‌پی ثابت:</b>\nدریافت نام کاربری و رمز عبور جهت ورود به نرم افزار Connectix و استفاده از آیپی ثابت.";
+                $groupMessage .= "\n\n<b>📍 " . parseType($group['name']) . ":</b>\nدریافت نام کاربری و رمز عبور جهت ورود به نرم افزار Connectix و استفاده از آیپی ثابت.";
                 break;
             case "Business Class":
-                $groupMessage .= "\n\n<b>💼 بیزینس کلاس:</b>\nسرویسی با کیفیت بالاتر و متصل در شرایط اینترنت ملی برای کاربران حرفه‌ای.";
+                $groupMessage .= "\n\n<b>💼 " . parseType($group['name']) . ":</b>\nسرویسی با کیفیت بالاتر و متصل در شرایط اینترنت ملی برای کاربران حرفه‌ای.";
                 break;
             case "BCSublink":
-                $groupMessage .= "\n\n<b>💼 بیزینس ساب‌لینک:</b>\nدریافت لینک سابسکریپشن سرویس بیزنس کلس جهت استفاده در نرم افزار هایی که از V2Ray پشتیبانی میکنند (مثل V2RayNG و V2Box)";
+                $groupMessage .= "\n\n<b>💼 " . parseType($group['name']) . ":</b>\nدریافت لینک سابسکریپشن سرویس بیزنس کلس جهت استفاده در نرم افزار هایی که از V2Ray پشتیبانی میکنند (مثل V2RayNG و V2Box)";
                 break;
             default:
                 $typeEmoji = "📱";
@@ -3697,7 +3701,7 @@ function message($message, $variables = []) {
     $msg = match ($message) {
         "welcome_message" => $welcomeMessage,
         "accounts" => "📦 اکانت های متصل یه حساب تلگرام شما:\n\n* در صورت عدم مشاهده اکانت خود، آن را اضافه کنید.",
-        "get_test" => "🎁 لطفا نوع اکانت تست را انتخاب کنید:\n\n<b>📱 ویژه(پیشنهاد میشود):</b>\nدریافت نام کاربری و رمز عبور جهت ورود به نرم افزار Connectix و استفاده از 4 پروتکل و بیش از 10 کشور برای اتصال.\n\n<b>💰 اقتصادی:</b>\nسرویس اقتصادی با قیمت مناسب برای کاربرانی که به دنبال یک راه حل ارزان و کارآمد هستند.",
+        "get_test" => "🎁 لطفا نوع اکانت تست را انتخاب کنید:\n\n<b>📱 " . parseType('default') . ":</b>\nدریافت نام کاربری و رمز عبور جهت ورود به نرم افزار Connectix و استفاده از 4 پروتکل و بیش از 10 کشور برای اتصال.\n\n<b>💰 " . parseType('Economic') . ":</b>\nسرویس اقتصادی با قیمت مناسب برای کاربرانی که به دنبال یک راه حل ارزان و کارآمد هستند.",
         "count" => "$typeEmoji نوع سرویس $groupName انتخاب شد.\n\n🔢 این اکانت را برای چند کاربر (دستگاه) قابل استفاده باشد؟",
         "buy" => "با تشکر از اعتماد و حسن انتخاب شما در خرید سرویس فیلترشکن {$appName} .\nلطفا نوع خرید خود را انتخاب کنید:\n\n<b>🔄️ تمدید اکانت فعلی:</b>\nاین دکمه برای خرید اشتراک برای اکانت قبلی استفاده میشود.\n\n<b>🛍️ خرید اکانت جدید:</b>\nاین دکمه برای خرید اکانت جدید استفاده میشود.",
         "group" => $groupMessage,

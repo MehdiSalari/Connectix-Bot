@@ -67,6 +67,9 @@ if ($forceChannelJoin && $telegramChannelId != null) {
     }
 }
 
+// errorLog(parseType("BCSublink"), "bot.php", __LINE__);
+// exit;
+
 
 $adminIds = array_map('strval', array_filter([
     $botConfig['admin_id'] ?? null,
