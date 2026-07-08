@@ -3246,6 +3246,20 @@ function parseType($type) {
     return $name;
 }
 
+function parseTypeWithEmoji($type) {
+    $name = parseType($type);
+    return match($type) {
+            "default" => "📱 | $name",
+            "Sublink" => "🔗 | $name",
+            "Economic" => "💰 | $name",
+            "Static IP" => "📍 | $name",
+            "Iran Access" => "🏠 | $name",
+            "Business Class" => "💼 | $name",
+            "BCSublink" => "💼 | $name",
+            default => $name
+        };
+}
+
 function keyboard($keyboard) {
     try {
         $uid = UID;
@@ -3273,7 +3287,7 @@ function keyboard($keyboard) {
 
                 $firstBtn = [];
 
-                if ($config['test'] && $user['test'] == 0) {
+                if ($config['test'] == true && $user['test'] == 0 && getSellerPlans("free") != []) {
                     $firstBtn[] = [
                         ['text' => '🎁 | دریافت اکانت تست', 'callback_data' => 'get_test']
                     ];
@@ -3398,11 +3412,25 @@ function keyboard($keyboard) {
                 break;
 
             case "get_test":
+                $plans = getSellerPlans("free");
+                // Show error if no test plan
+                if ($plans == []) {
+                    tg('answerCallbackQuery', [
+                        'callback_query_id' => CBID,
+                        'text' => '❌ اکانت تست غیر فعال است!',
+                        'show_alert' => true
+                    ]);
+                    exit();
+                }
+                $planBtns = [];
+                foreach ($plans as $plan) {
+                    $planGroupName = $plan['group_name_translations']['en'];
+                    $name = parseTypeWithEmoji($planGroupName);
+                    
+                    $planBtns[] = ['text' => $name, 'callback_data' => "getTest_$planGroupName"];
+                }
                 $keyboard = [
-                    [
-                        ['text' => '📱 | ' . parseType('default'), 'callback_data' => 'getTest_default'],
-                        ['text' => '💰 | ' . parseType('Economic'), 'callback_data' => 'getTest_economic']
-                    ],
+                    $planBtns,
                     [
                         ['text' => '↪️ | بازگشت', 'callback_data' => 'main_menu']
                     ]
@@ -3443,17 +3471,7 @@ function keyboard($keyboard) {
                 $groups = getSellerPlans("group");
                 $keyboard = [];
                 foreach ($groups as $group) {
-                    $name = parseType($group['name']);
-                    $name =  match($group['name']) {
-                        "default" => "📱 | $name",
-                        "Sublink" => "🔗 | $name",
-                        "Economic" => "💰 | $name",
-                        "Static IP" => "📍 | $name",
-                        "Iran Access" => "🏠 | $name",
-                        "Business Class" => "💼 | $name",
-                        "BCSublink" => "💼 | $name",
-                        default => $group['name']
-                    };
+                    $name = parseTypeWithEmoji($group['name']);
                     $keyboard[] = [
                         ['text' => $name, 'callback_data' => 'buy_group:' . $group['name']]
                     ];
