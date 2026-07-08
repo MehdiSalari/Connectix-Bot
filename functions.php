@@ -2824,7 +2824,7 @@ function getTest($type) {
                     }
                 }
             }
-        } elseif ($type === "normal") {
+        } elseif ($type === "default") {
             foreach ($plans as $plan) {
                 if (stripos($plan['title'], 'Economic') === false && stripos($plan['title'], 'Sublink') === false) {
                     if ($plan['type'] !== null && $plan['type'] == "Free") {
