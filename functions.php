@@ -46,6 +46,7 @@ function tg($method, $params = []) {
     if ($result === false) {
         $err = curl_error($ch);
         curl_close($ch);
+        echo "<script>alert('Telegram connection error: $err');</script>";
         return json_encode(['ok' => false, 'error' => 'curl_error', 'description' => $err]);
     }
     curl_close($ch);
@@ -245,6 +246,7 @@ function getBotProfiePhoto($update = false) {
     if (!file_exists($botAvatarPath) || $update) {
 
         $bot = json_decode(tg('getMe'), true);
+        if ($bot['ok'] == false); return $botAvatarPath; 
         $username = $bot['result']['username'];
         $telegramProfile = fetchTelegramProfile($username);
         $botAvatarUrl = $telegramProfile['avatar'] ?? null;
