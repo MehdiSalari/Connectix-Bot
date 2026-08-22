@@ -3,9 +3,11 @@
 if (version_compare(PHP_VERSION, '8.0.0', '<')) {
     die('PHP version 8.0.0 or higher is required.');
 }
+
+require_once '../functions.php';
+
 if (file_exists('../config.php')) {
     require_once '../config.php';
-    require_once '../functions.php';
     session_start();
     if (isset($_SESSION['admin_id'])) {
         $admin = getAdminById($_SESSION['admin_id']);
