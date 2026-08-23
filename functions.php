@@ -8,6 +8,7 @@ define('BOT_TOKEN', $botToken);  // Bot token for authentication with Telegram A
 define('TELEGRAM_URL', 'https://api.telegram.org/bot' . BOT_TOKEN . '/');  // Base URL for Telegram Bot API
 define('VERSION', file_exists(__DIR__ . '/version.txt') ? trim(file_get_contents(__DIR__ . '/version.txt')) : '0.0.1'); // Version of the bot
 function tg($method, $params = []) {
+
     if (!$params) {
         $params = array();
     }
@@ -2338,6 +2339,7 @@ function paycheck($query) {
                     $name = $user['name'];
                     $telegram_id = $user['telegram_id'];
                     $user_id = $user['id'];
+                    $userUsername = $user['telegram_id'];
                     $response = createClient($name, $chat_id, $telegram_id, $payment['plan_id']);
                     if ($response === false) {
                         errorLog("Error in creating client: " . $conn->error, "functions.php", 1977);
@@ -2444,7 +2446,7 @@ function paycheck($query) {
             $planName = parsePlanTitle($plan['title'])['text'];
             $planPrice = $payment['price'];
             // Update paycheck message for admin
-            $caption = "✅ سفارش شماره <code>$orderNumber</code> با موفقیت تایید شد\n\n👤 نام کاربری: <code>$clientUsername</code>\n📦 پلن:\n $planName\n💵 مبلغ: $planPrice";
+            $caption = "✅ سفارش شماره <code>$orderNumber</code> با موفقیت تایید شد\n\n🪪 نام کاربری تلگرام: $userUsername -> <a href='tg://user?id=$userUsername'>مشاهده</a>\n👤 نام کاربری اکانت: <code>$clientUsername</code>\n📦 پلن:\n $planName\n💵 مبلغ: $planPrice";
             $keyboard = [
                 'inline_keyboard' => [
                     [
