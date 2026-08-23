@@ -43,7 +43,10 @@ function tg($method, $params = []) {
     }
 
     $result = curl_exec($ch);
-    file_put_contents( __DIR__ .'/debug/telres.log', date('Y-m-d H:i:s') . " - " . $result . "\n", FILE_APPEND);
+    $debugDir = __DIR__ . '/debug';
+    if (is_dir($debugDir)) {
+        file_put_contents($debugDir . '/telres.log', date('Y-m-d H:i:s') . " - " . $result . "\n", FILE_APPEND);
+    }
     if ($result === false) {
         $err = curl_error($ch);
         curl_close($ch);
