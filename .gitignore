@@ -1,3 +1,6 @@
+# ==========================================
+# Legacy Connectix
+# ==========================================
 config.php
 debug/*.*
 .vscode/*
@@ -9,3 +12,40 @@ broadcast/*.json
 broadcast/*.txt
 setup/*.json
 setup/*.txt
+
+# ==========================================
+# Laravel
+# ==========================================
+/vendor/
+/node_modules/
+
+.env
+.env.*
+!.env.example
+
+/storage/*.key
+/storage/app/public
+/storage/framework/cache/*
+/storage/framework/sessions/*
+/storage/framework/testing/*
+/storage/framework/views/*
+/storage/logs/*
+
+/bootstrap/cache/*
+
+# PHPUnit
+.phpunit.result.cache
+
+# Laravel Pint
+.php-cs-fixer.cache
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Build
+/public/build/
+/public/hot
+/public/storage
