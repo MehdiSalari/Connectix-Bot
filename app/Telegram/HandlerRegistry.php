@@ -10,6 +10,7 @@ use App\Telegram\Handlers\AccountHandler;
 use App\Telegram\Handlers\AddAccountHandler;
 use App\Telegram\Handlers\AdminHandler;
 use App\Telegram\Handlers\CouponHandler;
+use App\Telegram\Handlers\DownloadHandler;
 use App\Telegram\Handlers\FreeTestHandler;
 use App\Telegram\Handlers\GuideHandler;
 use App\Telegram\Handlers\MainMenuHandler;
@@ -56,6 +57,7 @@ class HandlerRegistry
         AddAccountHandler::class,
         ShareContactHandler::class,
         GuideHandler::class,
+        DownloadHandler::class,
         SupportHandler::class,
         AdminHandler::class,
     ];

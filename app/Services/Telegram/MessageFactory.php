@@ -33,7 +33,10 @@ class MessageFactory
             'welcome_message' => $this->settings->message('welcome_text'),
             'support' => $this->settings->message('contact_support'),
             'faq' => $this->settings->message('questions_and_answers'),
-            'test_created' => $this->settings->message('free_test_account_created'),
+            'test_created' => $this->settings->message(
+                'free_test_account_created',
+                'اکانت تست شما با موفقیت ایجاد شد.'
+            ),
 
             'accounts' => "📦 اکانت های متصل یه حساب تلگرام شما:\n\n* در صورت عدم مشاهده اکانت خود، آن را اضافه کنید.",
 

@@ -80,7 +80,7 @@ Two consequences are load-bearing:
 | `setup.php` panel fetch | `Panel\PanelSettingsService` | done |
 | `smsPayment()` | — | Phase 9 |
 | `paycheck()` provisioning half | — | Phase 9 |
-| `guide()` | `Guide\GuideService` (data) + Phase 11 handlers | partial |
+| `guide()` | `Guide\GuideService` (data) + `GuideHandler` | done |
 
 `functions.php` is deliberately **not** ported as one service. It stays in
 place, untouched, until Phase 20.
@@ -172,7 +172,52 @@ parity reference for the panel payload, and the SQL is the schema reference.
 Laravel-owned code reads its name from `PanelSettingsService` instead, with
 `Connectix Bot` as the fallback.
 
-## 10. Open items this audit could not settle
+## 10. Trial account and guides (Phase 11)
+
+### Free trial
+
+* `keyboard('get_test')` rendered one button per free plan. Plans of the same
+  group carry identical labels and the same `getTest_<group>` callback, so the
+  handler (`FreeTestHandler`) drops the duplicate rows; the visible menu is
+  unchanged.
+* `getTest()` plan selection matched a **lower-case** `economic` and an exact
+  `default` token against case-sensitive `strpos` titles: `economic` wants
+  `+ Economic`/`+Economic`, `default` wants the first `Free` title with neither
+  `Economic` nor `Sublink`. The token comes straight from the callback, so the
+  capitalised `getTest_Economic` button answers
+  `پلن مناسب برای نوع درخواستی (Economic) یافت نشد.` in legacy; that quirk is
+  kept.
+* The `test` flag is only true once the panel round-trip finished; the guard
+  message is `⚠️ شما قبلا درخواست تست داده اید!`.
+* The success text (`free_test_account_created`, default
+  `اکانت تست شما با موفقیت ایجاد شد.`) resolves through `PanelSettingsService`:
+  local override, then panel, then the built-in default.
+* The confirm message carries the credentials inline
+  (`👤 نام کاربری` / `🔑 رمز عبور` / optional `🔗 لینک سابسکریبشن`) and the
+  `accounts` / `main_menu` keyboard.
+
+### Guides
+
+* `GuideHandler` opens the menu as a fresh `sendMessage` and deletes the source
+  message (the `guide` branch of bot.php); every other guide callback edits the
+  source message like the default `callBackCheck` branch.
+* `use` → link button when a link file exists, otherwise the stored video;
+  `install` → the platform picker; `custom_<n>` → the item's video.
+* A missing or unreadable video answers the alert
+  `🙅🏻 فعلا ویدیو آموزشی در دسترس نمی باشد!` and nothing else.
+* Videos are uploaded as a multipart `sendVideo` with a dedicated 10s connect
+  timeout and 120s body timeout; the button message is deleted afterwards (a
+  failure to delete is only logged).
+
+### Downloads
+
+* `DownloadHandler` renders `دانلود اپلیکیشن Connectix برای <b>{label}</b>`,
+  each download row is `📥 | {label}` with the URL from
+  `DownloadLinkService`, and the Telegram channel button (`📲 | دانلود از تلگرام`)
+  appears only for android (4), windows (5) and mac (11), built from config
+  `connectix_bot.telegram_app_username`. Home and back rows close the page.
+
+## 11. Open items this audit could not settle
 
 * The `payments` receipt column set. Receipts are forwarded to the
   administrators as Telegram photos, never stored (Phase 9), matching legacy,

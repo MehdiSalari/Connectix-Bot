@@ -97,6 +97,54 @@ class TelegramService
     }
 
     /**
+     * Upload a local video file.
+     *
+     * Port of the `sendVideo` calls legacy made with a `CURLFile`: the guide
+     * videos live on disk and are sent as multipart form data, with the rest
+     * of the call parameters travelling alongside the file.
+     *
+     * @param  array<string, mixed>  $params
+     *
+     * @throws TelegramApiException
+     */
+    public function sendVideo(int|string $chatId, string $videoPath, array $params = []): array
+    {
+        $token = config('connectix_bot.telegram.token');
+
+        if (blank($token)) {
+            throw new TelegramApiException('Telegram bot token is not configured.');
+        }
+
+        $file = @fopen($videoPath, 'rb');
+
+        if ($file === false) {
+            throw new TelegramApiException('Video file could not be opened: '.$videoPath);
+        }
+
+        try {
+            $response = Http::connectTimeout(self::CONNECT_TIMEOUT)
+                ->timeout(self::TIMEOUT)
+                ->attach('video', $file, basename($videoPath))
+                ->post($this->baseUrl($token).'/sendVideo', array_merge([
+                    'chat_id' => $chatId,
+                ], $params));
+        } catch (ConnectionException $e) {
+            Log::error('Telegram transport failure.', [
+                'method' => 'sendVideo',
+                'error' => $e->getMessage(),
+            ]);
+
+            throw TelegramApiException::transport('sendVideo', $e->getMessage());
+        } finally {
+            if (is_resource($file)) {
+                fclose($file);
+            }
+        }
+
+        return $this->decode('sendVideo', $response);
+    }
+
+    /**
      * Edit the text of an existing message.
      *
      * @param  array<string, mixed>  $params
