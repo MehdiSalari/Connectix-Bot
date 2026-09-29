@@ -224,6 +224,27 @@ class PlanService
     }
 
     /**
+     * Find a plan by its exact title anywhere in the catalogue.
+     *
+     * Port of the `plan` branch of `renew()`, which matched
+     * `$plan['title'] === $planTitle` over every plan the bot could see. The
+     * title is what an account's own plan name carries, which is why the
+     * renewal flow looks plans up this way instead of by id.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function findByTitle(string $title): ?array
+    {
+        foreach ($this->allPlans() as $plan) {
+            if (($plan['title'] ?? null) === $title) {
+                return $plan;
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Find a sellable plan by id, used when settling a payment.
      *
      * @return array<string, mixed>|null

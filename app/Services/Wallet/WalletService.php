@@ -164,10 +164,61 @@ class WalletService
 
     /**
      * Whether the wallet can cover the amount.
+     *
+     * Port of the `wallet('get')` check in `checkout()`. Legacy compared the
+     * balance it had already read and then decreased the wallet in a separate
+     * query, so two rapid taps could both pass the check and take the balance
+     * negative. Use {@see self::decreaseIfAffordable()} to make the check and
+     * the debit one decision.
      */
     public function canAfford(string|int $chatId, int $amount): bool
     {
         return $this->balance($chatId) >= $amount;
+    }
+
+    /**
+     * Decrease a balance only if it covers the amount, deciding both under one
+     * row lock.
+     *
+     * Returns null when the wallet is missing or cannot cover the amount, in
+     * which case nothing is written: no balance change and no ledger entry.
+     * This is what the purchase flow uses, so a buyer can never be charged
+     * twice for one order or end up with a negative balance.
+     */
+    public function decreaseIfAffordable(
+        string|int $chatId,
+        int $amount,
+        WalletTransactionType $type = WalletTransactionType::Buy,
+        WalletTransactionStatus $status = WalletTransactionStatus::Success,
+    ): ?Wallet {
+        return DB::transaction(function () use ($chatId, $amount, $type, $status): ?Wallet {
+            // The lock is what turns "is there enough" and "take the money" into
+            // a single serialised step: a competing purchase blocks here until
+            // this transaction commits, and then sees the new balance.
+            $wallet = Wallet::query()
+                ->where('chat_id', (string) $chatId)
+                ->lockForUpdate()
+                ->first();
+
+            if ($wallet === null || $wallet->balanceAmount() < $amount) {
+                return null;
+            }
+
+            $wallet->forceFill([
+                'balance' => (string) ($wallet->balanceAmount() - $amount),
+            ])->save();
+
+            WalletTransaction::query()->create([
+                'wallet_id' => $wallet->id,
+                'amount' => (string) $amount,
+                'operation' => WalletOperation::Decrease->value,
+                'chat_id' => (string) $chatId,
+                'status' => $status->value,
+                'type' => $type->value,
+            ]);
+
+            return $wallet;
+        });
     }
 
     /**

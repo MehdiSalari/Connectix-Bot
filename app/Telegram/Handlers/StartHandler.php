@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Services\Telegram\KeyboardFactory;
 use App\Services\Telegram\MessageFactory;
 use App\Services\Telegram\TelegramService;
+use App\Services\User\UserStateService;
 use App\Telegram\Contracts\UpdateHandler;
 use App\Telegram\TelegramUpdate;
 
@@ -18,6 +19,9 @@ use App\Telegram\TelegramUpdate;
  * panel's welcome text with `keyboard('main_menu')`. A `/start` sent as a
  * callback (Telegram keeps the button on a private chat) is treated the same,
  * as legacy did by matching the text.
+ *
+ * The state is cleared first because legacy got here through `userInfo()`,
+ * which started with `actionStep('clear', ...)`.
  */
 class StartHandler implements UpdateHandler
 {
@@ -25,6 +29,7 @@ class StartHandler implements UpdateHandler
         private readonly TelegramService $telegram,
         private readonly MessageFactory $messages,
         private readonly KeyboardFactory $keyboards,
+        private readonly UserStateService $state,
     ) {}
 
     public function supports(TelegramUpdate $update, User $user): bool
@@ -39,6 +44,8 @@ class StartHandler implements UpdateHandler
     public function handle(TelegramUpdate $update, User $user): void
     {
         $chatId = (string) $user->chat_id;
+
+        $this->state->tryClear($user);
 
         $this->telegram->sendMessage($chatId, $this->messages->make('welcome_message'), [
             'reply_markup' => json_encode([
