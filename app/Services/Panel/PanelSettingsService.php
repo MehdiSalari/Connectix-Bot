@@ -137,6 +137,16 @@ class PanelSettingsService
     }
 
     /**
+     * The configured WebApp base URL, or null to derive it from the request.
+     */
+    public function webAppUrl(): ?string
+    {
+        $url = $this->string(config('connectix_bot.webapp_url'));
+
+        return $url === '' ? null : $url;
+    }
+
+    /**
      * One bot message. Order of precedence: local override, seller panel,
      * and finally the built-in default supplied by the caller.
      */
