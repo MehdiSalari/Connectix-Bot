@@ -264,7 +264,93 @@ login behind `login.php`, the remembered `token` cookie of `logout.php` and the
 * `logout` invalidates the session, regenerates the CSRF token and expires the
   `token` cookie, matching `logout.php`.
 
-## 12. Open items this audit could not settle
+## 12. The admin panel (Phase 13)
+
+Every legacy page under the panel root was rebuilt on Blade behind the
+`admin.auth` middleware: the root `index.php` dashboard, `users/index.php`,
+`users/user.php`, `users/profile.php`, `users/search.php`,
+`transactions/transactions.php`, `transactions/wallet_transactions.php`,
+`transactions/sms_payments.php` and the guide/broadcast forms of the root
+`index.php`.
+
+### Where settings live now
+
+* Legacy wrote branding and copy to `setup/bot_config.json` once, at install
+  time, and every page read that file. The new `panel_settings` table
+  (`setting_key` primary key, `setting_value`, `updated_at`) is the database
+  port of that file: `PanelSettingsService::saveOverrides()` upserts a row per
+  field the settings form submitted, and a blank field **deletes** its row so
+  the seller panel value surfaces again - the "clear this field" behaviour the
+  legacy installer implied by simply not writing the key.
+* Precedence is unchanged from Phase 5: a set `.env` value wins (an explicit
+  operator override), then a `panel_settings` row, then the seller panel
+  payload, then the built-in default. `PanelSettingsService::overrides()` is
+  guarded with a catch so an install that has not run the migration yet - or a
+  unit test that never touches the database - degrades to "no overrides"
+  instead of throwing.
+* Toggles (`bot_active`, `test`, `force_channel_join`, `bank.bot_notice`) are
+  read through `PanelSettingsService::flag()`, so flipping a checkbox on the
+  settings page changes the behaviour of `TelegramGateway`, `KeyboardFactory`,
+  `ChannelMembershipService` and `SmsPaymentService` on the next update without
+  an `.env` edit. This is the one place where the rewrite is more dynamic than
+  legacy, which only read the JSON file.
+
+### Settings save
+
+`AdminSettingsController::update` mirrors the root `index.php` POST in order:
+validate, store the local overrides, mirror the branding up to the seller panel
+with `update-bot` (reusing the current bot payload from
+`getTelegramBotConfig()`, so the token and the notification switches are not
+invented here), then re-register the Telegram webhook. A panel or webhook
+failure is reported as a warning flash while the local save stands - the
+seller's own copy is never lost to a remote outage.
+
+Two deliberate differences from legacy:
+
+* fields the form cleared are **not** pushed as empty strings to the panel, so
+  a cleared field reverts to panel branding instead of blanking the panel too;
+* the webhook is only re-registered when `telegram.webhook_url` and
+  `telegram.webhook_secret` are configured, the same policy as the
+  `telegram:webhook` command, instead of legacy's unconditional call.
+
+### Orders, wallets and clients
+
+* `transactions/transactions.php` listed the `payments` table with the same
+  search columns, and approved a pending row by writing `is_paid = 1`. The
+  panel reuses `PaymentService::search()`, `markPaid()` and `markRejected()`,
+  so a decision taken in the panel and one taken from a Telegram callback are
+  literally the same code path. A row that already has a decision is refused
+  instead of silently rewritten.
+* Wallet administration reuses `WalletService::create()/adjust()` with
+  `DONE_BY_ADMIN` and the optional announcement, so the ledger row and the
+  Telegram notice match the legacy profile page.
+* Client details keep the legacy split: the local `clients` row for the list,
+  and a live `GET /v1/seller/clients/show` behind the "details" button, so an
+  install without a reachable panel still lists its accounts.
+
+### Guides and broadcast
+
+* Guide uploads keep the legacy rules: standard platforms
+  (`use`, `android`, `ios`, `windows`, `mac`, `linux`), mp4 up to 10 MB or a
+  URL in a `.txt`, the counterpart file deleted when the other is written, and
+  custom entries under `custom/` with a sanitised title.
+* Broadcast is a faithful port of `broadcast/broadcast_start.php` and
+  `broadcast/broadcast_progress.php`: the job is persisted in
+  `storage/app/broadcast/broadcast_start.json`, the sent counter in
+  `broadcast_done.stamp` so a dropped connection resumes, the request holding
+  the Server-Sent Events stream performs the sends throttled to Telegram-safe
+  speed, per-recipient failures are reported and the loop continues, and the
+  job plus its media are cleaned up when the stream ends. Test mode delivers
+  only to the administrator's own chat id. No queue and no worker, by design.
+
+### Role restrictions
+
+List pages are open to `admin` and `editor`; every mutating action (wallet
+create/adjust, order decision, settings save, guide add/delete, broadcast
+start) requires `admin`. Legacy only checked that *some* session existed, so
+this is the intended Phase 12/13 behaviour, not a parity break.
+
+## 13. Open items this audit could not settle
 
 * The `payments` receipt column set. Receipts are forwarded to the
   administrators as Telegram photos, never stored (Phase 9), matching legacy,

@@ -6,6 +6,7 @@ namespace App\Services\Payment;
 
 use App\Enums\SmsPaymentType;
 use App\Models\SmsPayment;
+use App\Services\Panel\PanelSettingsService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 
@@ -29,6 +30,10 @@ use Illuminate\Support\Facades\Log;
  */
 class SmsPaymentService
 {
+    public function __construct(
+        private readonly PanelSettingsService $settings,
+    ) {}
+
     /**
      * How long an unmatched deposit stays claimable, in minutes.
      *
@@ -51,7 +56,7 @@ class SmsPaymentService
      */
     public function bankName(): ?string
     {
-        $name = trim((string) config('connectix_bot.bank.name', ''));
+        $name = trim($this->settings->text('connectix_bot.bank.name', 'bank.name'));
 
         return $name === '' ? null : $name;
     }
@@ -61,7 +66,7 @@ class SmsPaymentService
      */
     public function botNotice(): bool
     {
-        return (bool) config('connectix_bot.bank.bot_notice', true);
+        return $this->settings->flag('connectix_bot.bank.bot_notice', 'bank.bot_notice', true);
     }
 
     /**

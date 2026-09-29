@@ -48,7 +48,7 @@ class TelegramGateway
             return;
         }
 
-        if (! config('connectix_bot.active', true)) {
+        if (! $this->settings->flag('connectix_bot.active', 'bot_active', true)) {
             $this->refuse($update, $chatId, 'ربات در حال حاضر غیرفعال است.');
 
             return;

@@ -85,7 +85,7 @@ class KeyboardFactory
             return [];
         }
 
-        if (config('connectix_bot.test_enabled', true) && ! $user->hasUsedTest() && $this->hasFreeTestPlan()) {
+        if ($this->settings->flag('connectix_bot.test_enabled', 'test', true) && ! $user->hasUsedTest() && $this->hasFreeTestPlan()) {
             return [[['text' => '🎁 | دریافت اکانت تست', 'callback_data' => 'get_test']]];
         }
 

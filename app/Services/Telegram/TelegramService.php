@@ -109,39 +109,61 @@ class TelegramService
      */
     public function sendVideo(int|string $chatId, string $videoPath, array $params = []): array
     {
+        return $this->sendMultipart('sendVideo', $chatId, 'video', $videoPath, $params);
+    }
+
+    /**
+     * Upload a local file with any Telegram send method.
+     *
+     * Generalisation of the legacy multipart `CURLFile` calls (sendPhoto,
+     * sendAnimation, sendVideo, sendVoice, sendDocument). The file is attached
+     * as multipart form data and the remaining call parameters travel
+     * alongside it as form fields.
+     *
+     * @param  array<string, mixed>  $params
+     *
+     * @throws TelegramApiException
+     */
+    public function sendMultipart(
+        string $method,
+        int|string $chatId,
+        string $fileParam,
+        string $filePath,
+        array $params = [],
+    ): array {
         $token = config('connectix_bot.telegram.token');
 
         if (blank($token)) {
             throw new TelegramApiException('Telegram bot token is not configured.');
         }
 
-        $file = @fopen($videoPath, 'rb');
+        $file = @fopen($filePath, 'rb');
 
         if ($file === false) {
-            throw new TelegramApiException('Video file could not be opened: '.$videoPath);
+            throw new TelegramApiException('File could not be opened: '.$filePath);
         }
 
         try {
             $response = Http::connectTimeout(self::CONNECT_TIMEOUT)
                 ->timeout(self::TIMEOUT)
-                ->attach('video', $file, basename($videoPath))
-                ->post($this->baseUrl($token).'/sendVideo', array_merge([
+                ->attach($fileParam, $file, basename($filePath))
+                ->post($this->baseUrl($token).'/'.$method, array_merge([
                     'chat_id' => $chatId,
                 ], $params));
         } catch (ConnectionException $e) {
             Log::error('Telegram transport failure.', [
-                'method' => 'sendVideo',
+                'method' => $method,
                 'error' => $e->getMessage(),
             ]);
 
-            throw TelegramApiException::transport('sendVideo', $e->getMessage());
+            throw TelegramApiException::transport($method, $e->getMessage());
         } finally {
             if (is_resource($file)) {
                 fclose($file);
             }
         }
 
-        return $this->decode('sendVideo', $response);
+        return $this->decode($method, $response);
     }
 
     /**

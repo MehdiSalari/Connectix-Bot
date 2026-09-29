@@ -1,81 +1,84 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ $appName }} | Admin</title>
-    <style>
-        * { box-sizing: border-box; }
+@extends('layouts.admin', ['title' => 'داشبورد', 'active' => 'dashboard'])
 
-        body {
-            font-family: 'Segoe UI', Arial, sans-serif;
-            background: #f4f4f7;
-            margin: 0;
-            padding: 0;
-            min-height: 100vh;
-        }
-
-        header {
-            background: linear-gradient(135deg, #95009f, #667eea);
-            color: #fff;
-            padding: 18px 24px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-
-        header h1 {
-            margin: 0;
-            font-size: 20px;
-            font-weight: 600;
-        }
-
-        header .who { font-size: 14px; opacity: 0.95; }
-
-        main { padding: 32px 24px; max-width: 900px; margin: 0 auto; }
-
-        .card {
-            background: #fff;
-            border-radius: 12px;
-            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.06);
-            padding: 24px;
-            margin-bottom: 20px;
-        }
-
-        .card h2 { margin: 0 0 12px 0; font-size: 18px; color: #333; }
-
-        .card p { margin: 4px 0; color: #555; font-size: 15px; }
-
-        .logout {
-            background: rgba(255, 255, 255, 0.18);
-            color: #fff;
-            border: 1px solid rgba(255, 255, 255, 0.6);
-            border-radius: 8px;
-            padding: 8px 16px;
-            font-size: 14px;
-            cursor: pointer;
-        }
-
-        .logout:hover { background: rgba(255, 255, 255, 0.32); }
-    </style>
-</head>
-<body>
-    <header>
-        <h1>{{ $appName }} Admin Panel</h1>
-        <div class="who">
-            {{ $admin->email }} · {{ $admin->role->label() }} ·
-            <form action="{{ route('admin.logout') }}" method="post" style="display:inline">
-                @csrf
-                <button type="submit" class="logout">Logout</button>
-            </form>
+@section('content')
+    <div class="grid">
+        <div class="stat">
+            <div class="k">کاربران</div>
+            <div class="v">{{ number_format($stats['users']) }}</div>
         </div>
-    </header>
-
-    <main>
-        <div class="card">
-            <h2>Dashboard</h2>
-            <p>The panel sections arrive in the next phase.</p>
+        <div class="stat">
+            <div class="k">سفارش‌های امروز</div>
+            <div class="v">{{ number_format($stats['today_payments']) }}</div>
         </div>
-    </main>
-</body>
-</html>
+        <div class="stat">
+            <div class="k">فروش امروز (تومان)</div>
+            <div class="v">{{ number_format($stats['today_sum']) }}</div>
+        </div>
+        <div class="stat">
+            <div class="k">سفارش‌های در انتظار بررسی</div>
+            <div class="v">{{ number_format($stats['pending_payments']) }}</div>
+        </div>
+        <div class="stat">
+            <div class="k">موجودی کل کیف پول‌ها</div>
+            <div class="v">{{ number_format($stats['wallet_balance']) }}</div>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>آخرین کاربران</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>شناسه گفتگو</th>
+                    <th>نام</th>
+                    <th>تلگرام</th>
+                    <th>تاریخ عضویت</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @forelse ($recent_users as $user)
+                    <tr>
+                        <td dir="ltr">{{ $user->chat_id }}</td>
+                        <td>{{ $user->name ?? '-' }}</td>
+                        <td dir="ltr">{{ $user->telegram_id ?? '-' }}</td>
+                        <td>{{ $user->created_at?->format('Y-m-d H:i') }}</td>
+                        <td><a class="btn ghost" href="{{ route('admin.users.show', $user) }}">مشاهده</a></td>
+                    </tr>
+                @empty
+                    <tr><td colspan="5" class="muted">کاربری ثبت نشده است.</td></tr>
+                @endforelse
+            </tbody>
+        </table>
+    </div>
+
+    <div class="card">
+        <h2>آخرین سفارش‌ها</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>شماره سفارش</th>
+                    <th>کاربر</th>
+                    <th>مبلغ</th>
+                    <th>روش</th>
+                    <th>وضعیت</th>
+                    <th>تاریخ</th>
+                </tr>
+            </thead>
+            <tbody>
+                @forelse ($recent_payments as $payment)
+                    <tr>
+                        <td dir="ltr">{{ $payment->order_number }}</td>
+                        <td>@if ($payment->user?->name) {{ $payment->user->name }} @else <span class="muted">-</span> @endif</td>
+                        <td>{{ number_format($payment->priceAmount()) }}</td>
+                        <td>{{ $payment->method->label() }}</td>
+                        <td><span class="badge {{ $payment->is_paid->isDecided() ? ($payment->is_paid->value === '1' ? 'ok' : 'no') : 'wait' }}">{{ $payment->is_paid->label() }}</span></td>
+                        <td>{{ $payment->created_at?->format('Y-m-d H:i') }}</td>
+                    </tr>
+                @empty
+                    <tr><td colspan="6" class="muted">سفارشی ثبت نشده است.</td></tr>
+                @endforelse
+            </tbody>
+        </table>
+    </div>
+@endsection

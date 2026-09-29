@@ -1,0 +1,160 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Http\Controllers\Admin;
+
+use App\Http\Controllers\Controller;
+use App\Models\Admin;
+use App\Services\Broadcast\BroadcastService;
+use App\Services\Panel\PanelSettingsService;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\File;
+use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\StreamedResponse;
+
+/**
+ * The broadcast page: compose a message, optionally attach media, and stream
+ * the fan-out over Server-Sent Events exactly like the legacy
+ * broadcast/broadcast_progress.php did.
+ *
+ * Test mode delivers only to the admin's own chat id so a reseller can check
+ * the copy and media once before releasing it to every user.
+ */
+class AdminBroadcastController extends Controller
+{
+    public function __construct(
+        private readonly BroadcastService $broadcast,
+    ) {}
+
+    public function show(): View
+    {
+        return view('admin.broadcast.index', [
+            'appName' => app(PanelSettingsService::class)->appName(),
+            'running' => $this->broadcast->pending() !== null,
+            'sent' => $this->broadcast->pending() === null ? null : $this->broadcast->progress(),
+        ]);
+    }
+
+    /**
+     * Validate and persist a new job.
+     *
+     * Mirrors broadcast_start.php: the media file, if any, is parked next to
+     * the job state, the counter is reset, and the page is told to open the
+     * progress stream.
+     */
+    public function start(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'message' => ['required', 'string', 'max:4096'],
+            'test' => ['sometimes', 'boolean'],
+        ]);
+
+        /** @var Admin $admin */
+        $admin = $request->user('admin');
+
+        $media = null;
+
+        $upload = $request->file('media');
+
+        if ($upload instanceof UploadedFile && $upload->isValid()) {
+            $name = time().'_'.basename($upload->getClientOriginalName());
+
+            $media = $this->broadcast->mediaStoragePath().'/'.$name;
+
+            $upload->move($this->broadcast->mediaStoragePath(), $name);
+        }
+
+        $this->broadcast->persist(
+            (string) $data['message'],
+            $media,
+            (string) $admin->chat_id,
+            (bool) $request->boolean('test'),
+        );
+
+        return response()->json([
+            'ok' => true,
+            'progress_url' => route('admin.broadcast.progress'),
+        ]);
+    }
+
+    /**
+     * The Server-Sent Events stream that runs the send loop.
+     *
+     * Each recipient produces a `log` event, the loop emits empty `progress`
+     * events, and the final `done` event carries the totals. The stream ends
+     * with the job cleaned up, so a refresh of the page is ready for the next
+     * run.
+     */
+    public function progress(Request $request): StreamedResponse
+    {
+        return response()->stream(function () use ($request): void {
+            $this->streamHeaders();
+
+            $withSecret = $request->boolean('with_secret');
+
+            $this->broadcast->run(
+                function (string $chatId, bool $ok, string $error, int $done, int $total) use ($withSecret): void {
+                    $this->event([
+                        'type' => 'log',
+                        'chat_id' => $withSecret ? $chatId : $this->mask($chatId),
+                        'status' => $ok ? 'success' : 'error',
+                        'message' => $ok ? 'ارسال شد' : ($error !== '' ? $error : 'خطا'),
+                    ]);
+
+                    $this->event(['type' => 'progress', 'done' => $done, 'total' => $total]);
+                },
+                function (int $total): void {
+                    $this->event(['type' => 'done', 'total' => $total]);
+                },
+            );
+        }, 200, [
+            'Content-Type' => 'text/event-stream',
+            'Cache-Control' => 'no-cache',
+            'X-Accel-Buffering' => 'no',
+        ]);
+    }
+
+    // -----------------------------------------------------------------
+    // Internals
+    // -----------------------------------------------------------------
+
+    private function streamHeaders(): void
+    {
+        if (function_exists('ob_end_flush')) {
+            @ob_end_flush();
+        }
+
+        if (function_exists('ob_implicit_flush')) {
+            @ob_implicit_flush(true);
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    private function event(array $payload): void
+    {
+        echo 'data: '.json_encode($payload, JSON_UNESCAPED_UNICODE)."\n\n";
+
+        if (function_exists('flush')) {
+            @flush();
+        }
+    }
+
+    /**
+     * Obscure everything but the last three digits, like the legacy browser
+     * log did when it truncated ids. The full id stays available through the
+     * `with_secret` query flag.
+     */
+    private function mask(string $chatId): string
+    {
+        $length = strlen($chatId);
+
+        return $length > 4
+            ? str_repeat('*', $length - 3).substr($chatId, -3)
+            : $chatId;
+    }
+}

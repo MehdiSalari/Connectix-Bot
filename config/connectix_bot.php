@@ -289,4 +289,19 @@ return [
     */
 
     'webapp_url' => env('CONNECTIX_BOT_WEBAPP_URL'),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Broadcast fan-out
+    |--------------------------------------------------------------------------
+    |
+    | `delay_us` is the pause between recipient sends, mirroring the legacy
+    | `usleep(333000)` that throttled the broadcast progress stream to roughly
+    | three messages per second so Telegram never rejected the fan-out.
+    |
+    */
+
+    'broadcast' => [
+        'delay_us' => (int) env('CONNECTIX_BOT_BROADCAST_DELAY_US', 333000),
+    ],
 ];

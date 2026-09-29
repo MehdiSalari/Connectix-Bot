@@ -34,7 +34,7 @@ class ChannelMembershipService
      */
     public function isEnforced(): bool
     {
-        return (bool) config('connectix_bot.force_channel_join', false);
+        return $this->settings->flag('connectix_bot.force_channel_join', 'force_channel_join', false);
     }
 
     /**
