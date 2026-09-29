@@ -73,6 +73,21 @@ class TelegramGatewayTest extends TestCase
             $stubs['https://api.telegram.org/*'] = Http::response(['ok' => true, 'result' => true], 200);
         }
 
+        // The channel gate builds its "join the channel" message out of the
+        // reseller branding, which is fetched from the seller panel on demand. The
+        // panel is a separate host from Telegram, so it needs its own stub: the
+        // gateway reaching for it is correct behaviour, not a stray request.
+        if (! array_key_exists('https://api.connectix.vip/*', $stubs)) {
+            $stubs['https://api.connectix.vip/*'] = Http::response([
+                'bot' => [
+                    'app_name' => 'Acme',
+                    'channel_telegram' => '@acme_channel',
+                    'channel_id' => '-100123',
+                ],
+                'telegram_messages' => [],
+            ], 200);
+        }
+
         Http::fake($stubs);
     }
 

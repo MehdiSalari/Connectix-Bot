@@ -7,6 +7,7 @@ namespace App\Providers;
 use App\Services\Download\DownloadLinkService;
 use App\Services\Guide\GuideService;
 use App\Services\Panel\PanelSettingsService;
+use App\Services\Setup\ApplicationKey;
 use App\Services\Telegram\AdminGuard;
 use Illuminate\Support\ServiceProvider;
 
@@ -45,6 +46,16 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        if ($this->app->runningUnitTests()) {
+            // The key is a side effect on the developer's own `.env`, and a test
+            // suite has no business writing that file. The service itself is
+            // tested directly in tests/Feature/SetupTest.php instead.
+            return;
+        }
+
+        // Before the HTTP kernel: EncryptCookies and the session refuse to boot
+        // without a key, so a freshly unpacked release could not even render the
+        // installer that is meant to give it one.
+        $this->app->make(ApplicationKey::class)->ensure();
     }
 }

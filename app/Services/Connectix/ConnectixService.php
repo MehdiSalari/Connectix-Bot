@@ -228,6 +228,46 @@ class ConnectixService
     }
 
     // -----------------------------------------------------------------
+    // Authentication
+    // -----------------------------------------------------------------
+
+    /**
+     * Exchange seller credentials for the API bearer token.
+     *
+     * Port of `getPanelToken()` in legacy `setup/setup.php`, which the installer
+     * used to turn the email and password the operator typed into the token the
+     * rest of the application authenticates with. Keeping it here is what makes
+     * the installer possible at all: the rewrite only ever read a static token
+     * from the environment, so there was no way to obtain one from inside the
+     * application.
+     *
+     * The panel requires the two device fields legacy sent, so they are kept.
+     *
+     * @throws ConnectixApiException
+     */
+    public function login(string $email, string $password): string
+    {
+        $payload = $this->send('post', '/v1/seller/auth/login', ['json' => [
+            'email' => $email,
+            'password' => $password,
+            'rememberMe' => false,
+            'device_browser' => 'Chrome',
+            'device_os' => 'Windows',
+        ]], authenticated: false);
+
+        $token = $payload['token'] ?? $payload['data']['token'] ?? null;
+
+        if (! is_string($token) || $token === '') {
+            throw new ConnectixApiException(
+                'The panel did not return a token. Check the seller email and password.',
+                '/v1/seller/auth/login',
+            );
+        }
+
+        return $token;
+    }
+
+    // -----------------------------------------------------------------
     // Wallets
     // -----------------------------------------------------------------
 
@@ -414,22 +454,32 @@ class ConnectixService
 
     /**
      * @param  array<string, mixed>  $options
+     * @param  string|null  $token  Overrides the configured bearer token.
+     * @param  bool  $authenticated  False for the endpoints that are called before
+     *                               a token exists, such as the login itself.
      * @return array<string, mixed>
      *
      * @throws ConnectixApiException
      */
-    private function send(string $verb, string $endpoint, array $options, ?string $token = null): array
-    {
-        $token ??= config('connectix_bot.connectix.token');
+    private function send(
+        string $verb,
+        string $endpoint,
+        array $options,
+        ?string $token = null,
+        bool $authenticated = true,
+    ): array {
+        $bearer = $token ?? config('connectix_bot.connectix.token');
 
-        if (blank($token)) {
+        if ($authenticated && blank($bearer)) {
             throw new ConnectixApiException(
                 'Connectix panel token is not configured.',
                 $endpoint
             );
         }
 
-        $request = $this->client()->withToken($token);
+        $request = $authenticated
+            ? $this->client()->withToken($bearer)
+            : $this->client();
 
         try {
             $response = $verb === 'get'

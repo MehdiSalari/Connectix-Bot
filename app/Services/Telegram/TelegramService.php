@@ -252,13 +252,20 @@ class TelegramService
     // ---------------------------------------------------------------------
 
     /**
+     * Identity of the bot behind the token.
+     *
+     * The token can be passed in explicitly because the installer has to verify
+     * a token the operator just typed before it is written to the environment.
+     *
      * @return array<string, mixed>|null
      *
      * @throws TelegramApiException
      */
-    public function getMe(): ?array
+    public function getMe(?string $withToken = null): ?array
     {
-        return $this->result('getMe');
+        $result = $this->request('getMe', [], $withToken)['result'] ?? null;
+
+        return is_array($result) ? $result : null;
     }
 
     /**
@@ -288,12 +295,14 @@ class TelegramService
      * Register the webhook, replacing any previously configured one.
      *
      * @param  array<string, mixed>  $options
+     * @param  string|null  $withToken  Used by the installer, which registers
+     *                                  the webhook for a token it is validating.
      *
      * @throws TelegramApiException
      */
-    public function setWebhook(string $url, array $options = []): array
+    public function setWebhook(string $url, array $options = [], ?string $withToken = null): array
     {
-        return $this->call('setWebhook', array_merge(['url' => $url], $options));
+        return $this->request('setWebhook', array_merge(['url' => $url], $options), $withToken);
     }
 
     /**
@@ -301,17 +310,19 @@ class TelegramService
      *
      * @throws TelegramApiException
      */
-    public function getWebhookInfo(): ?array
+    public function getWebhookInfo(?string $withToken = null): ?array
     {
-        return $this->result('getWebhookInfo');
+        $result = $this->request('getWebhookInfo', [], $withToken)['result'] ?? null;
+
+        return is_array($result) ? $result : null;
     }
 
     /**
      * @throws TelegramApiException
      */
-    public function deleteWebhook(): array
+    public function deleteWebhook(?string $withToken = null): array
     {
-        return $this->call('deleteWebhook');
+        return $this->request('deleteWebhook', [], $withToken);
     }
 
     // ---------------------------------------------------------------------
@@ -326,9 +337,9 @@ class TelegramService
      *
      * @throws TelegramApiException
      */
-    private function request(string $method, array $params): array
+    private function request(string $method, array $params, ?string $withToken = null): array
     {
-        $token = config('connectix_bot.telegram.token');
+        $token = $withToken ?? config('connectix_bot.telegram.token');
 
         if (blank($token)) {
             throw new TelegramApiException('Telegram bot token is not configured.');

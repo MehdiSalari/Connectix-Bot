@@ -331,6 +331,25 @@ class PanelSettingsService
     }
 
     /**
+     * Drop the cached panel payload and resolve it again.
+     *
+     * Legacy fetched GET /v1/seller/telegram-bot exactly once, during
+     * installation, and wrote the result to setup/bot_config.json. This is that
+     * fetch, on demand: the installer's bot configuration step calls it so the
+     * reseller's branding is in place the moment the wizard finishes instead of
+     * after the cache expires.
+     *
+     * @return array<string, mixed>
+     */
+    public function refresh(): array
+    {
+        $this->cache->forget('connectix_bot.panel.telegram_bot');
+        $this->resolved = null;
+
+        return $this->payload();
+    }
+
+    /**
      * The panel payload, from cache when possible.
      *
      * @return array{bot: array<string, mixed>, telegramMessages: array<string, string>}

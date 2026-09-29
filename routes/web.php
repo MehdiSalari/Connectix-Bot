@@ -11,6 +11,7 @@ use App\Http\Controllers\Admin\AdminSmsPaymentController;
 use App\Http\Controllers\Admin\AdminUserController;
 use App\Http\Controllers\Admin\AdminWalletTransactionController;
 use App\Http\Controllers\Bank\BankSmsController;
+use App\Http\Controllers\Setup\SetupWizardController;
 use App\Http\Controllers\Telegram\TelegramWebhookController;
 use Illuminate\Support\Facades\Route;
 
@@ -46,6 +47,48 @@ Route::post('/telegram/webhook', TelegramWebhookController::class)
 */
 
 Route::post('/bank/sms', BankSmsController::class)->name('bank.sms');
+
+/*
+|--------------------------------------------------------------------------
+| Installation wizard
+|--------------------------------------------------------------------------
+|
+| The Laravel replacement for legacy setup/index.php, setup/setup.php and
+| setup/setup_progress.php.
+|
+| Two middlewares decide what happens here:
+|
+|  - `setup.installed` (EnsureInstalled, global) is what sends an uninstalled
+|    application here in the first place. It lets /setup and /up through even on a
+|    fresh deployment, which is the only reason a fresh deployment can be
+|    installed at all;
+|  - `setup.protect` keeps the wizard to a signed in administrator once the
+|    application is installed, and answers 404 to everyone else.
+|
+| The steps are the legacy order, split so each can be retried on its own. The
+| POST routes are throttled: an installer that creates an admin and registers a
+| webhook should not be something a script can hammer.
+|
+*/
+
+Route::prefix('setup')->name('setup.')->middleware(['setup.protect', 'throttle:30,1'])->group(function (): void {
+    Route::get('/', [SetupWizardController::class, 'index'])->name('index');
+    Route::get('/done', [SetupWizardController::class, 'done'])->name('done');
+
+    Route::post('/database', [SetupWizardController::class, 'database'])->name('database');
+    Route::post('/migrations', [SetupWizardController::class, 'migrations'])->name('migrations');
+    Route::post('/connectix', [SetupWizardController::class, 'connectix'])->name('connectix');
+    Route::post('/telegram', [SetupWizardController::class, 'telegram'])->name('telegram');
+    Route::post('/webhook', [SetupWizardController::class, 'webhook'])->name('webhook');
+    Route::post('/admin', [SetupWizardController::class, 'admin'])->name('admin');
+    Route::post('/bot-config', [SetupWizardController::class, 'botConfig'])->name('bot-config');
+    Route::post('/import', [SetupWizardController::class, 'import'])->name('import');
+    Route::post('/complete', [SetupWizardController::class, 'complete'])->name('complete');
+    Route::post('/reset', [SetupWizardController::class, 'reset'])->name('reset');
+
+    // Last, so it never shadows a named step above.
+    Route::get('/{step}', [SetupWizardController::class, 'show'])->name('show');
+});
 
 /*
 |--------------------------------------------------------------------------

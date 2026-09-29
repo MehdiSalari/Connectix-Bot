@@ -23,6 +23,15 @@
         <env name="BCRYPT_ROUNDS" value="4"/>
         <env name="BROADCAST_CONNECTION" value="null"/>
         <env name="CACHE_STORE" value="array"/>
+        <!--
+            The first-run guard is off for the suite, so a test only has to run the
+            migrations to get a working application. tests/Feature/SetupTest.php
+            switches it back on per test to exercise the installer itself.
+        -->
+        <env name="CONNECTIX_SETUP_ENFORCE" value="false"/>
+        <!-- The installer writes here, never into the project's own files. -->
+        <env name="CONNECTIX_SETUP_STATE_FILE" value="storage/framework/testing/connectix-setup.json"/>
+        <env name="CONNECTIX_SETUP_ENV_FILE" value="storage/framework/testing/connectix-setup.env"/>
         <env name="DB_CONNECTION" value="sqlite"/>
         <env name="DB_DATABASE" value=":memory:"/>
         <env name="DB_URL" value=""/>

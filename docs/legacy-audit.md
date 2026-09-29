@@ -519,7 +519,65 @@ covers the other case, a fresh Laravel database filled from an old install.
   timestamp - so a repeated run does not duplicate it, because the panel does
   not expose an id for every transaction.
 
-## 16. Open items this audit could not settle
+## 16. The first-run installer (Phase 18)
+
+Legacy installed the bot from three files in the document root: `setup/index.php`
+(the form), `setup/setup.php` (one long script that wrote a `config.php` next to
+itself) and `setup/setup_progress.php` (the progress poll). Two of them wrote
+credentials into a PHP file served by the same web server, and the script had no
+steps to retry: one failure meant starting over, with no way to see how far it had
+got.
+
+The rewrite keeps the same sequence and makes each part its own step.
+
+| Legacy step | Rewrite |
+| --- | --- |
+| the form's environment report | `GET /setup/requirements` |
+| writing `config.php` | `App\Support\EnvWriter`, the only writer of `.env` |
+| `CREATE TABLE IF NOT EXISTS` per table | `POST /setup/migrations` → `migrate --force` |
+| seller panel login for the token | `POST /setup/connectix` → `ConnectixService::login()` |
+| `getMe` on the bot token | `POST /setup/telegram` → `getMe()` |
+| `setWebhook` with the shared secret | `POST /setup/webhook` |
+| `setAdmin()` upsert | `POST /setup/admin` |
+| writing `setup/bot_config.json` | `panel_settings` rows plus `CONNECTIX_BOT_*` in `.env` |
+| the closing screen | `POST /setup/complete`, live checks, then `GET /setup/done` |
+| `config.php` existing = installed | `App\Services\Setup\InstallationService` live checks |
+
+* **State is derived, not remembered.** `isInstalled()` reads the environment, the
+  database, the schema, the credentials and the admin table on every request.
+  `storage/app/connectix/setup.json` records which step last ran, for the report
+  and for `reset`, and is deliberately *not* the criterion: a deleted or forged
+  state file cannot unlock an uninstalled runtime, and a lost one cannot lock an
+  installed one out of its own panel.
+* **The installer closes itself.** Once the checks pass, `/setup/*` answers 404
+  to everyone except a signed in administrator with the `admin` role. The one
+  exception is the closing report immediately after a successful install, allowed
+  through the operator's own session because the application only became
+  installed a moment earlier and they are not signed in to the panel yet.
+* **Nothing destructive.** The schema step runs `migrate --force` and reports the
+  tables it could not create. There is no `migrate:fresh`, no `db:wipe` and no
+  `truncate` anywhere in the installer or its CLI, because the database it points
+  at is very often a populated one. `reset` removes the state file and nothing
+  else.
+* **Secrets stay secret.** Every credential goes to `.env` and none of them is
+  echoed back: the views show whether a value is set, never what it is. A failed
+  step logs the exception class and a redacted message, with anything shaped like
+  `password=…`, `token: …` or `bearer …` masked, because a shared host's log file
+  is readable by more people than this application.
+* **A release without `APP_KEY` can still install itself.** `EncryptCookies` and
+  the session refuse to boot without a key, so the key is resolved in
+  `AppServiceProvider::boot()` (`App\Services\Setup\ApplicationKey`) before the
+  HTTP kernel: from `config`, then `.env`, then a `0600` cache file under
+  `storage/`, and generated and persisted only if none of those had one. The key
+  is stable across requests, or the wizard's own session would die after every
+  click. The test suite never takes this path, so a test run cannot write to the
+  developer's `.env`.
+* **The same work from a shell.** `php artisan connectix:setup` offers
+  `status`, `requirements`, `migrate`, `webhook`, `complete` and `reset`, for a
+  host where the operator would rather not click through nine screens. `status`
+  prints the same check report the first step shows.
+
+## 17. Open items this audit could not settle
 
 * The `payments` receipt column set. Receipts are forwarded to the
   administrators as Telegram photos, never stored (Phase 9), matching legacy,
@@ -528,3 +586,9 @@ covers the other case, a fresh Laravel database filled from an old install.
   is safe either way, but if the panel forbids it the clamp is inert.
 * The real production schema. Only the dump and a local SQLite database have
   been verified; `migrate` against production MySQL is still untested.
+* The panel half of the installer against a live seller panel: `login()`,
+  `getTelegramBotConfig()` and the webhook calls are covered by fakes, and the
+  token probe only proves the panel accepts the token it is given.
+* The wizard against a real MySQL account. The tests run it on SQLite, and the
+  `CREATE DATABASE IF NOT EXISTS` branch and the privilege failures it exists for
+  have not been exercised.
