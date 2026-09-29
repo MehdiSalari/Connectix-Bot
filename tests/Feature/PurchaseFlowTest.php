@@ -14,6 +14,7 @@ use App\Models\Payment;
 use App\Models\User;
 use App\Models\Wallet;
 use App\Models\WalletTransaction;
+use App\Services\Plan\PlanService;
 use App\Services\Telegram\MessageFactory;
 use App\Services\User\UserStateService;
 use App\Services\Wallet\WalletService;
@@ -48,6 +49,15 @@ class PurchaseFlowTest extends TestCase
      * driven without re-faking, which would be shadowed by the setUp stubs.
      */
     private bool $storeFails = false;
+
+    /**
+     * What `show?id` answers with. Re-faking that URL would be shadowed by the
+     * setUp stub (the first registered pattern wins), so the stub reads this
+     * property per request and a test may swap it in mid-flight.
+     *
+     * @var array<string, mixed>|null
+     */
+    private ?array $panelClient = null;
 
     protected function setUp(): void
     {
@@ -85,6 +95,8 @@ class PurchaseFlowTest extends TestCase
      */
     private function fakePanel(array $clients = []): void
     {
+        $this->panelClient = $clients === [] ? $this->clientPayload() : $clients;
+
         $catalogue = [
             // `groups` is what the group menu is built from, alongside the
             // flattened plan list.
@@ -139,9 +151,9 @@ class PurchaseFlowTest extends TestCase
             // against the full URL including it. The username lookup is left
             // unfaked on purpose: a stub registered here would shadow the one
             // the linking test needs.
-            'https://api.connectix.vip/v1/seller/clients/show?id=*' => Http::response([
-                'client' => $clients === [] ? $this->clientPayload() : $clients,
-            ], 200),
+            'https://api.connectix.vip/v1/seller/clients/show?id=*' => function () {
+                return Http::response(['client' => $this->panelClient], 200);
+            },
             'https://api.connectix.vip/v1/seller/seller-plans' => Http::response($catalogue, 200),
             'https://api.telegram.org/*' => Http::response(['ok' => true, 'result' => true], 200),
             'https://t.me/*' => Http::response('<html></html>', 200),
@@ -859,6 +871,37 @@ class PurchaseFlowTest extends TestCase
 
         $this->assertSame('local-uuid', $payment->client_id, 'a renewal must not create a new account');
         $this->assertSame(PaymentStatus::Paid, $payment->is_paid);
+        $this->assertStringContainsString('اکانت شما با موفقیت تمدید شد.', $this->lastMessage());
+    }
+
+    /**
+     * Legacy read `plans[0]` off the client for the plan line. A panel answer
+     * without plans would render a blank line, so the ordered plan's title is
+     * used as the fallback (ClientProvisioner::currentPlanName).
+     */
+    public function test_a_client_without_plans_falls_back_to_the_ordered_plan_title(): void
+    {
+        $this->panelClient = [
+            'id' => 'panel-uuid',
+            'username' => 'acme-user',
+            'password' => 'pass1234',
+            'count_of_devices' => 1,
+        ];
+
+        $user = $this->makeUser(500_000);
+
+        $this->makeClient($user, 'local-uuid', 'acme-user');
+
+        $this->app->make(RenewHandler::class)->handle($this->press('renew_acc:acme-user'), $user);
+        $this->app->make(RenewHandler::class)->handle($this->press('renew_plan:(1x) Unlimited-1M'), $user);
+
+        $this->app->make(PurchaseHandler::class)->handle($this->press('pay_wallet:120,000'), $user);
+
+        $expected = $this->app->make(PlanService::class)
+            ->parsePlanTitle('(1x) Unlimited-1M')['text'];
+
+        $this->assertNotSame('', $expected);
+        $this->assertStringContainsString($expected, $this->lastMessage());
         $this->assertStringContainsString('اکانت شما با موفقیت تمدید شد.', $this->lastMessage());
     }
 

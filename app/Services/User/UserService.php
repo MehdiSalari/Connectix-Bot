@@ -81,10 +81,15 @@ class UserService
     }
 
     /**
-     * Port of `userInfo()` as a whole: clear the conversation state, sync the
-     * profile and guarantee a wallet.
+     * Sync the profile and guarantee a wallet for a chat we just saw.
+     *
+     * The conversation state is deliberately NOT cleared here. Legacy cleared
+     * it inside `userInfo()`, which ran only for `/start`, `main_menu` and
+     * `new_menu` (bot.php:104/390/400); clearing on every update destroyed
+     * multi-step flows mid-flight. Each of those three branches clears on its
+     * own, matching where legacy put it.
      */
-    public function sync(UserStateService $states, string|int $chatId, ?string $username, ?string $firstName): ?User
+    public function sync(string|int $chatId, ?string $username, ?string $firstName): ?User
     {
         try {
             $user = $this->findOrCreateByChatId($chatId);
@@ -92,8 +97,6 @@ class UserService
             if ($user === null) {
                 return null;
             }
-
-            $states->tryClear($user);
 
             return $this->refreshProfile($user, $username, $firstName);
         } catch (Throwable $e) {

@@ -34,12 +34,4 @@ class Wallet extends Model
     {
         return (int) $this->balance;
     }
-
-    /**
-     * Whether the wallet can cover the given amount.
-     */
-    public function canAfford(int $amount): bool
-    {
-        return $this->balanceAmount() >= $amount;
-    }
 }

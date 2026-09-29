@@ -358,4 +358,82 @@ class FreeTestFlowTest extends TestCase
         $this->assertSame('خطا در ایجاد اکانت', $this->lastEditText());
         $this->assertSame(0, Client::query()->count());
     }
+
+    // -----------------------------------------------------------------
+    // Failures after the panel client exists
+    // -----------------------------------------------------------------
+
+    /**
+     * The local insert fails (here: the id already exists), which is the one
+     * failure legacy handled by sending the error and nothing else. The trial
+     * was already spent on the panel, so it stays spent: a retry would only
+     * provision a second free client.
+     */
+    public function test_a_failed_local_store_reports_only_the_error_and_consumes_the_trial(): void
+    {
+        $this->fakePanel();
+
+        $user = $this->makeUser();
+
+        Client::query()->create([
+            'id' => 'trial-uuid',
+            'count_of_devices' => 1,
+            'username' => 'existing',
+            'password' => 'secret',
+            'chat_id' => (string) self::CHAT,
+            'user_id' => $user->id,
+            'created_at' => now(),
+        ]);
+
+        $this->handle('getTest_default', $user);
+
+        // The error message only: legacy never reached the credentials text,
+        // and a success message edited over the error would hide the failure.
+        $this->assertSame(['خطا در ذخیره اطلاعات اکانت'], $this->editTexts());
+
+        $user->refresh();
+
+        $this->assertTrue($user->test);
+        $this->assertSame(1, Client::query()->count());
+
+        // The retry is turned away instead of creating a second panel client.
+        $this->handle('getTest_default', $user);
+
+        $this->assertSame(1, $this->storeCalls());
+        $this->assertSame(
+            ['خطا در ذخیره اطلاعات اکانت', '⚠️ شما قبلا درخواست تست داده اید!'],
+            $this->editTexts(),
+        );
+    }
+
+    /**
+     * A panel that was created but cannot be read back still spends the trial:
+     * legacy committed `test = 1` before the insert no matter what the read
+     * returned, and without the flag every retry would add another client.
+     */
+    public function test_a_failed_panel_read_consumes_the_trial_without_storing_a_client(): void
+    {
+        $this->fakePanel([
+            'https://api.connectix.vip/v1/seller/clients/show?id=*' => Http::response(
+                ['message' => 'server error'],
+                500,
+            ),
+        ]);
+
+        $user = $this->makeUser();
+
+        $this->handle('getTest_default', $user);
+
+        $this->assertSame(['خطا در دریافت اطلاعات اکانت'], $this->editTexts());
+        $this->assertSame(0, Client::query()->count());
+
+        $user->refresh();
+
+        $this->assertTrue($user->test);
+
+        $this->handle('getTest_default', $user);
+
+        $this->assertSame(1, $this->storeCalls());
+        $this->assertStringContainsString('⚠️ شما قبلا درخواست تست داده اید!', $this->lastEditText());
+    }
 }

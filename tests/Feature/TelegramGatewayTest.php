@@ -11,9 +11,9 @@ use App\Services\Telegram\ChannelMembershipService;
 use App\Services\Telegram\TelegramGateway;
 use App\Services\Telegram\TelegramService;
 use App\Services\User\UserService;
-use App\Services\User\UserStateService;
 use App\Telegram\Contracts\UpdateHandler;
 use App\Telegram\HandlerRegistry;
+use App\Telegram\Handlers\StartHandler;
 use App\Telegram\TelegramUpdate;
 use Illuminate\Contracts\Container\Container;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -101,10 +101,10 @@ class TelegramGatewayTest extends TestCase
         return new TelegramGateway(
             $this->app->make(TelegramService::class),
             $this->app->make(UserService::class),
-            $this->app->make(UserStateService::class),
             $this->app->make(ChannelMembershipService::class),
             $registry,
             $this->app->make(PanelSettingsService::class),
+            $this->app->make(AdminGuard::class),
         );
     }
 
@@ -151,7 +151,12 @@ class TelegramGatewayTest extends TestCase
         $this->assertSame(1, HandlingHandler::$calls, 'only the first matching handler may run');
     }
 
-    public function test_it_clears_a_stale_conversation_state_before_dispatching(): void
+    /**
+     * A mid-flow update must keep its state: legacy cleared only inside the
+     * `/start` and menu branches (bot.php:104/390/400), never in the code
+     * path every update travelled through.
+     */
+    public function test_it_keeps_the_conversation_state_across_updates(): void
     {
         config(['connectix_bot.active' => true, 'connectix_bot.force_channel_join' => false]);
 
@@ -160,7 +165,36 @@ class TelegramGatewayTest extends TestCase
         $user = User::query()->create(['chat_id' => '555']);
         $user->forceFill(['action' => json_encode(['action' => 'buy', 'plan' => '99'])])->save();
 
-        $this->gateway([AlwaysHandles::class])->handle(TelegramUpdate::fromArray($this->startUpdate()));
+        $this->gateway([AlwaysHandles::class])->handle(TelegramUpdate::fromArray([
+            'update_id' => 1,
+            'message' => [
+                'message_id' => 1,
+                'from' => ['id' => 555, 'is_bot' => false, 'first_name' => 'Ali'],
+                'chat' => ['id' => 555, 'first_name' => 'Ali', 'username' => 'ali'],
+                'text' => '4321',
+            ],
+        ]));
+
+        $this->assertDatabaseHas('users', [
+            'chat_id' => '555',
+            'action' => json_encode(['action' => 'buy', 'plan' => '99']),
+        ]);
+    }
+
+    /**
+     * The clear still happens where legacy put it: inside the `/start`
+     * branch itself (bot.php:104), before the welcome message goes out.
+     */
+    public function test_the_start_branch_clears_the_conversation_state(): void
+    {
+        config(['connectix_bot.active' => true, 'connectix_bot.force_channel_join' => false]);
+
+        $this->fakeHttp();
+
+        $user = User::query()->create(['chat_id' => '555']);
+        $user->forceFill(['action' => json_encode(['action' => 'buy', 'plan' => '99'])])->save();
+
+        $this->gateway([StartHandler::class])->handle(TelegramUpdate::fromArray($this->startUpdate()));
 
         $this->assertDatabaseHas('users', ['chat_id' => '555', 'action' => null]);
     }
@@ -175,7 +209,40 @@ class TelegramGatewayTest extends TestCase
         $this->assertSame(0, HandlingHandler::$calls);
         $this->assertDatabaseMissing('users', ['chat_id' => '555']);
         Http::assertSent(fn ($request) => str_contains($request->url(), 'sendMessage')
-            && str_contains($request['text'], 'غیرفعال'));
+            && $request['text'] === 'ربات موقتاً غیرفعال است 💤');
+    }
+
+    /**
+     * The switch mutes users, not the people who flip it: legacy checked
+     * `!$isBotActive && !$isAdminRequest` at bot.php:81-83, so an
+     * administrator could always reach the bot after turning it off.
+     */
+    public function test_an_admin_is_served_while_the_bot_is_inactive(): void
+    {
+        config(['connectix_bot.active' => false, 'connectix_bot.force_channel_join' => false]);
+        config(['connectix_bot.admin_ids' => ['555']]);
+        $this->fakeHttp();
+
+        $this->gateway([AlwaysHandles::class])->handle(TelegramUpdate::fromArray($this->startUpdate()));
+
+        $this->assertSame(1, HandlingHandler::$calls);
+        $this->assertDatabaseHas('users', ['chat_id' => '555']);
+    }
+
+    /**
+     * The same bypass must not leak to everyone else: a stranger stays
+     * refused even when the id list is configured.
+     */
+    public function test_a_non_admin_is_still_refused_when_the_bot_is_inactive(): void
+    {
+        config(['connectix_bot.active' => false, 'connectix_bot.force_channel_join' => false]);
+        config(['connectix_bot.admin_ids' => ['999']]);
+        $this->fakeHttp();
+
+        $this->gateway([AlwaysHandles::class])->handle(TelegramUpdate::fromArray($this->startUpdate()));
+
+        $this->assertSame(0, HandlingHandler::$calls);
+        $this->assertDatabaseMissing('users', ['chat_id' => '555']);
     }
 
     public function test_the_channel_gate_blocks_a_user_who_has_not_joined(): void

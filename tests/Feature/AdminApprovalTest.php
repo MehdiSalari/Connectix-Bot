@@ -16,6 +16,7 @@ use App\Services\Wallet\WalletService;
 use App\Telegram\Handlers\AdminHandler;
 use App\Telegram\TelegramUpdate;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\Factory;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
@@ -62,9 +63,15 @@ class AdminApprovalTest extends TestCase
     // Fixtures
     // -----------------------------------------------------------------
 
-    private function fakePanel(): void
+    /**
+     * The whole fake set, built at once so refake() can override a single
+     * response for a failure test.
+     *
+     * @param  array<string, mixed>  $overrides
+     */
+    private function fakePanel(array $overrides = []): void
     {
-        Http::fake([
+        Http::fake(array_merge([
             'https://api.connectix.vip/v1/seller/clients/store' => Http::response(['client_id' => 'new-client-uuid'], 200),
             'https://api.connectix.vip/v1/seller/clients/add-plan' => Http::response(['ok' => true], 200),
             'https://api.connectix.vip/v1/seller/clients/show?id=*' => Http::response([
@@ -101,7 +108,22 @@ class AdminApprovalTest extends TestCase
                 ],
             ], 200),
             'https://api.telegram.org/*' => Http::response(['ok' => true, 'result' => true], 200),
-        ]);
+        ], $overrides));
+    }
+
+    /**
+     * Rebuild the whole fake set with overrides: Http::fake keeps the first
+     * stub registered for a URL, so setUp's set would win over a later call.
+     *
+     * @param  array<string, mixed>  $overrides
+     */
+    private function refake(array $overrides): void
+    {
+        Http::swap(new Factory);
+
+        Http::preventStrayRequests();
+
+        $this->fakePanel($overrides);
     }
 
     private function makeBuyer(): User
@@ -315,6 +337,117 @@ class AdminApprovalTest extends TestCase
         $this->app->make(AdminHandler::class)->handle($this->pressAs('not'), $buyer);
 
         $this->assertSame(['🤷🏻 این دکمه کاری انجام نمیده'], $this->answerCallbackTexts());
+    }
+
+    // -----------------------------------------------------------------
+    // Failures during the decision
+    // -----------------------------------------------------------------
+
+    /**
+     * The panel refuses to create the client while the administrator
+     * approves. The money is taken but the account does not exist, so the
+     * order stays open for a retry; only the buyer is told what happened.
+     *
+     * Legacy stopped at a log line and left the receipt untouched - and left
+     * the buyer silent about a payment it had already taken. The caption
+     * stays untouched here too; the admin alert is what legacy never had.
+     */
+    public function test_a_panel_failure_during_acceptance_leaves_the_order_pending(): void
+    {
+        $this->refake([
+            'https://api.connectix.vip/v1/seller/clients/store' => Http::response(
+                ['message' => 'server error'],
+                500,
+            ),
+        ]);
+
+        $buyer = $this->makeBuyer();
+        $payment = $this->makePayment();
+
+        $this->app->make(AdminHandler::class)->handle($this->pressAs('payment_accept:'.$payment->id), $buyer);
+
+        $payment->refresh();
+
+        $this->assertSame(PaymentStatus::Pending, $payment->is_paid);
+        $this->assertSame('new', $payment->client_id);
+
+        $this->assertStringContainsString(
+            '❌ ساخت اکانت شما با خطا مواجه شد.',
+            implode("\n", $this->sentMessages()),
+        );
+
+        $this->assertSame([], $this->editCaptions());
+        $this->assertSame(['رکورد مورد نظر یافت نشد.'], $this->answerCallbackTexts());
+    }
+
+    /**
+     * Same for a renewal: the order only ever moves to paid once the panel
+     * accepted the plan, so a failed add-plan keeps it pending and the
+     * administrator can approve again once the panel recovers.
+     */
+    public function test_an_add_plan_failure_during_a_renewal_leaves_the_order_pending(): void
+    {
+        $this->refake([
+            'https://api.connectix.vip/v1/seller/clients/add-plan' => Http::response(
+                ['message' => 'server error'],
+                500,
+            ),
+        ]);
+
+        $buyer = $this->makeBuyer();
+
+        $payment = $this->app->make(PaymentService::class)->create(
+            chatId: self::CHAT,
+            clientId: 'acme-uuid',
+            planId: '11',
+            price: '120,000',
+            method: PaymentMethod::Card,
+        ) ?? $this->fail('payment could not be created');
+
+        $this->app->make(AdminHandler::class)->handle($this->pressAs('payment_accept:'.$payment->id), $buyer);
+
+        $payment->refresh();
+
+        $this->assertSame(PaymentStatus::Pending, $payment->is_paid);
+        $this->assertSame('acme-uuid', $payment->client_id);
+
+        $this->assertStringContainsString(
+            '❌ ساخت اکانت شما با خطا مواجه شد.',
+            implode("\n", $this->sentMessages()),
+        );
+
+        $this->assertSame([], $this->editCaptions());
+    }
+
+    /**
+     * The account exists by the time the buyer is told about it: when
+     * Telegram cannot deliver that message, the order must still end up
+     * paid, because a lost notification cannot undo a provisioned client.
+     */
+    public function test_a_failed_credential_delivery_still_marks_the_order_paid(): void
+    {
+        $this->refake([
+            'https://api.telegram.org/bottest-token/sendMessage' => Http::response(
+                ['ok' => false, 'description' => 'internal server error'],
+                200,
+            ),
+        ]);
+
+        $buyer = $this->makeBuyer();
+        $payment = $this->makePayment();
+
+        $this->app->make(AdminHandler::class)->handle($this->pressAs('payment_accept:'.$payment->id), $buyer);
+
+        $payment->refresh();
+
+        $this->assertSame(PaymentStatus::Paid, $payment->is_paid);
+        $this->assertSame('new-client-uuid', $payment->client_id);
+        $this->assertSame(1, $this->storeCalls());
+
+        $this->assertStringContainsString(
+            '✅ سفارش شماره <code>'.$payment->order_number.'</code> با موفقیت تایید شد',
+            $this->lastEditCaption(),
+        );
     }
 
     // -----------------------------------------------------------------

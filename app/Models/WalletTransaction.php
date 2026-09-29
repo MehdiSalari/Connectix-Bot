@@ -40,9 +40,4 @@ class WalletTransaction extends Model
     {
         return $this->belongsTo(Wallet::class, 'wallet_id');
     }
-
-    public function isPending(): bool
-    {
-        return $this->status->isPending();
-    }
 }

@@ -8,7 +8,6 @@ use App\Exceptions\TelegramApiException;
 use App\Models\User;
 use App\Services\Panel\PanelSettingsService;
 use App\Services\User\UserService;
-use App\Services\User\UserStateService;
 use App\Telegram\HandlerRegistry;
 use App\Telegram\TelegramUpdate;
 use Illuminate\Support\Facades\Log;
@@ -20,7 +19,9 @@ use Throwable;
  * Replaces the ~600 line procedural bot.php. The gateway owns exactly four
  * concerns, in the same order legacy applied them:
  *
- *   1. the bot is switched on,
+ *   1. the bot is switched on (unless the sender is an administrator, which is
+ *      what legacy did at bot.php:81-83 - the switch mutes users, not the
+ *      people who flip it),
  *   2. the user is a member of the required channel,
  *   3. the user row exists and is in sync,
  *   4. the first handler that claims the update runs.
@@ -33,10 +34,10 @@ class TelegramGateway
     public function __construct(
         private readonly TelegramService $telegram,
         private readonly UserService $users,
-        private readonly UserStateService $states,
         private readonly ChannelMembershipService $channels,
         private readonly HandlerRegistry $handlers,
         private readonly PanelSettingsService $settings,
+        private readonly AdminGuard $admins,
     ) {}
 
     public function handle(TelegramUpdate $update): void
@@ -48,8 +49,9 @@ class TelegramGateway
             return;
         }
 
-        if (! $this->settings->flag('connectix_bot.active', 'bot_active', true)) {
-            $this->refuse($update, $chatId, 'ربات در حال حاضر غیرفعال است.');
+        if (! $this->settings->flag('connectix_bot.active', 'bot_active', true)
+            && ! $this->admins->isAdmin($update->fromUserId())) {
+            $this->refuse($update, $chatId, 'ربات موقتاً غیرفعال است 💤');
 
             return;
         }
@@ -59,7 +61,6 @@ class TelegramGateway
         }
 
         $user = $this->users->sync(
-            $this->states,
             $chatId,
             $update->username(),
             $update->firstName(),

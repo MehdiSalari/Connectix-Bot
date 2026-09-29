@@ -223,6 +223,60 @@ class AdminAuthTest extends TestCase
         $this->assertGuest('admin');
     }
 
+    /**
+     * The cookie holds the seller token itself, so it must never be readable
+     * from JavaScript and must carry the thirty day lifetime login.php set.
+     */
+    public function test_the_remembered_token_cookie_is_httponly_and_lasts_thirty_days(): void
+    {
+        $this->makeAdmin();
+
+        $response = $this->post(route('admin.login.attempt'), $this->credentials());
+
+        $cookie = $response->getCookie('token');
+
+        $this->assertNotNull($cookie, 'the token cookie was not set');
+        $this->assertTrue($cookie->isHttpOnly());
+        // Written as 'Lax'; Symfony reports the normalized lower case.
+        $this->assertSame('lax', strtolower((string) $cookie->getSameSite()));
+        $this->assertSame('/', $cookie->getPath());
+
+        $ttl = $cookie->getExpiresTime() - time();
+
+        $this->assertGreaterThan(30 * 24 * 3600 - 60, $ttl);
+        $this->assertLessThanOrEqual(30 * 24 * 3600, $ttl);
+    }
+
+    public function test_the_token_cookie_is_marked_secure_only_when_served_over_https(): void
+    {
+        $this->makeAdmin();
+
+        $plain = $this->post(route('admin.login.attempt'), $this->credentials());
+
+        $this->assertFalse($plain->getCookie('token')->isSecure());
+
+        // The https URL is what makes the framework see a TLS request: a bare
+        // HTTPS server variable is stripped again for an http URI.
+        $secure = $this->post(
+            str_replace('http://', 'https://', route('admin.login.attempt')),
+            $this->credentials(),
+        );
+
+        $this->assertTrue($secure->getCookie('token')->isSecure());
+    }
+
+    public function test_the_session_cookie_is_httponly(): void
+    {
+        $this->makeAdmin();
+
+        $response = $this->post(route('admin.login.attempt'), $this->credentials());
+
+        $cookie = $response->getCookie((string) config('session.cookie'), false);
+
+        $this->assertNotNull($cookie, 'the session cookie was not set');
+        $this->assertTrue($cookie->isHttpOnly());
+    }
+
     // -----------------------------------------------------------------
     // Signing out and roles
     // -----------------------------------------------------------------

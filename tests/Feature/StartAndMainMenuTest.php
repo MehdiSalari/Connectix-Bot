@@ -279,6 +279,33 @@ class StartAndMainMenuTest extends TestCase
         $this->assertNotEmpty($this->sentMessages());
     }
 
+    /**
+     * Keyboards sent before the rewrite still sit in old chats carrying the
+     * `new_menu` callback (functions.php:2391/2425/2508/2983). Legacy claimed
+     * it (bot.php:400): the state was cleared through `userInfo()` and the
+     * welcome menu was posted as a fresh message, not as an edit.
+     */
+    public function test_new_menu_is_claimed_and_posts_a_fresh_message_like_legacy(): void
+    {
+        $user = $this->makeUser();
+        $user->forceFill(['action' => json_encode(['action' => 'coupon'])])->save();
+
+        $update = $this->update('new_menu', 555, isCallback: true);
+        $handler = $this->app->make(MainMenuHandler::class);
+
+        $this->assertTrue($handler->supports($update, $user), 'old keyboards must keep working');
+
+        $handler->handle($update, $user);
+
+        $this->assertNotEmpty($this->sentMessages(), 'legacy answered new_menu with a fresh message');
+
+        foreach (Http::recorded() as [$request]) {
+            $this->assertStringNotContainsString('editMessageText', $request->url());
+        }
+
+        $this->assertDatabaseHas('users', ['chat_id' => '555', 'action' => null]);
+    }
+
     public function test_the_welcome_text_comes_from_the_seller_panel(): void
     {
         config(['connectix_bot.panel.enabled' => true, 'connectix_bot.connectix.token' => 'panel-token']);

@@ -19,6 +19,7 @@ use App\Telegram\Handlers\PaymentHandler;
 use App\Telegram\Handlers\PurchaseHandler;
 use App\Telegram\TelegramUpdate;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\Factory;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
@@ -65,7 +66,13 @@ class ReceiptPaymentTest extends TestCase
     // Fixtures
     // -----------------------------------------------------------------
 
-    private function fakePanel(array $clients = []): void
+    /**
+     * The whole fake set, built at once so a test can override a single
+     * response through refake() without inheriting stale stubs.
+     *
+     * @param  array<string, mixed>  $overrides
+     */
+    private function fakePanel(array $overrides = []): void
     {
         $catalogue = [
             'groups' => [['name' => 'default']],
@@ -87,11 +94,11 @@ class ReceiptPaymentTest extends TestCase
             ],
         ];
 
-        Http::fake([
+        Http::fake(array_merge([
             'https://api.connectix.vip/v1/seller/clients/store' => Http::response(['client_id' => 'new-client-uuid'], 200),
             'https://api.connectix.vip/v1/seller/clients/add-plan' => Http::response(['ok' => true], 200),
             'https://api.connectix.vip/v1/seller/clients/show?id=*' => Http::response([
-                'client' => $clients === [] ? $this->clientPayload() : $clients,
+                'client' => $this->clientPayload(),
             ], 200),
             'https://api.connectix.vip/v1/seller/clients?username=*' => Http::response([
                 'clients' => ['data' => [$this->clientPayload()]],
@@ -99,7 +106,25 @@ class ReceiptPaymentTest extends TestCase
             'https://api.connectix.vip/v1/seller/seller-plans' => Http::response($catalogue, 200),
             'https://api.telegram.org/*' => Http::response(['ok' => true, 'result' => true], 200),
             'https://t.me/*' => Http::response('<html></html>', 200),
-        ]);
+        ], $overrides));
+    }
+
+    /**
+     * Rebuild the whole fake set with overrides.
+     *
+     * Http::fake keeps the first stub registered for a URL, so setUp's set
+     * would win over a later call; swapping in a fresh factory is what lets a
+     * test change one response after the fact.
+     *
+     * @param  array<string, mixed>  $overrides
+     */
+    private function refake(array $overrides): void
+    {
+        Http::swap(new Factory);
+
+        Http::preventStrayRequests();
+
+        $this->fakePanel($overrides);
     }
 
     private function fakeCoupons(array $coupons): void
@@ -405,6 +430,53 @@ class ReceiptPaymentTest extends TestCase
 
         $this->assertSame('panel-uuid', $payment->client_id);
         $this->assertSame(PaymentStatus::Pending, $payment->is_paid);
+    }
+
+    /**
+     * Telegram goes down between the card screen and the receipt. The photo
+     * is the buyer's proof of payment: the order must be written and the
+     * conversation closed even though neither the confirmation nor the
+     * forward to the administrators could be delivered.
+     */
+    public function test_a_telegram_outage_still_writes_the_order_and_clears_the_state(): void
+    {
+        $user = $this->makeUser();
+
+        $this->startCardPurchase($user);
+
+        $this->refake([
+            'https://api.telegram.org/*' => Http::response(
+                ['ok' => false, 'description' => 'internal server error'],
+                200,
+            ),
+        ]);
+
+        $this->app->make(PaymentHandler::class)->handle($this->photo(), $user);
+
+        $payment = Payment::query()->firstOrFail();
+
+        $this->assertSame(PaymentStatus::Pending, $payment->is_paid);
+        $this->assertStringStartsWith('CX', (string) $payment->order_number);
+        $this->assertSame([], $this->state($user));
+    }
+
+    /**
+     * A duplicate photo after the receipt step is over (Telegram redelivers,
+     * or the buyer sends another picture) must not open a second order.
+     */
+    public function test_a_second_card_receipt_after_the_state_is_cleared_creates_no_second_order(): void
+    {
+        $user = $this->makeUser();
+
+        $this->startCardPurchase($user);
+
+        $handler = $this->app->make(PaymentHandler::class);
+
+        $handler->handle($this->photo(), $user);
+        $handler->handle($this->photo('AgAC-second'), $user);
+
+        $this->assertSame(1, Payment::query()->count());
+        $this->assertSame([], $this->state($user));
     }
 
     // -----------------------------------------------------------------

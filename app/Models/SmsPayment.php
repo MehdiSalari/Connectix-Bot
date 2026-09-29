@@ -42,14 +42,4 @@ class SmsPayment extends Model
             ->where('expired_at', '>', now())
             ->where('created_at', '<=', now());
     }
-
-    public function isExpired(): bool
-    {
-        return $this->expired_at !== null && $this->expired_at->isPast();
-    }
-
-    public function isMatched(): bool
-    {
-        return $this->payment_id !== null && $this->payment_id !== '';
-    }
 }

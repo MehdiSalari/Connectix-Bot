@@ -13,7 +13,6 @@ use App\Services\Telegram\MessageFactory;
 use App\Services\Telegram\TelegramService;
 use App\Telegram\Contracts\UpdateHandler;
 use App\Telegram\TelegramUpdate;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -165,13 +164,23 @@ class FreeTestHandler implements UpdateHandler
             return;
         }
 
+        // The panel client exists now, so the trial is consumed from here on.
+        // Legacy committed `test = 1` for every run that reached this point
+        // (autocommit made the flag survive even a failed local insert), and
+        // a retry after a later failure would provision a second free client.
+        if (! $this->markTrialUsed($update, $user)) {
+            return;
+        }
+
         $client = $this->fetchPanelClient($update, $user, $clientId);
 
         if ($client === null) {
             return;
         }
 
-        $this->storeLocally($update, $user, $clientId, $client);
+        if (! $this->storeLocally($update, $user, $clientId, $client)) {
+            return;
+        }
 
         $this->confirm($update, $user, $client);
     }
@@ -271,27 +280,53 @@ class FreeTestHandler implements UpdateHandler
     }
 
     /**
-     * Mark the trial as used and keep a local copy of the account, mirroring
-     * the two statements of the legacy database block.
+     * Mark the user's trial as used, the `UPDATE users SET test = 1` of the
+     * legacy database block.
+     *
+     * Kept separate from the client insert below and committed on its own,
+     * exactly as legacy autocommit did: a trial whose local insert fails must
+     * still be spent, otherwise a retry provisions a second free client.
+     */
+    private function markTrialUsed(TelegramUpdate $update, User $user): bool
+    {
+        try {
+            $user->forceFill(['test' => true])->save();
+        } catch (\Throwable $e) {
+            Log::error('Free test flag could not be saved.', [
+                'chat_id' => $user->chat_id,
+                'error' => $e->getMessage(),
+            ]);
+
+            $this->render($update, $user, 'خطا در ذخیره اطلاعات اکانت', []);
+
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Keep a local copy of the account, the `INSERT INTO clients` of the
+     * legacy database block.
+     *
+     * Returns false when the row could not be written. Legacy stopped here
+     * with the same error and never sent the credentials, so the caller must
+     * not fall through to the success message either.
      *
      * @param  array<string, mixed>  $client
      */
-    private function storeLocally(TelegramUpdate $update, User $user, string $clientId, array $client): void
+    private function storeLocally(TelegramUpdate $update, User $user, string $clientId, array $client): bool
     {
         try {
-            DB::transaction(function () use ($user, $clientId, $client): void {
-                $user->forceFill(['test' => true])->save();
-
-                Client::query()->create([
-                    'id' => $clientId,
-                    'count_of_devices' => (int) ($client['count_of_devices'] ?? 0),
-                    'username' => (string) ($client['username'] ?? ''),
-                    'password' => (string) ($client['password'] ?? ''),
-                    'chat_id' => (string) $user->chat_id,
-                    'user_id' => $user->id,
-                    'created_at' => now(),
-                ]);
-            });
+            Client::query()->create([
+                'id' => $clientId,
+                'count_of_devices' => (int) ($client['count_of_devices'] ?? 0),
+                'username' => (string) ($client['username'] ?? ''),
+                'password' => (string) ($client['password'] ?? ''),
+                'chat_id' => (string) $user->chat_id,
+                'user_id' => $user->id,
+                'created_at' => now(),
+            ]);
         } catch (\Throwable $e) {
             Log::error('Free test client could not be stored locally.', [
                 'client_id' => $clientId,
@@ -300,7 +335,11 @@ class FreeTestHandler implements UpdateHandler
             ]);
 
             $this->render($update, $user, 'خطا در ذخیره اطلاعات اکانت', []);
+
+            return false;
         }
+
+        return true;
     }
 
     /**

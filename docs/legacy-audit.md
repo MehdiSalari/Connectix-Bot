@@ -664,3 +664,83 @@ upload rejection, role and origin gates, client password, bank secret) and
 
 Left to the operator: rotating the bot token is only necessary if `config.php`
 has ever left the machine - it has never been tracked by git.
+
+## 19. Testing and legacy parity (Phase 18)
+
+Phase 18 compared each flow branch by branch against `bot.php` /
+`functions.php` and pinned the comparison with tests. The suite stands at 430
+tests, 1381 assertions.
+
+### The state clear belonged to three branches, not to every update
+
+* **Legacy**: `userInfo()` - whose first statement was `actionStep('clear', ...)`
+  (functions.php:194) - ran only at bot.php:104 (`/start`), bot.php:390
+  (`main_menu`) and bot.php:400 (`new_menu`).
+* **The bug**: `UserService::sync()` ported `userInfo()` wholesale and ran on
+  *every* webhook update, so `users.action` was wiped before the handler read
+  it. No multi-step flow survived its second update (`PurchaseHandler` died on
+  the missing `acc` key, and the E2E walk produced no order at all).
+* **Fixed**: the clear is gone from `sync()`; `StartHandler` and
+  `MainMenuHandler` clear where legacy put it. Pinned by
+  `TelegramGatewayTest::test_it_keeps_the_conversation_state_across_updates`,
+  `...test_the_start_branch_clears_the_conversation_state`, and exercised
+  through the real webhook by `EndToEndPurchaseTest`.
+
+### `new_menu` still exists in old chats
+
+Legacy keyboards carry the `new_menu` callback
+(functions.php:2391/2425/2508/2983) and messages live forever, so
+`MainMenuHandler` claims it as well: the state is cleared through
+`userInfo()`'s old path and the welcome menu is posted as a fresh message
+(bot.php:400), not as an edit.
+
+### What the failure and edge tests pin
+
+* **Trial accounts.** The `test` flag is committed the moment the panel
+  creates the client, so a failed profile fetch still consumes the one free
+  trial (legacy's autocommit), and a failed store reports only the error -
+  no success message, no half-written row (legacy wrote a row with empty
+  credentials; the rewrite does not).
+* **Panel failures during acceptance.** An accept whose panel call fails
+  leaves the order `Pending` and answers `رکورد مورد نظر یافت نشد.`; a
+  renewal whose `add-plan` fails stays `Pending`; a failure to *deliver* the
+  credentials still marks the order `Paid`, because the account exists.
+* **Telegram outages.** A receipt whose forward fails still writes the order
+  and clears the state - the money arrived, the silence must not.
+* **Duplicate receipts.** A second photo after the state was cleared
+  acknowledges without creating a second order; the E2E redelivery test
+  asserts the same through the webhook ledger.
+* **Coupon window.** The bounds are inclusive exactly as legacy compared
+  them, and the default "now" is the Tehran ISO string legacy passed.
+* **Admin cookies.** `remember_token`-style login: `HttpOnly`, `SameSite=Lax`
+  (Symfony normalises case), 30 days, `Secure` when served over HTTPS - the
+  secure flag is only reachable from an `https://` request because Symfony
+  unsets `HTTPS` for http URIs.
+* **Plan label fallback.** A panel answer without `plans` falls back to the
+  ordered plan's parsed title instead of rendering a blank line
+  (`ClientProvisioner::currentPlanName`; its last tier - the raw `plan_id` -
+  is unreachable through provisioning, which requires a sellable plan first).
+* **End to end.** `EndToEndPurchaseTest` drives `/start` -> buy -> group ->
+  device count -> plan -> card -> receipt -> admin accept through
+  `POST /telegram/webhook` with the configured secret, and expects a `Paid`
+  order, a stored client and the caption legacy sent.
+
+### Test infrastructure notes
+
+* `Http::fake()` keeps the first registered pattern for a URL: re-faking a
+  stub set up in `setUp()` never wins. Panel payloads are therefore swapped
+  through properties the stub reads per request (`$storeFails`,
+  `$panelClient`), or by rebuilding the whole factory via `Http::swap()` in
+  `refake()`.
+
+### Known divergences, deliberately kept
+
+* **Profile refresh on every update.** Legacy re-scraped `t.me/<username>`
+  only at `/start`, `main_menu` and `new_menu`; `UserService::sync()` still
+  does it on every update for users with a username. The data ends up fresher
+  and failures are logged and ignored, but it costs one outbound request per
+  update. Moving it into the same three branches is a candidate follow-up if
+  t.me load ever matters.
+* **Wallet row on first contact.** `ensureWallet()` guarantees the zero
+  balance wallet as soon as the user is seen, rather than wherever legacy
+  happened to create it first.

@@ -125,6 +125,50 @@ class CouponServiceTest extends TestCase
         $this->assertNull($this->coupons->rejectionReason('SAVE10'));
     }
 
+    /**
+     * The bounds are compared lexically and both ends are inclusive, so a
+     * coupon is usable right up to the last microsecond of its last day.
+     */
+    public function test_the_window_bounds_are_inclusive_exactly_as_legacy_compared_them(): void
+    {
+        $coupon = [
+            'start_date_text' => '2026-01-01T00:00:00.000000Z',
+            'end_date_text' => '2026-01-31T23:59:59.999999Z',
+        ];
+
+        $this->assertTrue($this->coupons->isWithinWindow($coupon, '2026-01-01T00:00:00.000000Z'));
+        $this->assertTrue($this->coupons->isWithinWindow($coupon, '2026-01-31T23:59:59.999999Z'));
+        $this->assertFalse($this->coupons->isWithinWindow($coupon, '2025-12-31T23:59:59.999999Z'));
+        $this->assertFalse($this->coupons->isWithinWindow($coupon, '2026-02-01T00:00:00.000000Z'));
+    }
+
+    /**
+     * The panel sends its bounds as `Y-m-d\TH:i:s.u\Z` strings and the
+     * internal "now" is compared against them as a string. If that shape
+     * ever changed (a space instead of the T, a missing Z, a different
+     * clock), a plainly open window would read as expired.
+     */
+    public function test_the_default_now_is_the_legacy_tehran_iso_string(): void
+    {
+        $now = now('Asia/Tehran');
+
+        $this->fakeCoupons([
+            $this->coupon([
+                'coupon_code' => 'OPEN',
+                'start_date_text' => $now->copy()->subMinute()->format('Y-m-d\TH:i:s.u\Z'),
+                'end_date_text' => $now->copy()->addMinute()->format('Y-m-d\TH:i:s.u\Z'),
+            ]),
+            $this->coupon([
+                'coupon_code' => 'FUTURE',
+                'start_date_text' => $now->copy()->addMinute()->format('Y-m-d\TH:i:s.u\Z'),
+                'end_date_text' => $now->copy()->addHours(2)->format('Y-m-d\TH:i:s.u\Z'),
+            ]),
+        ]);
+
+        $this->assertNull($this->coupons->rejectionReason('OPEN'));
+        $this->assertSame(CouponService::ERROR_EXPIRED, $this->coupons->rejectionReason('FUTURE'));
+    }
+
     public function test_a_plan_restricted_coupon_is_refused_for_another_plan(): void
     {
         $this->fakeCoupons([$this->coupon([
