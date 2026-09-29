@@ -22,6 +22,8 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->alias([
             'telegram.webhook' => \App\Http\Middleware\VerifyTelegramWebhook::class,
+            'admin.auth' => \App\Http\Middleware\AuthenticateAdmin::class,
+            'admin.role' => \App\Http\Middleware\EnsureAdminRole::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

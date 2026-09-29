@@ -248,6 +248,37 @@ class ConnectixService
     }
 
     /**
+     * Whether a bearer token belongs to a live Connectix seller account.
+     *
+     * Port of the login.php cookie check: the remembered token was fetched
+     * from the admins table and the panel was asked for the seller it belongs
+     * to. The token is only valid when the response carries a seller id.
+     *
+     * This is the one endpoint that authenticates with a caller-supplied token
+     * instead of the configured one, hence the separate path.
+     */
+    public function verifySellerToken(string $token): bool
+    {
+        try {
+            $payload = $this->send('get', '/v1/seller/seller-data', [], $token);
+        } catch (ConnectixApiException $e) {
+            Log::warning('Seller token could not be verified on the panel.', [
+                'error' => $e->getMessage(),
+            ]);
+
+            return false;
+        }
+
+        $seller = $payload['data']['seller'] ?? $payload['seller'] ?? null;
+
+        if (! is_array($seller) || blank($seller['id'] ?? null)) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
      * Push the Telegram bot token to the seller panel.
      *
      * @param  array<string, mixed>  $body
@@ -341,9 +372,9 @@ class ConnectixService
      *
      * @throws ConnectixApiException
      */
-    private function send(string $verb, string $endpoint, array $options): array
+    private function send(string $verb, string $endpoint, array $options, ?string $token = null): array
     {
-        $token = config('connectix_bot.connectix.token');
+        $token ??= config('connectix_bot.connectix.token');
 
         if (blank($token)) {
             throw new ConnectixApiException(

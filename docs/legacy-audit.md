@@ -217,7 +217,54 @@ Laravel-owned code reads its name from `PanelSettingsService` instead, with
   appears only for android (4), windows (5) and mac (11), built from config
   `connectix_bot.telegram_app_username`. Home and back rows close the page.
 
-## 11. Open items this audit could not settle
+## 11. Admin authentication and authorization (Phase 12)
+
+The `admins` table and its `Admin` model predated this phase. The web session
+login behind `login.php`, the remembered `token` cookie of `logout.php` and the
+`isset($_SESSION['admin_id'])` page guard were ported to `/admin`.
+
+### Sign in
+
+* `AdminLoginController::login` mirrors `login.php`: lookup `admins.email`,
+  `Hash::check` against the bcrypt `password`, then open the `admin` guard
+  session. Both an unknown email and a wrong password answer the single legacy
+  message `Invalid email or password` (no user enumeration).
+* The form is CSRF-protected and validated (`email` required/max 190,
+  `password` required); a failed attempt is redirected back to the login page
+  with the error flashed and the typed email kept as `old()` input.
+* On success the response remembers the seller token in a 30-day
+  `token` cookie (the legacy `setcookie('token', $admin['token'], ...)`).
+
+### Remembered token auto-login
+
+* With a `token` cookie, `login.php` called
+  `https://api.connectix.vip/v1/seller/seller-data` with
+  `Authorization: Bearer <token>` and only trusted the session when the seller
+  `id` came back. `AdminLoginController::show` reproduces that via
+  `ConnectixService::verifySellerToken`, which:
+  * makes a GET with the cookie token overriding the config bearer,
+  * returns `false` when the payload has no seller `id`,
+  * treats a `ConnectixApiException` (non-2xx/network) as "panel no longer
+    accepts it".
+* A token that names neither an `admins` row nor a seller the panel still
+  accepts is dropped (`Cookie::forget` → expired) and the admin stays on the
+  login page. Legacy redirected there to `setup/index.php`; the installer was
+  not ported, so the site keeps serving until credentials are entered.
+
+### Roles and authorization
+
+* `EnsureAdminRole` gate reads `admins.role` (`admin`/`editor`). `editor` may
+  open the dashboard; routes that mutate data will be admin-only. Legacy
+  stored but never enforced the role at runtime — this is the first place the
+  enum has teeth, so it is a deliberate improvement, not a regression.
+* `AuthenticateAdmin` replaces the `isset($_SESSION['admin_id'])` cheek of each
+  legacy page: guests are sent to `admin.login` (preserving the intended URL
+  for `redirect()->intended()` after signing in), and JSON requests get a
+  401.
+* `logout` invalidates the session, regenerates the CSRF token and expires the
+  `token` cookie, matching `logout.php`.
+
+## 12. Open items this audit could not settle
 
 * The `payments` receipt column set. Receipts are forwarded to the
   administrators as Telegram photos, never stored (Phase 9), matching legacy,
