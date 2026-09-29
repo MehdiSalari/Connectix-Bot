@@ -51,8 +51,7 @@ class PlanService
 
     public function __construct(
         private readonly ConnectixService $connectix,
-    ) {
-    }
+    ) {}
 
     // -----------------------------------------------------------------
     // Catalogue
@@ -65,7 +64,7 @@ class PlanService
      */
     public function payload(): ?array
     {
-        $cacheKey = 'echovpn.seller_plans';
+        $cacheKey = 'connectix_bot.seller_plans';
 
         try {
             return Cache::remember(
@@ -329,7 +328,7 @@ class PlanService
      */
     public function parseType(string $type): string
     {
-        $groups = config('echovpn.plan_groups', []);
+        $groups = config('connectix_bot.plan_groups', []);
 
         return match ($type) {
             'default' => $groups['default'] ?? 'ویژه',
@@ -446,10 +445,12 @@ class PlanService
             'text' => $finalText,
             'is_free' => $isFree,
             'devices' => $devices,
-            'traffic_gb' => $isUnlimited ? '∞' : ($traffic !== null && $traffic !== '' ? (float) $traffic : null),
+            // A truthy check for the same reason as the gift suffix: legacy
+            // yields null (not 0.0) for a "0GB" quota.
+            'traffic_gb' => $isUnlimited ? '∞' : ((bool) $traffic ? (float) $traffic : null),
             'period_text' => $periodText,
             'period_days' => $this->approximateDays((int) $periodNum, $periodUnit),
-            'gift_days' => $giftDays !== null ? (int) $giftDays : 0,
+            'gift_days' => (bool) $giftDays ? (int) $giftDays : 0,
             'extras' => $extras,
             'has_sublink' => in_array('ساب‌لینک', $extras, true) || in_array('بیزینس ساب‌لینک', $extras, true),
             'has_static_ip' => in_array('آی‌پی ثابت', $extras, true),
@@ -491,7 +492,10 @@ class PlanService
     {
         $extras = [];
 
-        if ($giftDays !== null && $giftDays !== '') {
+        // A truthy check, not a null check: legacy drops a "+0D" suffix because
+        // the string "0" is falsy in PHP, and a plan titled that way renders
+        // without a gift badge.
+        if ((bool) $giftDays) {
             $extras[] = "+$giftDays روز هدیه";
         }
 

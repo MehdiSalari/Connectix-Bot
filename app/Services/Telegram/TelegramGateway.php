@@ -6,6 +6,7 @@ namespace App\Services\Telegram;
 
 use App\Exceptions\TelegramApiException;
 use App\Models\User;
+use App\Services\Panel\PanelSettingsService;
 use App\Services\User\UserService;
 use App\Services\User\UserStateService;
 use App\Telegram\HandlerRegistry;
@@ -35,8 +36,8 @@ class TelegramGateway
         private readonly UserStateService $states,
         private readonly ChannelMembershipService $channels,
         private readonly HandlerRegistry $handlers,
-    ) {
-    }
+        private readonly PanelSettingsService $settings,
+    ) {}
 
     public function handle(TelegramUpdate $update): void
     {
@@ -47,7 +48,7 @@ class TelegramGateway
             return;
         }
 
-        if (! config('echovpn.active', true)) {
+        if (! config('connectix_bot.active', true)) {
             $this->refuse($update, $chatId, 'ربات در حال حاضر غیرفعال است.');
 
             return;
@@ -160,14 +161,14 @@ class TelegramGateway
         $params = [];
 
         if ($joinAction) {
-            $channel = (string) config('echovpn.channel_telegram', '');
+            $channel = $this->settings->channelTelegram();
 
             $keyboard = [];
 
             if ($channel !== '') {
                 $keyboard[] = [[
                     'text' => 'عضویت در کانال',
-                    'url' => 'https://t.me/'.ltrim($channel, '@'),
+                    'url' => 'https://t.me/'.$channel,
                 ]];
             }
 

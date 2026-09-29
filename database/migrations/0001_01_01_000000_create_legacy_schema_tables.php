@@ -10,10 +10,10 @@ use Illuminate\Support\Facades\Schema;
  * Legacy Connectix Bot schema.
  *
  * Every migration in this file mirrors the exact column types, nullability and
- * keys of the production MySQL schema shipped with the legacy application
- * (see debug/echovpn.sql). Compatibility with the existing production database
- * takes priority over schema aesthetics, so a few columns keep their original
- * VARCHAR storage:
+ * keys of the production MySQL schema that shipped with the legacy application
+ * (the reference dump in the debug directory). Compatibility with the existing
+ * production database takes priority over schema aesthetics, so a few columns
+ * keep their original VARCHAR storage:
  *
  *  - payments.price              formatted string, e.g. "159,000"
  *  - payments.is_paid            nullable tri-state ('' pending, 0, 1)

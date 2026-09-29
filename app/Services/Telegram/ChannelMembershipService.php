@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Telegram;
 
 use App\Exceptions\TelegramApiException;
+use App\Services\Panel\PanelSettingsService;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
@@ -15,6 +16,9 @@ use Illuminate\Support\Facades\Log;
  * period so a user tapping through several menus does not trigger an API call
  * per keystroke, and a transport failure is treated as "joined" so a Telegram
  * outage cannot lock every user out of the bot.
+ *
+ * The channel id comes from the resolved settings, so an installation that
+ * only configured it in the seller panel still enforces membership.
  */
 class ChannelMembershipService
 {
@@ -22,15 +26,15 @@ class ChannelMembershipService
 
     public function __construct(
         private readonly TelegramService $telegram,
-    ) {
-    }
+        private readonly PanelSettingsService $settings,
+    ) {}
 
     /**
      * Whether the enforcement is switched on for this installation.
      */
     public function isEnforced(): bool
     {
-        return (bool) config('echovpn.force_channel_join', false);
+        return (bool) config('connectix_bot.force_channel_join', false);
     }
 
     /**
@@ -38,15 +42,15 @@ class ChannelMembershipService
      */
     public function hasJoined(int|string $chatId, int|string $userId): bool
     {
-        $channelId = config('echovpn.telegram_channel_id');
+        $channelId = $this->settings->channelId();
 
-        if (blank($channelId)) {
+        if ($channelId === null || $channelId === '') {
             Log::warning('Channel membership is enforced but no channel id is configured.');
 
             return true;
         }
 
-        $cacheKey = 'echovpn.channel_join.'.$channelId.'.'.$userId;
+        $cacheKey = 'connectix_bot.channel_join.'.$channelId.'.'.$userId;
 
         $cached = Cache::get($cacheKey);
 
@@ -76,12 +80,12 @@ class ChannelMembershipService
      */
     public function forget(int|string $userId): void
     {
-        $channelId = config('echovpn.telegram_channel_id');
+        $channelId = $this->settings->channelId();
 
-        if (blank($channelId)) {
+        if ($channelId === null || $channelId === '') {
             return;
         }
 
-        Cache::forget('echovpn.channel_join.'.$channelId.'.'.$userId);
+        Cache::forget('connectix_bot.channel_join.'.$channelId.'.'.$userId);
     }
 }

@@ -44,8 +44,8 @@ class TelegramWebhookCommand extends Command
 
     private function set(TelegramService $telegram): int
     {
-        $url = (string) config('echovpn.telegram.webhook_url');
-        $secret = (string) config('echovpn.telegram.webhook_secret');
+        $url = (string) config('connectix_bot.telegram.webhook_url');
+        $secret = (string) config('connectix_bot.telegram.webhook_secret');
 
         if ($url === '') {
             $this->error('TELEGRAM_WEBHOOK_URL is not set in the environment.');

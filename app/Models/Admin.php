@@ -6,7 +6,8 @@ namespace App\Models;
 
 use App\Enums\AdminRole;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
@@ -43,12 +44,12 @@ class Admin extends Authenticatable
     /**
      * Clients owned by the admin's Telegram chat.
      */
-    public function clients(): \Illuminate\Database\Eloquent\Relations\HasMany
+    public function clients(): HasMany
     {
         return $this->hasMany(Client::class, 'chat_id', 'chat_id');
     }
 
-    public function wallet(): \Illuminate\Database\Eloquent\Relations\HasOne
+    public function wallet(): HasOne
     {
         return $this->hasOne(Wallet::class, 'chat_id', 'chat_id');
     }

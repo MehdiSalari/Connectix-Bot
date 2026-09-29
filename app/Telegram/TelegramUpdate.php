@@ -18,9 +18,7 @@ final readonly class TelegramUpdate
     /**
      * @param  array<string, mixed>  $raw
      */
-    public function __construct(private array $raw)
-    {
-    }
+    public function __construct(private array $raw) {}
 
     /**
      * @param  array<string, mixed>  $payload

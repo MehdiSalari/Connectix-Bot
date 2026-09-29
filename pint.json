@@ -1,0 +1,23 @@
+{
+    "preset": "laravel",
+    "exclude": [
+        "bank",
+        "broadcast",
+        "debug",
+        "setup",
+        "transactions",
+        "update",
+        "users"
+    ],
+    "notName": [
+        "app.php",
+        "bot.php",
+        "config.php",
+        "config.example.php",
+        "functions.php",
+        "gregorian_jalali.php",
+        "index.php",
+        "login.php",
+        "logout.php"
+    ]
+}

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use App\Models\User;
+use App\Services\Panel\PanelSettingsService;
 use App\Services\Telegram\AdminGuard;
 use App\Services\Telegram\ChannelMembershipService;
 use App\Services\Telegram\TelegramGateway;
@@ -33,7 +34,7 @@ class TelegramGatewayTest extends TestCase
 
         // Without a token TelegramService refuses to issue a request at all, so
         // the HTTP fakes below would never see anything.
-        config(['echovpn.telegram.token' => 'test-token']);
+        config(['connectix_bot.telegram.token' => 'test-token']);
 
         // The handler doubles share one counter across the suite.
         HandlingHandler::$calls = 0;
@@ -52,7 +53,7 @@ class TelegramGatewayTest extends TestCase
      * declares the whole set exactly once.
      *
      * @param  array<string, mixed>  $telegramOverrides  Must come first so a
-     *                                                      specific pattern wins.
+     *                                                   specific pattern wins.
      */
     private function fakeHttp(array $telegramOverrides = [], bool $withProfile = true): void
     {
@@ -88,6 +89,7 @@ class TelegramGatewayTest extends TestCase
             $this->app->make(UserStateService::class),
             $this->app->make(ChannelMembershipService::class),
             $registry,
+            $this->app->make(PanelSettingsService::class),
         );
     }
 
@@ -109,7 +111,7 @@ class TelegramGatewayTest extends TestCase
 
     public function test_it_creates_the_user_and_wallet_on_first_contact(): void
     {
-        config(['echovpn.active' => true, 'echovpn.force_channel_join' => false]);
+        config(['connectix_bot.active' => true, 'connectix_bot.force_channel_join' => false]);
         $this->fakeHttp();
 
         $this->gateway([AlwaysHandles::class])->handle(TelegramUpdate::fromArray($this->startUpdate()));
@@ -125,7 +127,7 @@ class TelegramGatewayTest extends TestCase
 
     public function test_it_dispatches_to_the_first_supporting_handler(): void
     {
-        config(['echovpn.active' => true, 'echovpn.force_channel_join' => false]);
+        config(['connectix_bot.active' => true, 'connectix_bot.force_channel_join' => false]);
         $this->fakeHttp();
 
         $this->gateway([NeverHandles::class, AlwaysHandles::class])
@@ -136,7 +138,7 @@ class TelegramGatewayTest extends TestCase
 
     public function test_it_clears_a_stale_conversation_state_before_dispatching(): void
     {
-        config(['echovpn.active' => true, 'echovpn.force_channel_join' => false]);
+        config(['connectix_bot.active' => true, 'connectix_bot.force_channel_join' => false]);
 
         $this->fakeHttp();
 
@@ -150,7 +152,7 @@ class TelegramGatewayTest extends TestCase
 
     public function test_an_inactive_bot_refuses_the_user(): void
     {
-        config(['echovpn.active' => false, 'echovpn.force_channel_join' => false]);
+        config(['connectix_bot.active' => false, 'connectix_bot.force_channel_join' => false]);
         $this->fakeHttp();
 
         $this->gateway([AlwaysHandles::class])->handle(TelegramUpdate::fromArray($this->startUpdate()));
@@ -163,8 +165,8 @@ class TelegramGatewayTest extends TestCase
 
     public function test_the_channel_gate_blocks_a_user_who_has_not_joined(): void
     {
-        config(['echovpn.active' => true, 'echovpn.force_channel_join' => true]);
-        config(['echovpn.telegram_channel_id' => '-100123']);
+        config(['connectix_bot.active' => true, 'connectix_bot.force_channel_join' => true]);
+        config(['connectix_bot.telegram_channel_id' => '-100123']);
 
         $this->fakeHttp([
             'https://api.telegram.org/*getChatMember*' => Http::response([
@@ -184,8 +186,8 @@ class TelegramGatewayTest extends TestCase
 
     public function test_the_channel_gate_lets_a_member_through(): void
     {
-        config(['echovpn.active' => true, 'echovpn.force_channel_join' => true]);
-        config(['echovpn.telegram_channel_id' => '-100123']);
+        config(['connectix_bot.active' => true, 'connectix_bot.force_channel_join' => true]);
+        config(['connectix_bot.telegram_channel_id' => '-100123']);
 
         $this->fakeHttp([
             'https://api.telegram.org/*getChatMember*' => Http::response([
@@ -208,8 +210,8 @@ class TelegramGatewayTest extends TestCase
      */
     public function test_the_channel_gate_fails_open_when_telegram_is_unreachable(): void
     {
-        config(['echovpn.active' => true, 'echovpn.force_channel_join' => true]);
-        config(['echovpn.telegram_channel_id' => '-100123']);
+        config(['connectix_bot.active' => true, 'connectix_bot.force_channel_join' => true]);
+        config(['connectix_bot.telegram_channel_id' => '-100123']);
 
         $this->fakeHttp([
             'https://api.telegram.org/*' => Http::response(['ok' => false, 'description' => 'boom'], 500),
@@ -222,7 +224,7 @@ class TelegramGatewayTest extends TestCase
 
     public function test_an_unclaimed_update_answers_the_callback_so_the_button_stops_spinning(): void
     {
-        config(['echovpn.active' => true, 'echovpn.force_channel_join' => false]);
+        config(['connectix_bot.active' => true, 'connectix_bot.force_channel_join' => false]);
         $this->fakeHttp();
 
         $update = TelegramUpdate::fromArray([
@@ -243,7 +245,7 @@ class TelegramGatewayTest extends TestCase
 
     public function test_a_throwing_handler_is_contained_and_the_user_is_told(): void
     {
-        config(['echovpn.active' => true, 'echovpn.force_channel_join' => false]);
+        config(['connectix_bot.active' => true, 'connectix_bot.force_channel_join' => false]);
         $this->fakeHttp();
 
         $this->gateway([ExplodingHandler::class])->handle(TelegramUpdate::fromArray($this->startUpdate()));
@@ -254,7 +256,7 @@ class TelegramGatewayTest extends TestCase
 
     public function test_an_update_without_a_chat_is_ignored(): void
     {
-        config(['echovpn.active' => true, 'echovpn.force_channel_join' => false]);
+        config(['connectix_bot.active' => true, 'connectix_bot.force_channel_join' => false]);
         $this->fakeHttp();
 
         $this->gateway([AlwaysHandles::class])->handle(TelegramUpdate::fromArray(['update_id' => 3]));
@@ -265,7 +267,7 @@ class TelegramGatewayTest extends TestCase
 
     public function test_the_admin_guard_matches_the_legacy_string_comparison(): void
     {
-        config(['echovpn.admin_ids' => ['100', '200']]);
+        config(['connectix_bot.admin_ids' => ['100', '200']]);
 
         $guard = AdminGuard::fromConfig();
 

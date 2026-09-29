@@ -9,6 +9,4 @@ use Illuminate\Routing\Controller as BaseController;
 /**
  * Base controller for the Telegram HTTP layer.
  */
-abstract class Controller extends BaseController
-{
-}
+abstract class Controller extends BaseController {}

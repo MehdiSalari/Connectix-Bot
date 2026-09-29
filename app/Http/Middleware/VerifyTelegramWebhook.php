@@ -19,7 +19,7 @@ class VerifyTelegramWebhook
 {
     public function handle(Request $request, Closure $next): Response
     {
-        $expected = config('echovpn.telegram.webhook_secret');
+        $expected = config('connectix_bot.telegram.webhook_secret');
 
         if (blank($expected)) {
             return $next($request);

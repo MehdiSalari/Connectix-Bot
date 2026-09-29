@@ -239,7 +239,7 @@ class TelegramService
      */
     private function request(string $method, array $params): array
     {
-        $token = config('echovpn.telegram.token');
+        $token = config('connectix_bot.telegram.token');
 
         if (blank($token)) {
             throw new TelegramApiException('Telegram bot token is not configured.');

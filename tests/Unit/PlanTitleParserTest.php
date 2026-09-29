@@ -25,7 +25,7 @@ class PlanTitleParserTest extends TestCase
         parent::setUp();
 
         // The parser never calls the panel, so a bare client is enough.
-        $this->plans = new PlanService(new ConnectixService());
+        $this->plans = new PlanService(new ConnectixService);
     }
 
     public function test_it_parses_a_plain_monthly_plan(): void
@@ -116,12 +116,29 @@ class PlanTitleParserTest extends TestCase
         $this->assertSame(365, $this->plans->approximateDays(1, 'Y'));
     }
 
-    public function test_group_labels_match_the_legacy_map(): void
+    public function test_group_labels_match_the_installed_legacy_map(): void
     {
+        // These are the exact `plan_group_names` values the legacy installer
+        // wrote to setup/bot_config.json, spelling included.
+        $this->assertSame('ویژه', $this->plans->parseType('default'));
+        $this->assertSame('سابلینک', $this->plans->parseType('Sublink'));
+        $this->assertSame('بیزنیس سابلنک', $this->plans->parseType('BCSublink'));
+        $this->assertSame('بیزینس کلس', $this->plans->parseType('Business Class'));
+        $this->assertSame('📱 | ویژه', $this->plans->parseTypeWithEmoji('default'));
+    }
+
+    /**
+     * With no configured labels, legacy fell back to ZWNJ spellings that differ
+     * from the panel ones. Those fallbacks still drive any label a reseller
+     * removed from their own map.
+     */
+    public function test_group_labels_fall_back_to_the_legacy_defaults(): void
+    {
+        config(['connectix_bot.plan_groups' => []]);
+
         $this->assertSame('ویژه', $this->plans->parseType('default'));
         $this->assertSame('ساب‌لینک', $this->plans->parseType('Sublink'));
         $this->assertSame('بیزینس ساب‌لینک', $this->plans->parseType('BCSublink'));
-        $this->assertSame('📱 | ویژه', $this->plans->parseTypeWithEmoji('default'));
     }
 
     /**

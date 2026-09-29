@@ -8,6 +8,7 @@ use App\Exceptions\ConnectixApiException;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Response;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -260,6 +261,29 @@ class ConnectixService
     }
 
     /**
+     * The reseller's own branding and bot copy, as configured in the seller
+     * panel. Legacy `setup.php` called this endpoint once at install time and
+     * stored the result in setup/bot_config.json; see PanelSettingsService for
+     * the runtime equivalent.
+     *
+     * @return array{
+     *     bot: array<string, mixed>,
+     *     telegram_messages: array<string, string>
+     * }
+     *
+     * @throws ConnectixApiException
+     */
+    public function getTelegramBotConfig(): array
+    {
+        $payload = $this->get('/v1/seller/telegram-bot');
+
+        return [
+            'bot' => Arr::wrap($payload['bot'] ?? []),
+            'telegram_messages' => Arr::wrap($payload['telegramMessages'] ?? []),
+        ];
+    }
+
+    /**
      * @param  array<string, mixed>  $body
      * @return array<string, mixed>
      *
@@ -319,7 +343,7 @@ class ConnectixService
      */
     private function send(string $verb, string $endpoint, array $options): array
     {
-        $token = config('echovpn.connectix.token');
+        $token = config('connectix_bot.connectix.token');
 
         if (blank($token)) {
             throw new ConnectixApiException(
@@ -377,17 +401,17 @@ class ConnectixService
     {
         return Http::acceptJson()
             ->withHeaders([
-                'User-Agent' => (string) config('echovpn.connectix.user_agent'),
+                'User-Agent' => (string) config('connectix_bot.connectix.user_agent'),
             ])
-            ->connectTimeout((int) config('echovpn.connectix.connect_timeout'))
-            ->timeout((int) config('echovpn.connectix.timeout'))
+            ->connectTimeout((int) config('connectix_bot.connectix.connect_timeout'))
+            ->timeout((int) config('connectix_bot.connectix.timeout'))
             ->withOptions([
-                'verify' => (bool) config('echovpn.connectix.verify_tls', true),
+                'verify' => (bool) config('connectix_bot.connectix.verify_tls', true),
             ]);
     }
 
     private function url(string $endpoint): string
     {
-        return rtrim((string) config('echovpn.connectix.base_url'), '/').$endpoint;
+        return rtrim((string) config('connectix_bot.connectix.base_url'), '/').$endpoint;
     }
 }

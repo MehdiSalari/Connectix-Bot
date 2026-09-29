@@ -105,7 +105,7 @@ class TelegramProfileService
         $previousState = libxml_use_internal_errors(true);
 
         try {
-            $dom = new DOMDocument();
+            $dom = new DOMDocument;
             $loaded = $dom->loadHTML('<?xml encoding="UTF-8">'.$html);
 
             if (! $loaded) {

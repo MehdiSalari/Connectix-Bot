@@ -22,8 +22,7 @@ class TelegramWebhookController extends Controller
 {
     public function __construct(
         private readonly TelegramGateway $gateway,
-    ) {
-    }
+    ) {}
 
     public function __invoke(Request $request): JsonResponse
     {

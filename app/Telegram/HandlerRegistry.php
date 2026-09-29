@@ -6,6 +6,20 @@ namespace App\Telegram;
 
 use App\Models\User;
 use App\Telegram\Contracts\UpdateHandler;
+use App\Telegram\Handlers\AccountHandler;
+use App\Telegram\Handlers\AddAccountHandler;
+use App\Telegram\Handlers\AdminHandler;
+use App\Telegram\Handlers\CouponHandler;
+use App\Telegram\Handlers\FreeTestHandler;
+use App\Telegram\Handlers\GuideHandler;
+use App\Telegram\Handlers\MainMenuHandler;
+use App\Telegram\Handlers\PaymentHandler;
+use App\Telegram\Handlers\PurchaseHandler;
+use App\Telegram\Handlers\RenewHandler;
+use App\Telegram\Handlers\ShareContactHandler;
+use App\Telegram\Handlers\StartHandler;
+use App\Telegram\Handlers\SupportHandler;
+use App\Telegram\Handlers\WalletHandler;
 use Illuminate\Contracts\Container\Container;
 use Illuminate\Support\Facades\Log;
 
@@ -30,25 +44,25 @@ class HandlerRegistry
      * @var array<int, class-string<UpdateHandler>>
      */
     private const HANDLERS = [
-        \App\Telegram\Handlers\StartHandler::class,
-        \App\Telegram\Handlers\MainMenuHandler::class,
-        \App\Telegram\Handlers\AccountHandler::class,
-        \App\Telegram\Handlers\FreeTestHandler::class,
-        \App\Telegram\Handlers\PurchaseHandler::class,
-        \App\Telegram\Handlers\RenewHandler::class,
-        \App\Telegram\Handlers\PaymentHandler::class,
-        \App\Telegram\Handlers\CouponHandler::class,
-        \App\Telegram\Handlers\WalletHandler::class,
-        \App\Telegram\Handlers\AddAccountHandler::class,
-        \App\Telegram\Handlers\ShareContactHandler::class,
-        \App\Telegram\Handlers\GuideHandler::class,
-        \App\Telegram\Handlers\SupportHandler::class,
-        \App\Telegram\Handlers\AdminHandler::class,
+        StartHandler::class,
+        MainMenuHandler::class,
+        AccountHandler::class,
+        FreeTestHandler::class,
+        PurchaseHandler::class,
+        RenewHandler::class,
+        PaymentHandler::class,
+        CouponHandler::class,
+        WalletHandler::class,
+        AddAccountHandler::class,
+        ShareContactHandler::class,
+        GuideHandler::class,
+        SupportHandler::class,
+        AdminHandler::class,
     ];
 
     /**
      * @param  array<int, class-string<UpdateHandler>>  $handlers  Defaults to
-     *                                                              {@see self::HANDLERS}.
+     *                                                             {@see self::HANDLERS}.
      *                                                             Injecting the
      *                                                             list keeps the
      *                                                             dispatch path
@@ -57,8 +71,7 @@ class HandlerRegistry
     public function __construct(
         private readonly Container $container,
         private readonly array $handlers = self::HANDLERS,
-    ) {
-    }
+    ) {}
 
     /**
      * Handlers resolved from the container, in precedence order.

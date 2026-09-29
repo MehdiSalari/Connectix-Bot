@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use App\Services\Telegram\TelegramGateway;
-use Illuminate\Support\Facades\Http;
 use Mockery;
 use Tests\TestCase;
 
@@ -37,7 +36,7 @@ class TelegramWebhookTest extends TestCase
 
     public function test_it_rejects_a_request_without_the_secret_header(): void
     {
-        config(['echovpn.telegram.webhook_secret' => self::SECRET]);
+        config(['connectix_bot.telegram.webhook_secret' => self::SECRET]);
 
         $this->postJson('/telegram/webhook', $this->startUpdate())
             ->assertForbidden();
@@ -45,7 +44,7 @@ class TelegramWebhookTest extends TestCase
 
     public function test_it_rejects_a_request_with_a_wrong_secret(): void
     {
-        config(['echovpn.telegram.webhook_secret' => self::SECRET]);
+        config(['connectix_bot.telegram.webhook_secret' => self::SECRET]);
 
         $this->postJson('/telegram/webhook', $this->startUpdate(), [
             'X-Telegram-Bot-Api-Secret-Token' => 'wrong',
@@ -54,7 +53,7 @@ class TelegramWebhookTest extends TestCase
 
     public function test_it_rejects_a_secret_that_is_a_prefix_of_the_real_one(): void
     {
-        config(['echovpn.telegram.webhook_secret' => self::SECRET]);
+        config(['connectix_bot.telegram.webhook_secret' => self::SECRET]);
 
         $this->postJson('/telegram/webhook', $this->startUpdate(), [
             'X-Telegram-Bot-Api-Secret-Token' => substr(self::SECRET, 0, 10),
@@ -63,7 +62,7 @@ class TelegramWebhookTest extends TestCase
 
     public function test_it_accepts_a_request_carrying_the_configured_secret(): void
     {
-        config(['echovpn.telegram.webhook_secret' => self::SECRET]);
+        config(['connectix_bot.telegram.webhook_secret' => self::SECRET]);
 
         $this->swap(TelegramGateway::class, Mockery::mock(TelegramGateway::class));
 
@@ -74,7 +73,7 @@ class TelegramWebhookTest extends TestCase
 
     public function test_it_acknowledges_an_empty_payload_without_touching_the_gateway(): void
     {
-        config(['echovpn.telegram.webhook_secret' => self::SECRET]);
+        config(['connectix_bot.telegram.webhook_secret' => self::SECRET]);
 
         $gateway = Mockery::mock(TelegramGateway::class);
         $gateway->shouldNotReceive('handle');
@@ -91,7 +90,7 @@ class TelegramWebhookTest extends TestCase
      */
     public function test_it_acknowledges_even_when_handling_throws(): void
     {
-        config(['echovpn.telegram.webhook_secret' => self::SECRET]);
+        config(['connectix_bot.telegram.webhook_secret' => self::SECRET]);
 
         $gateway = Mockery::mock(TelegramGateway::class);
         $gateway->shouldReceive('handle')->andThrow(new \RuntimeException('boom'));
@@ -108,7 +107,7 @@ class TelegramWebhookTest extends TestCase
      */
     public function test_it_allows_requests_when_no_secret_is_configured(): void
     {
-        config(['echovpn.telegram.webhook_secret' => null]);
+        config(['connectix_bot.telegram.webhook_secret' => null]);
 
         $this->swap(TelegramGateway::class, Mockery::mock(TelegramGateway::class));
 
@@ -117,7 +116,7 @@ class TelegramWebhookTest extends TestCase
 
     public function test_the_csrf_token_is_not_required_for_the_webhook(): void
     {
-        config(['echovpn.telegram.webhook_secret' => self::SECRET]);
+        config(['connectix_bot.telegram.webhook_secret' => self::SECRET]);
 
         $this->swap(TelegramGateway::class, Mockery::mock(TelegramGateway::class));
 

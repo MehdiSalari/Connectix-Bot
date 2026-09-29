@@ -11,6 +11,7 @@ use App\Exceptions\TelegramApiException;
 use App\Models\Wallet;
 use App\Models\WalletTransaction;
 use App\Services\Telegram\TelegramService;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -30,8 +31,7 @@ class WalletService
 {
     public function __construct(
         private readonly TelegramService $telegram,
-    ) {
-    }
+    ) {}
 
     /**
      * Look up a wallet by chat id.
@@ -44,7 +44,7 @@ class WalletService
     /**
      * Every wallet, newest last. Port of `wallet('get')` without an argument.
      *
-     * @return \Illuminate\Database\Eloquent\Collection<int, Wallet>
+     * @return Collection<int, Wallet>
      */
     public function all()
     {
@@ -83,6 +83,13 @@ class WalletService
      * Apply a balance change and record it in the ledger atomically.
      *
      * Returns the resulting wallet, or null when the wallet is missing.
+     *
+     * `$announce` reproduces the one notification legacy sent from
+     * `createWalletTransaction()`: an administrator credit or debit tells the
+     * user about it. It is deliberately limited to DONE_BY_ADMIN, because
+     * every other transaction already announces itself from its own flow.
+     * The message goes out after the commit, so a rolled back transaction
+     * never tells the user about a change that did not happen.
      */
     public function adjust(
         string|int $chatId,
@@ -92,7 +99,7 @@ class WalletService
         WalletTransactionStatus $status = WalletTransactionStatus::Success,
         bool $announce = false,
     ): ?Wallet {
-        return DB::transaction(function () use ($chatId, $operation, $amount, $type, $status, $announce): ?Wallet {
+        $wallet = DB::transaction(function () use ($chatId, $operation, $amount, $type, $status): ?Wallet {
             // Lock the row so concurrent purchases cannot both read the old balance.
             $wallet = Wallet::query()
                 ->where('chat_id', (string) $chatId)
@@ -122,6 +129,12 @@ class WalletService
 
             return $wallet;
         });
+
+        if ($announce && $wallet !== null && $type === WalletTransactionType::DoneByAdmin) {
+            $this->announceAdjustment($chatId, $operation, $amount);
+        }
+
+        return $wallet;
     }
 
     /**
@@ -208,7 +221,7 @@ class WalletService
     /**
      * Ledger entries for a chat, newest first. Port of `wallet('transactions')`.
      *
-     * @return \Illuminate\Database\Eloquent\Collection<int, WalletTransaction>
+     * @return Collection<int, WalletTransaction>
      */
     public function transactionsFor(string|int $chatId)
     {

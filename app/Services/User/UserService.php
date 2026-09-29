@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Services\User;
 
-use App\Models\Wallet;
 use App\Models\User;
+use App\Models\Wallet;
 use App\Services\Telegram\TelegramProfileService;
 use App\Services\Wallet\WalletService;
 use Illuminate\Support\Facades\Log;
@@ -21,8 +21,7 @@ class UserService
     public function __construct(
         private readonly TelegramProfileService $profiles,
         private readonly WalletService $wallets,
-    ) {
-    }
+    ) {}
 
     /**
      * Find a user by chat id.
