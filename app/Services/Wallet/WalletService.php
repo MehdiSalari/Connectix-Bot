@@ -270,6 +270,71 @@ class WalletService
     }
 
     /**
+     * Mark a pending deposit as paid and credit the balance, both under one
+     * lock.
+     *
+     * Port of the `accept` branch of `walletReqs()`, which read the status,
+     * then updated it and increased the balance in two separate queries. Two
+     * rapid approvals could therefore both read PENDING and credit the balance
+     * twice; locking the transaction row makes the decision and the credit one
+     * step and a second approval returns null.
+     *
+     * Returns null when the transaction is missing or already decided.
+     */
+    public function approveDeposit(int|WalletTransaction $transaction): ?Wallet
+    {
+        return DB::transaction(function () use ($transaction): ?Wallet {
+            /** @var WalletTransaction|null $tx */
+            $tx = $transaction instanceof WalletTransaction
+                ? WalletTransaction::query()->whereKey($transaction->id)->lockForUpdate()->first()
+                : WalletTransaction::query()->whereKey($transaction)->lockForUpdate()->first();
+
+            if ($tx === null || ! $tx->status->isPending()) {
+                return null;
+            }
+
+            $tx->forceFill(['status' => WalletTransactionStatus::Success->value])->save();
+
+            $wallet = Wallet::query()
+                ->where('chat_id', $tx->chat_id)
+                ->lockForUpdate()
+                ->first();
+
+            if ($wallet === null) {
+                return null;
+            }
+
+            $wallet->forceFill([
+                'balance' => (string) ($wallet->balanceAmount() + (int) $tx->amount),
+            ])->save();
+
+            return $wallet;
+        });
+    }
+
+    /**
+     * Mark a pending deposit as rejected.
+     *
+     * Port of the `reject` branch of `walletReqs()`, given the same atomic
+     * guard as {@see self::approveDeposit()}: only a PENDING transaction is
+     * decided by the first call.
+     */
+    public function rejectDeposit(int|WalletTransaction $transaction): bool
+    {
+        return DB::transaction(function () use ($transaction): bool {
+            $query = $transaction instanceof WalletTransaction
+                ? WalletTransaction::query()->whereKey($transaction->id)
+                : WalletTransaction::query()->whereKey($transaction);
+
+            $updated = $query
+                ->where('status', WalletTransactionStatus::Pending->value)
+                ->update(['status' => WalletTransactionStatus::RejectedByAdmin->value]);
+
+            return $updated > 0;
+        });
+    }
+
+    /**
      * Ledger entries for a chat, newest first. Port of `wallet('transactions')`.
      *
      * @return Collection<int, WalletTransaction>

@@ -174,8 +174,9 @@ Laravel-owned code reads its name from `PanelSettingsService` instead, with
 
 ## 10. Open items this audit could not settle
 
-* The `payments` receipt column set. The dump has no receipt path, so where
-  an uploaded receipt lives is still undecided (Phase 9).
+* The `payments` receipt column set. Receipts are forwarded to the
+  administrators as Telegram photos, never stored (Phase 9), matching legacy,
+  which sent the incoming `file_id` straight to each admin without saving it.
 * Whether a percentage above 100 is reachable through the panel UI. The clamp
   is safe either way, but if the panel forbids it the clamp is inert.
 * The real production schema. Only the dump and a local SQLite database have

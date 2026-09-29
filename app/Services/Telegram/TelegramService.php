@@ -78,6 +78,25 @@ class TelegramService
     }
 
     /**
+     * Send a photo.
+     *
+     * Port of the `sendPhoto` calls legacy made with a receipt: the
+     * `file_id` is forwarded as-is, so the image is never downloaded, stored
+     * or re-uploaded.
+     *
+     * @param  array<string, mixed>  $params
+     *
+     * @throws TelegramApiException
+     */
+    public function sendPhoto(int|string $chatId, string $fileId, array $params = []): array
+    {
+        return $this->call('sendPhoto', array_merge([
+            'chat_id' => $chatId,
+            'photo' => $fileId,
+        ], $params));
+    }
+
+    /**
      * Edit the text of an existing message.
      *
      * @param  array<string, mixed>  $params
