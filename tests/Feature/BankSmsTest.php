@@ -86,6 +86,27 @@ class BankSmsTest extends TestCase
         $this->assertTrue($sms->expired_at->greaterThan(now()->addMinutes(4)));
     }
 
+    public function test_a_redelivered_sms_is_stored_once_and_stays_matchable(): void
+    {
+        // A gateway that retries one POST used to store the same deposit twice.
+        // `claim()` refuses to choose between two deposits of one amount, so
+        // that duplicate silently switched auto-payment off for a customer who
+        // had transferred the right amount.
+        $this->setBank('blu');
+
+        Http::fake(['https://api.telegram.org/*' => Http::response(['ok' => true], 200)]);
+
+        $payload = ['msg' => 'بلو بانک | واریز 100,000 ریال | از سوی علی'];
+
+        $this->postJson('/bank/sms', $payload)->assertStatus(202);
+        $this->postJson('/bank/sms', $payload)->assertStatus(202);
+
+        $this->assertSame(1, SmsPayment::query()->count());
+
+        // Still exactly one candidate, so an order for 10,000 can claim it.
+        $this->assertNotNull(app(SmsPaymentService::class)->claim(10000));
+    }
+
     public function test_the_webhook_rejects_everything_but_a_json_post(): void
     {
         $this->setBank('blu');

@@ -270,9 +270,9 @@ return [
     'guides' => [
         'path' => env('CONNECTIX_BOT_GUIDES_PATH', 'assets/videos/guide'),
         'custom_path' => env('CONNECTIX_BOT_GUIDES_CUSTOM_PATH', 'assets/videos/guide/custom'),
-        'bot_avatar_path' => env('CONNECTIX_BOT_BOT_AVATAR_PATH', 'assets/images/avatars/bot-avatar.jpg'),
+        'bot_avatar_path' => env('CONNECTIX_BOT_AVATAR_PATH', 'assets/images/avatars/bot-avatar.jpg'),
         'bot_avatar_fallback' => env(
-            'CONNECTIX_BOT_BOT_AVATAR_FALLBACK',
+            'CONNECTIX_BOT_AVATAR_FALLBACK',
             'assets/images/avatars/bot-avatar-sample.jpg'
         ),
     ],

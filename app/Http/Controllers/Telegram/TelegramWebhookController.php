@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Telegram;
 
+use App\Models\HandledUpdate;
 use App\Services\Telegram\TelegramGateway;
 use App\Telegram\TelegramUpdate;
 use Illuminate\Http\JsonResponse;
@@ -34,6 +35,14 @@ class TelegramWebhookController extends Controller
 
         $update = TelegramUpdate::fromArray($payload);
 
+        // Telegram retries any delivery it could not confirm, and legacy had no
+        // way to notice: a retry re-ran the whole handler chain and could write
+        // a second order. The update id is claimed first, so a redelivery is
+        // acknowledged and dropped instead of processed twice.
+        if (! $this->claim($update->updateId())) {
+            return $this->ok();
+        }
+
         try {
             $this->gateway->handle($update);
         } catch (Throwable $e) {
@@ -48,6 +57,29 @@ class TelegramWebhookController extends Controller
         }
 
         return $this->ok();
+    }
+
+    /**
+     * Record the update id and report whether it is new.
+     *
+     * A ledger that cannot be written is logged and then ignored, because the
+     * alternative - refusing every update - takes the whole bot offline. The
+     * only consequence is that a Telegram retry is processed a second time,
+     * which is the behaviour legacy had anyway.
+     */
+    private function claim(int $updateId): bool
+    {
+        try {
+            return HandledUpdate::claim($updateId);
+        } catch (Throwable $e) {
+            Log::error('Could not record the Telegram update id; deduplication is off.', [
+                'update_id' => $updateId,
+                'exception' => $e::class,
+                'error' => $e->getMessage(),
+            ]);
+
+            return true;
+        }
     }
 
     private function ok(): JsonResponse

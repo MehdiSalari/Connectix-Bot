@@ -404,7 +404,79 @@ any request that reached the file while a job was pending ran the fan-out.
 Both routes are behind `admin.auth` and `admin.role:admin` now. This is a
 security fix, not a parity break; it is listed in section 8 as well.
 
-## 14. Open items this audit could not settle
+## 14. Sync and background work (Phase 15)
+
+Legacy had no scheduler at all. `update/clients.php`, `update/users.php`,
+`update/clients_update.php` and `functions.php::smsPayment()` only did their
+work when a human opened a page, and the audit used to call that "nightly
+reconciliation" - the word appears in the docs, not in the code. This phase
+moves that work into commands and a cron-driven schedule, and adds the
+idempotence legacy lacked.
+
+### Client and user reconciliation
+
+* `connectix:sync-clients` is the console form of `update/clients_update.php`:
+  it paginates `/v1/seller`, reads every client with `/v1/seller/clients/show`
+  and upserts the `users` and `clients` rows in one transaction per client.
+  Legacy followed `next_page_url` until it was null; this stops on the first
+  empty page, and also stops when a page repeats the previous one, because a
+  panel that ignores `page` would otherwise loop forever on a 1-minute cron.
+* Legacy wrote `test = 1` on every user it touched. That flag decides whether
+  a person gets a free trial instead of a paid purchase, so on a live install
+  running the legacy updater silently turned paying customers into test
+  accounts. The flag is now local: a new row gets the default, an existing row
+  keeps whatever it had.
+* `connectix:sync-users` is the console form of `update/users.php`, which
+  scraped `t.me` once per user with no pacing, no budget and no resume - a
+  table of any size was throttled by t.me and then killed by
+  `max_execution_time`, with no way to see how far it got. The command takes a
+  per-run budget, paces itself, prints the last user id it reached for the next
+  run, and skips a user whose profile could not be read instead of aborting.
+* Both commands take a `Cache::lock()`, so two cron ticks cannot interleave two
+  upserts on the same rows. `Cache::lock()` needs the `cache_locks` table,
+  which the default `CACHE_STORE=database` already provides.
+
+### No duplicate processing
+
+* Telegram redelivers any update it could not confirm, and legacy had no way
+  to notice: the whole handler chain ran again, including a second order write
+  and a second confirmation message. `telegram_updates` is now a ledger keyed
+  by `update_id`, claimed with `insertOrIgnore` before the gateway sees the
+  update, so a redelivery is answered and dropped. Two simultaneous deliveries
+  of one id still settle on a single handler run, because the check is the
+  primary key rather than a read followed by a write.
+* If the ledger cannot be written - an install that never ran the migration -
+  the failure is logged and the update is processed anyway. Refusing updates
+  would take the bot offline, and at-least-once is what legacy did.
+* A bank SMS gateway that retried one POST used to store the same deposit
+  twice, and `SmsPaymentService::claim()` deliberately refuses to choose between
+  two deposits of one amount - so the duplicate silently switched auto-payment
+  off for a customer who had transferred the right amount. Each delivery now
+  carries a `fingerprint` of bank, amount and normalised message text, and a
+  repeat inside the match window is dropped while the gateway still receives
+  its usual 202. The index is not unique on purpose: only the match window
+  decides, so a genuine second transfer of the same amount is still stored.
+* `connectix:prune` does the cleanups legacy only ever ran as a side effect of
+  a user action - expired unmatched bank deposits (kept the moment they are
+  matched) and, new, the update ledger rows older than 48 hours.
+
+### Shared hosting
+
+* The schedule in `routes/console.php` is driven by one cron entry,
+  `* * * * * cd /path/to/connectix && php artisan schedule:run`, and works
+  unchanged under `schedule:work` on a proper server. Every task is
+  `withoutOverlapping()` and takes its own lock.
+* There is no queue worker, daemon or polling loop anywhere: purchases, renewals
+  and deposits are all settled inside the request or the webhook that triggered
+  them, exactly as before.
+* `.env.example` was missing every key a fresh install actually needs -
+  `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, `CONNECTIX_PANEL_TOKEN` among
+  them - so `composer run setup` produced an install whose webhook accepted
+  forged updates and whose panel calls all failed. They are documented now, and
+  `config/connectix_bot.php` no longer reads the avatar paths from a misspelled
+  `CONNECTIX_BOT_BOT_AVATAR_*` pair that no `.env` could ever set.
+
+## 15. Open items this audit could not settle
 
 * The `payments` receipt column set. Receipts are forwarded to the
   administrators as Telegram photos, never stored (Phase 9), matching legacy,

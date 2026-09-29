@@ -150,15 +150,25 @@ class SmsPaymentService
      * Store a deposit for later matching.
      *
      * Port of the `save` branch of `smsPayment()`.
+     *
+     * Legacy inserted unconditionally, so a gateway retry of the same POST
+     * created a second row - and because `claim()` refuses to guess between two
+     * deposits of the same amount, that duplicate silently disabled
+     * auto-payment for a customer's real transfer. A repeated delivery inside
+     * the match window is therefore recognised and dropped here.
      */
     public function record(string $message, int $amount, ?string $bank = null): ?SmsPayment
     {
         $this->pruneExpired();
 
-        return SmsPayment::query()->create([
+        $bank = $bank ?? $this->bankName();
+        $fingerprint = $this->fingerprint($message, $amount, $bank);
+
+        $payment = SmsPayment::query()->create([
             'message' => $message,
             'amount' => $amount,
-            'bank' => $bank ?? $this->bankName(),
+            'bank' => $bank,
+            'fingerprint' => $fingerprint,
             // Matched rows keep the column; the row only expires while it is
             // still waiting for an order, which is what makes the prune below
             // safe to run on every request.
@@ -167,6 +177,50 @@ class SmsPaymentService
             'expired_at' => now()->addMinutes(self::MATCH_WINDOW_MINUTES),
             'created_at' => now(),
         ]);
+
+        if ($this->isRepeat($fingerprint, $payment)) {
+            // Keep the first row: it is the one an order can be matched
+            // against, and dropping it would unblock a payment that is waiting.
+            $payment->delete();
+
+            Log::warning('A bank SMS was delivered more than once; the repeat was dropped.', [
+                'sms_id' => $payment->getKey(),
+                'bank' => $bank,
+                'amount' => $amount,
+            ]);
+
+            return null;
+        }
+
+        return $payment;
+    }
+
+    /**
+     * Whether this exact message was already stored inside the match window.
+     *
+     * A genuine second transfer of the same amount has a different message
+     * text - bank SMS carry a reference, a time and a balance - so the whole
+     * message is part of the fingerprint rather than only the amount.
+     */
+    private function isRepeat(string $fingerprint, SmsPayment $payment): bool
+    {
+        return SmsPayment::query()
+            ->where('fingerprint', $fingerprint)
+            ->where('created_at', '>', now()->subMinutes(self::MATCH_WINDOW_MINUTES))
+            ->whereKeyNot($payment->getKey())
+            ->exists();
+    }
+
+    /**
+     * A stable hash of one delivery, so a retry is recognisable.
+     */
+    private function fingerprint(string $message, int $amount, ?string $bank): string
+    {
+        return hash('sha256', implode('|', [
+            (string) $bank,
+            (string) $amount,
+            trim(preg_replace('/\s+/u', ' ', $message) ?? $message),
+        ]));
     }
 
     /**

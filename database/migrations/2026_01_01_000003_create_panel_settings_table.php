@@ -22,7 +22,7 @@ return new class extends Migration
         Schema::create('panel_settings', function (Blueprint $table): void {
             $table->string('setting_key', 190)->primary();
             $table->longText('setting_value')->nullable();
-            $table->timestamp('updated_at')->nullable()->useCurrent();
+            $table->timestamp('updated_at')->useCurrent();
         });
     }
 

@@ -88,9 +88,12 @@ class BankSmsController extends Controller
             ], 400);
         }
 
-        $this->sms->record($message, $amount, $bank);
+        $deposit = $this->sms->record($message, $amount, $bank);
 
-        if ($this->sms->botNotice()) {
+        // A repeated delivery inside the match window is answered exactly like a
+        // first one, so a retrying gateway sees the success it expects. It is
+        // not stored twice, and the administrator is not notified again.
+        if ($deposit !== null && $this->sms->botNotice()) {
             $this->notifyAdmin($bank, $amount, $message);
         }
 
