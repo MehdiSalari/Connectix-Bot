@@ -19,6 +19,7 @@ use App\Services\Sync\ClientSyncService;
 use App\Services\Sync\WalletSyncService;
 use App\Services\Telegram\TelegramService;
 use App\Support\EnvWriter;
+use App\Support\LogRedaction;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
@@ -881,17 +882,13 @@ class SetupWizardController extends Controller
     }
 
     /**
-     * Mask anything written as `password=…`, `token: …` and friends, whatever
-     * quoting the driver or the API used.
+     * Mask anything written as `password=.`, `token: .` and friends, whatever
+     * quoting the driver or the API used, plus the bot token inside a Telegram
+     * URL. The pattern lives in `App\Support\LogRedaction` so the installer and
+     * every other log site agree on what a secret looks like.
      */
     private function redact(string $message): string
     {
-        $masked = (string) preg_replace(
-            '/((?:password|passwd|pwd|token|secret|api[_-]?key|authorization|bearer)\s*[=:]\s*)("[^"]*"|\'[^\']*\'|[^\s,;)]+)/i',
-            '$1***',
-            $message
-        );
-
-        return (string) str($masked)->replace(["\r", "\n"], ' ')->squish()->limit(300, '…');
+        return LogRedaction::mask($message);
     }
 }

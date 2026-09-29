@@ -147,7 +147,7 @@ $appName = json_decode(file_get_contents('../setup/bot_config.json'), true)['app
                         <tr class="table-row transition-all duration-200">
                             <td class="px-6 py-4 whitespace-nowrap">
                                 <div class="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center text-white text-s font-bold shadow-xl">
-                                    <?= $user['avatar'] ? '<img id="avatar" class="w-10 h-10 rounded-full" src="' . $user['avatar'] . '" alt="' . $user['name'] . '">' : mb_substr($user['name'] ?? 'U', 0, 1); ?>
+                                    <?= $user['avatar'] ? '<img id="avatar" class="w-10 h-10 rounded-full" src="' . htmlspecialchars($user['avatar'] ?? '', ENT_QUOTES) . '" alt="' . htmlspecialchars($user['name'] ?? '', ENT_QUOTES) . '">' : htmlspecialchars(mb_substr($user['name'] ?? 'U', 0, 1), ENT_QUOTES); ?>
                                 </div>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
@@ -158,7 +158,7 @@ $appName = json_decode(file_get_contents('../setup/bot_config.json'), true)['app
                                 </div>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap username">
-                                <?= $user['telegram_id'] ? '<a href="https://t.me/' . $user['telegram_id'] . '" target="_blank"><span class="text-blue-600">@' . htmlspecialchars($user['telegram_id']) . '</span></a>' : '<span class="text-gray-400">ندارد</span>' ?>
+                                <?= $user['telegram_id'] ? '<a href="https://t.me/' . htmlspecialchars($user['telegram_id'], ENT_QUOTES) . '" target="_blank"><span class="text-blue-600">@' . htmlspecialchars($user['telegram_id']) . '</span></a>' : '<span class="text-gray-400">ندارد</span>' ?>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600 font-mono"><?= $user['chat_id'] ?></td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">

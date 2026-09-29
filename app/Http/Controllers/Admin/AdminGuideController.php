@@ -181,7 +181,9 @@ class AdminGuideController extends Controller
 
         $mime = strtolower((string) $video->getMimeType());
 
-        if ($mime !== 'video/mp4' && $mime !== 'application/octet-stream') {
+        // Sniffed from the bytes, not taken from the request: `application/octet-stream`
+        // was accepted once and made the check cosmetic.
+        if ($mime !== 'video/mp4') {
             return 'فایل باید ویدیوی MP4 باشد.';
         }
 

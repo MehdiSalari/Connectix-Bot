@@ -46,7 +46,9 @@ Route::post('/telegram/webhook', TelegramWebhookController::class)
 |
 */
 
-Route::post('/bank/sms', BankSmsController::class)->name('bank.sms');
+Route::post('/bank/sms', BankSmsController::class)
+    ->middleware('throttle:60,1')
+    ->name('bank.sms');
 
 /*
 |--------------------------------------------------------------------------
@@ -109,7 +111,9 @@ Route::prefix('setup')->name('setup.')->middleware(['setup.protect', 'throttle:3
 
 Route::prefix('admin')->name('admin.')->group(function (): void {
     Route::get('login', [AdminLoginController::class, 'show'])->name('login');
-    Route::post('login', [AdminLoginController::class, 'login'])->name('login.attempt');
+    Route::post('login', [AdminLoginController::class, 'login'])
+        ->middleware('throttle:admin-login')
+        ->name('login.attempt');
 
     Route::middleware('admin.auth')->group(function (): void {
         Route::post('logout', [AdminLoginController::class, 'logout'])->name('logout');
@@ -182,8 +186,11 @@ Route::prefix('admin')->name('admin.')->group(function (): void {
         Route::post('broadcast', [AdminBroadcastController::class, 'start'])
             ->middleware('admin.role:admin')
             ->name('broadcast.start');
+        // The stream is what actually runs the send loop, so it carries the
+        // same `admin` requirement as the start it consumes: an editor must not
+        // be able to fire the job that `broadcast.start` alone may create.
         Route::get('broadcast/progress', [AdminBroadcastController::class, 'progress'])
-            ->middleware('admin.role:admin,editor')
+            ->middleware('admin.role:admin')
             ->name('broadcast.progress');
     });
 });

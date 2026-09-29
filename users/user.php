@@ -179,7 +179,7 @@ $backLink = match ($tab) {
             <!-- Avatar and Primary Information -->
             <div class="flex flex-col md:flex-row items-center gap-8 flex-1">
                 <div class="w-28 h-28 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center text-white text-5xl font-bold shadow-xl">
-                    <?= $user['avatar'] ? '<img id="avatar" class="w-28 h-28 rounded-full" src="' . $user['avatar'] . '" alt="' . $user['name'] . '">' : mb_substr($user['name'] ?? 'U', 0, 1); ?>
+                    <?= $user['avatar'] ? '<img id="avatar" class="w-28 h-28 rounded-full" src="' . htmlspecialchars($user['avatar'] ?? '', ENT_QUOTES) . '" alt="' . htmlspecialchars($user['name'] ?? '', ENT_QUOTES) . '">' : htmlspecialchars(mb_substr($user['name'] ?? 'U', 0, 1), ENT_QUOTES); ?>
                 </div>
                 <div class="text-center md:text-right">
                     <h2 class="text-3xl font-bold text-gray-800"><?= htmlspecialchars($user['name'] ?? 'نامشخص') ?></h2>
@@ -324,7 +324,7 @@ $backLink = match ($tab) {
     <!-- Profile Lightbox -->
     <div id="profileLightbox" class="fixed inset-0 hidden items-center justify-center z-50">
         <div class="absolute inset-0 bg-black bg-opacity-50" onclick="closeProfileLightbox()"></div>
-        <img id="lightboxImage" class="relative max-w-full max-h-full rounded-2xl shadow-2xl z-10" src="" alt="<?= $user['name'] ?>">
+        <img id="lightboxImage" class="relative max-w-full max-h-full rounded-2xl shadow-2xl z-10" src="" alt="<?= htmlspecialchars($user['name'] ?? '', ENT_QUOTES) ?>">
     </div>
 
     <!-- Clients (Connected Accounts) -->
@@ -522,7 +522,7 @@ function openProfileLightbox() {
     const lightbox = document.getElementById('profileLightbox');
     const lightboxImg = document.getElementById('lightboxImage');
     
-    lightboxImg.src = '<?= $user['avatar'] ?>';
+    lightboxImg.src = '<?= addslashes($user['avatar'] ?? '') ?>';
     lightbox.classList.remove('hidden');
     document.body.style.overflow = 'hidden';
 }
@@ -551,7 +551,7 @@ const avatar = document.getElementById('avatar');
 if (avatar) {
     avatar.addEventListener('click', function(e) {
         e.stopPropagation();
-        if ('<?= $user['avatar'] ?>') {
+        if ('<?= addslashes($user['avatar'] ?? '') ?>') {
             openProfileLightbox();
         }
     });

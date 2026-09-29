@@ -82,13 +82,21 @@ class DatabaseTester
             PDO::ATTR_TIMEOUT => 5,
         ];
 
+        // A DSN is a semicolon-separated key=value list, so a host, port or
+        // schema name carrying `;` or `=` would rewrite it. Each part is cut
+        // back to what it may contain before it is placed in the string; the
+        // database name follows the same rule `createMysqlDatabase()` applies.
+        $host = (string) preg_replace('~[^A-Za-z0-9.\-_\[\]:]~', '', (string) ($input['host'] ?? 'localhost'));
+        $port = isset($input['port']) ? (string) preg_replace('~\D~', '', (string) $input['port']) : null;
+        $database = (string) preg_replace('~[^A-Za-z0-9_$\x{0080}-\x{FFFF}\-]~u', '', (string) ($input['database'] ?? ''));
+
         return match ($driver) {
             'mysql' => new PDO(
                 sprintf(
                     'mysql:host=%s;port=%s;dbname=%s;charset=utf8mb4',
-                    $input['host'] ?? 'localhost',
-                    $input['port'] ?? '3306',
-                    $input['database'] ?? '',
+                    $host,
+                    $port ?? '3306',
+                    $database,
                 ),
                 $input['username'] ?? '',
                 $input['password'] ?? '',
@@ -97,9 +105,9 @@ class DatabaseTester
             'pgsql' => new PDO(
                 sprintf(
                     'pgsql:host=%s;port=%s;dbname=%s',
-                    $input['host'] ?? 'localhost',
-                    $input['port'] ?? '5432',
-                    $input['database'] ?? ''
+                    $host,
+                    $port ?? '5432',
+                    $database
                 ),
                 $input['username'] ?? '',
                 $input['password'] ?? '',
@@ -108,9 +116,9 @@ class DatabaseTester
             'sqlsrv' => new PDO(
                 sprintf(
                     'sqlsrv:Server=%s,%s;Database=%s',
-                    $input['host'] ?? 'localhost',
-                    $input['port'] ?? '1433',
-                    $input['database'] ?? ''
+                    $host,
+                    $port ?? '1433',
+                    $database
                 ),
                 $input['username'] ?? '',
                 $input['password'] ?? '',

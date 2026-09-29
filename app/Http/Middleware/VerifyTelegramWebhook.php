@@ -21,8 +21,12 @@ class VerifyTelegramWebhook
     {
         $expected = config('connectix_bot.telegram.webhook_secret');
 
+        // Fail closed. The installer refuses to register a webhook without a
+        // secret, so an empty configuration means nobody is supposed to be
+        // delivering updates to this endpoint - accepting them anyway would
+        // hand forged updates to the same handlers as real ones.
         if (blank($expected)) {
-            return $next($request);
+            return response()->json(['ok' => false], 403);
         }
 
         $provided = (string) $request->header('X-Telegram-Bot-Api-Secret-Token', '');

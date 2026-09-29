@@ -77,8 +77,10 @@ class SmsPaymentService
      */
     public function noticeRecipient(): ?string
     {
-        /** @var array<int, string> $ids */
-        $ids = (array) config('connectix_bot.admin_ids', []);
+        // Resolved through the same service every other admin check uses, so
+        // administrators who exist only in the seller panel receive the notice
+        // too - the config array alone only ever saw local overrides.
+        $ids = $this->settings->adminIds();
 
         return $ids === [] ? null : (string) $ids[0];
     }

@@ -1,6 +1,15 @@
 <?php
 require_once '../functions.php';
 session_start();
+
+// Admin session required. This page used to answer anyone who asked, and it
+// embeds the seller panel token below - the same gate users/index.php and
+// users/user.php already have.
+if (!isset($_SESSION['admin_id']) || empty($_SESSION['admin_id'])) {
+    header('Location: ../login.php');
+    exit;
+}
+
 $config = json_decode(file_get_contents('../setup/bot_config.json'), true);
 $appName = $config['app_name'] ?? 'Connectix Bot';
 $adminID = $config['admin_id'] ?? null;
@@ -10,7 +19,12 @@ if (!isset($_GET['userID'])) {
     exit;
 }
 
-$imgUrl = $_GET['userPic'];
+// Only an https picture address is ever put in the avatar: the value arrives
+// in the query string, so a javascript: or data: URL has no place here.
+$imgUrl = (string) ($_GET['userPic'] ?? '');
+if (!preg_match('~^https://~i', $imgUrl)) {
+    $imgUrl = '';
+}
 $user = getUser($_GET['userID']);
 $userId = $user['id'];
 $userChatId = $user['chat_id'];
@@ -86,14 +100,14 @@ if (isset($_GET['create_wallet']) && $_GET['create_wallet'] == true && $walletDa
                 <!-- Avatar and Primary Information -->
                 <div class="flex flex-col md:flex-row items-center gap-8 flex-1">
                     <div class="w-28 h-28 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center text-white text-5xl font-bold shadow-xl">
-                        <img id="avatar" class="w-28 h-28 rounded-full" src="<?= $imgUrl ?>" alt="<?= $user['name'] ?>">
+                        <img id="avatar" class="w-28 h-28 rounded-full" src="<?= htmlspecialchars($imgUrl, ENT_QUOTES) ?>" alt="<?= htmlspecialchars($user['name'] ?? '', ENT_QUOTES) ?>">
                     </div>
                     <div class="text-center md:text-right">
-                        <h2 class="text-3xl font-bold text-gray-800"><?=$user['name'] ?? 'نامشخص' ?></h2>
+                        <h2 class="text-3xl font-bold text-gray-800"><?= htmlspecialchars($user['name'] ?? 'نامشخص', ENT_QUOTES) ?></h2>
                         <div class="mt-3 space-y-2 text-gray-600">
                             <p>آیدی عددی: <code class="bg-gray-100 px-3 py-1 rounded font-mono"><?= $user['chat_id'] ?></code></p>
                             <?php if ($user['telegram_id']): ?>
-                                <p>یوزرنیم: <a href="https://t.me/<?= $user['telegram_id'] ?>" target="_blank" class="text-blue-600 hover:underline">@<?= htmlspecialchars($user['telegram_id']) ?></a></p>
+                                <p>یوزرنیم: <a href="https://t.me/<?= htmlspecialchars($user['telegram_id'], ENT_QUOTES) ?>" target="_blank" class="text-blue-600 hover:underline">@<?= htmlspecialchars($user['telegram_id']) ?></a></p>
                             <?php endif; ?>
                             <p class="text-sm">ثبت‌نام: <?= jdate($user['created_at'], true) ?></p>
                         </div>
@@ -185,7 +199,7 @@ if (isset($_GET['create_wallet']) && $_GET['create_wallet'] == true && $walletDa
         <!-- Profile Lightbox -->
         <div id="profileLightbox" class="fixed inset-0 hidden items-center justify-center z-50">
             <div class="absolute inset-0 bg-black bg-opacity-50" onclick="closeProfileLightbox()"></div>
-            <img id="lightboxImage" class="relative max-w-full max-h-full rounded-2xl shadow-2xl z-10" src="" alt="<?= $user['name'] ?>">
+            <img id="lightboxImage" class="relative max-w-full max-h-full rounded-2xl shadow-2xl z-10" src="" alt="<?= htmlspecialchars($user['name'] ?? '', ENT_QUOTES) ?>">
         </div>
 
         <!-- Clients (Connected Accounts) -->
@@ -386,7 +400,7 @@ if (isset($_GET['create_wallet']) && $_GET['create_wallet'] == true && $walletDa
         const lightbox = document.getElementById('profileLightbox');
         const lightboxImg = document.getElementById('lightboxImage');
         
-        lightboxImg.src = '<?= $user['avatar'] ?>';
+        lightboxImg.src = '<?= addslashes($user['avatar'] ?? '') ?>';
         lightbox.classList.remove('hidden');
         document.body.style.overflow = 'hidden';
     }
@@ -415,7 +429,7 @@ if (isset($_GET['create_wallet']) && $_GET['create_wallet'] == true && $walletDa
     if (avatar) {
         avatar.addEventListener('click', function(e) {
             e.stopPropagation();
-            if ('<?= $user['avatar'] ?>') {
+            if ('<?= addslashes($user['avatar'] ?? '') ?>') {
                 openProfileLightbox();
             }
         });

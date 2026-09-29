@@ -102,16 +102,20 @@ class TelegramWebhookTest extends TestCase
     }
 
     /**
-     * With no secret configured the endpoint stays open, which is what a fresh
-     * local install looks like. Documented so the trade-off is explicit.
+     * An empty configured secret is a misconfiguration, not a free pass:
+     * failing closed keeps anyone from posting updates while the webhook is
+     * in an unverified state. A fresh local install gets a random secret
+     * written at install time, so this branch only appears on broken setups.
      */
-    public function test_it_allows_requests_when_no_secret_is_configured(): void
+    public function test_it_refuses_requests_when_the_secret_is_blank(): void
     {
-        config(['connectix_bot.telegram.webhook_secret' => null]);
+        config(['connectix_bot.telegram.webhook_secret' => '']);
 
-        $this->swap(TelegramGateway::class, Mockery::mock(TelegramGateway::class));
+        $gateway = Mockery::mock(TelegramGateway::class);
+        $gateway->shouldNotReceive('handle');
+        $this->swap(TelegramGateway::class, $gateway);
 
-        $this->postJson('/telegram/webhook', $this->startUpdate())->assertOk();
+        $this->postJson('/telegram/webhook', $this->startUpdate())->assertForbidden();
     }
 
     public function test_the_csrf_token_is_not_required_for_the_webhook(): void

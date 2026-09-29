@@ -156,6 +156,12 @@ return [
     'bank' => [
         'name' => env('CONNECTIX_BOT_BANK_NAME'),
         'bot_notice' => (bool) env('CONNECTIX_BOT_BANK_BOT_NOTICE', true),
+
+        // When set, the gateway must send it in the X-Bank-Sms-Secret header.
+        // Legacy had no such check and an existing gateway will not grow one
+        // by itself, so an empty value keeps the old contract.
+        'secret' => (string) env('BANK_SMS_SECRET', ''),
+
         'banks' => [
             'blu' => [
                 'title' => 'بلو بانک',

@@ -1,0 +1,9 @@
+# bot_config.json carries the panel token, the bot token and the admin id;
+# setup_progress.json is machine state. Both are read by PHP on the
+# filesystem - nothing needs them over HTTP.
+#
+# The .php entry points stay reachable: login.php and index.php redirect to
+# setup/index.php, and the legacy update clients poll setup_progress.php.
+<FilesMatch "\.(json|txt)$">
+    Require all denied
+</FilesMatch>

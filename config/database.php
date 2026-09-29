@@ -42,6 +42,10 @@ return [
             'journal_mode' => null,
             'synchronous' => null,
             'transaction_mode' => 'DEFERRED',
+            // A failed query renders its bindings into the exception message,
+            // and an insert binding here is a plaintext client password or a
+            // legacy admin token. The log file must not collect those.
+            'mask_bindings_in_exception_messages' => true,
         ],
 
         'mysql' => [
@@ -59,6 +63,7 @@ return [
             'prefix_indexes' => true,
             'strict' => true,
             'engine' => null,
+            'mask_bindings_in_exception_messages' => true,
             'options' => extension_loaded('pdo_mysql') ? array_filter([
                 (PHP_VERSION_ID >= 80500 ? Mysql::ATTR_SSL_CA : PDO::MYSQL_ATTR_SSL_CA) => env('MYSQL_ATTR_SSL_CA'),
             ]) : [],
@@ -79,6 +84,7 @@ return [
             'prefix_indexes' => true,
             'strict' => true,
             'engine' => null,
+            'mask_bindings_in_exception_messages' => true,
             'options' => extension_loaded('pdo_mysql') ? array_filter([
                 (PHP_VERSION_ID >= 80500 ? Mysql::ATTR_SSL_CA : PDO::MYSQL_ATTR_SSL_CA) => env('MYSQL_ATTR_SSL_CA'),
             ]) : [],
@@ -97,6 +103,7 @@ return [
             'prefix_indexes' => true,
             'search_path' => 'public',
             'sslmode' => env('DB_SSLMODE', 'prefer'),
+            'mask_bindings_in_exception_messages' => true,
         ],
 
         'sqlsrv' => [
@@ -110,6 +117,7 @@ return [
             'charset' => env('DB_CHARSET', 'utf8'),
             'prefix' => '',
             'prefix_indexes' => true,
+            'mask_bindings_in_exception_messages' => true,
             // 'encrypt' => env('DB_ENCRYPT', 'yes'),
             // 'trust_server_certificate' => env('DB_TRUST_SERVER_CERTIFICATE', 'false'),
         ],
@@ -138,6 +146,7 @@ return [
             'prefix_indexes' => true,
             'strict' => true,
             'engine' => null,
+            'mask_bindings_in_exception_messages' => true,
         ],
 
     ],

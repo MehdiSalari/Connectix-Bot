@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\EnsureInstalled;
+use App\Http\Middleware\SecurityHeaders;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -14,8 +15,9 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         // The Telegram webhook is a server-to-server POST authenticated by the
         // X-Telegram-Bot-Api-Secret-Token header, so a CSRF token cannot exist.
-        // The bank SMS gateway is another server-to-server POST with no shared
-        // secret, matching legacy `bank/sms.php`, so it is excluded as well.
+        // The bank SMS gateway is another server-to-server POST: legacy had no
+        // shared secret, so this one accepts the gateway as legacy did, while a
+        // configured BANK_SMS_SECRET is required when the operator sets one.
         $middleware->validateCsrfTokens(except: [
             'telegram/*',
             'bank/*',
@@ -33,6 +35,11 @@ return Application::configure(basePath: dirname(__DIR__))
          * depends on configuration it has not written yet.
          */
         $middleware->prepend(EnsureInstalled::class);
+
+        // Prepended last so it sits outside the first-run guard: a redirect to
+        // the installer and a JSON 503 from the guard need the same headers a
+        // page does.
+        $middleware->prepend(SecurityHeaders::class);
 
         $middleware->alias([
             'telegram.webhook' => \App\Http\Middleware\VerifyTelegramWebhook::class,

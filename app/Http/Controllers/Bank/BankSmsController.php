@@ -47,6 +47,23 @@ class BankSmsController extends Controller
             ], 406);
         }
 
+        // The gateway posts to a fixed URL anyone can reach. An unset secret
+        // keeps the legacy contract (the old bank integration sends nothing
+        // extra); a set one must arrive in the header, compared without a
+        // timing tell.
+        $secret = (string) config('connectix_bot.bank.secret', '');
+
+        if ($secret !== '') {
+            $provided = (string) $request->header('X-Bank-Sms-Secret', '');
+
+            if (! hash_equals($secret, $provided)) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Unauthorized',
+                ], 403);
+            }
+        }
+
         $message = trim((string) $request->input('msg'));
 
         if ($message === '') {
@@ -70,7 +87,9 @@ class BankSmsController extends Controller
         if ($amount === null) {
             Log::error('Failed to extract amount from bank SMS.', [
                 'bank' => $bank,
-                'message' => $message,
+                // A stranger's card and phone numbers are in this text; the
+                // log file on a shared host has no business holding them.
+                'message' => $this->safeSmsBody($message),
             ]);
 
             return response()->json([
@@ -104,6 +123,24 @@ class BankSmsController extends Controller
                 'bank' => $bank,
             ],
         ], 202);
+    }
+
+    /**
+     * The raw SMS, minus what a stranger would not want in a log file.
+     *
+     * Runs of six or more digits are card, account or phone numbers; the last
+     * four stay so a support question can still be correlated, and the body is
+     * cut short because only the shape of the message explains a pattern miss.
+     */
+    private function safeSmsBody(string $message): string
+    {
+        $masked = (string) preg_replace_callback(
+            '/\d{6,}/',
+            static fn (array $m): string => '***'.substr($m[0], -4),
+            $message,
+        );
+
+        return mb_strlen($masked) > 120 ? mb_substr($masked, 0, 120).'…' : $masked;
     }
 
     /**

@@ -24,10 +24,37 @@ $message = $_POST['message'] ?? '';
 
 $mediaPath = null;
 if (isset($_FILES['media']) && $_FILES['media']['error'] === 0) {
-    $dir = __DIR__.'/uploads/';
-    if (!is_dir($dir)) mkdir($dir, 0755, true);
-    $mediaPath = $dir . time() . '_' . basename($_FILES['media']['name']);
-    move_uploaded_file($_FILES['media']['tmp_name'], $mediaPath);
+    // Same shape as the Laravel upload rules: an allow-listed type, a 50MB
+    // ceiling (the bot API limit), and a server-generated name. The stored
+    // name is what the web server will later serve, so it never comes from
+    // the upload itself - this also kills "shell.php.jpg" tricks.
+    $allowed = [
+        'jpg' => 'jpg', 'jpeg' => 'jpg', 'png' => 'png', 'gif' => 'gif',
+        'webp' => 'webp', 'bmp' => 'bmp',
+        'mp4' => 'mp4', 'mov' => 'mov', 'avi' => 'avi', 'mkv' => 'mkv', 'webm' => 'webm',
+        'mp3' => 'mp3', 'ogg' => 'ogg', 'm4a' => 'm4a', 'wav' => 'wav', 'amr' => 'amr',
+        'pdf' => 'pdf', 'doc' => 'doc', 'docx' => 'docx', 'xls' => 'xls', 'xlsx' => 'xlsx',
+        'ppt' => 'ppt', 'pptx' => 'pptx', 'txt' => 'txt', 'csv' => 'csv',
+        'zip' => 'zip', 'rar' => 'rar', '7z' => '7z',
+    ];
+    $ext = strtolower(pathinfo((string) ($_FILES['media']['name'] ?? ''), PATHINFO_EXTENSION));
+    if (isset($allowed[$ext]) && (int) $_FILES['media']['size'] <= 50 * 1024 * 1024) {
+        $dir = __DIR__.'/uploads/';
+        if (!is_dir($dir)) mkdir($dir, 0755, true);
+        $mediaPath = $dir . time() . '_' . bin2hex(random_bytes(8)) . '.' . $allowed[$ext];
+        move_uploaded_file($_FILES['media']['tmp_name'], $mediaPath);
+    }
+
+    if ($mediaPath === null) {
+        // The admin asked for a file; do not silently drop it from the send.
+        header('Content-Type: application/json');
+        echo json_encode([
+            'success' => false,
+            'message' => 'فرمت یا حجم فایل مجاز نیست',
+            'description' => 'unsupported media type or size'
+        ]);
+        exit;
+    }
 }
 
 // اگر حالت تست باشه → مستقیم بفرست به ادمین و تموم

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Exceptions;
 
+use App\Support\LogRedaction;
 use Exception;
 use Throwable;
 
@@ -40,6 +41,11 @@ class TelegramApiException extends Exception
 
     public static function transport(string $method, string $reason): self
     {
+        // Defence in depth: callers pass a Guzzle message that may carry the
+        // request URL, and the URL is where the bot token lives. The description
+        // is what the broadcast stream shows the operator, so it is masked too.
+        $reason = LogRedaction::mask($reason);
+
         return new self(
             sprintf('Telegram API call [%s] failed to reach the server: %s', $method, $reason),
             $reason,

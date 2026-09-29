@@ -9,6 +9,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Services\Connectix\ConnectixService;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -25,7 +26,7 @@ class AdminClientController extends Controller
         private readonly ConnectixService $connectix,
     ) {}
 
-    public function show(string $clientId): JsonResponse
+    public function show(Request $request, string $clientId): JsonResponse
     {
         try {
             $client = $this->connectix->getClientData($clientId);
@@ -48,14 +49,23 @@ class AdminClientController extends Controller
 
         $local = Client::query()->whereKey($clientId)->first();
 
-        return response()->json([
+        $payload = [
             'client' => $client,
             'local' => $local === null ? null : [
                 'username' => $local->username,
-                'password' => $local->password,
                 'count_of_devices' => $local->count_of_devices,
                 'created_at' => $local->created_at?->format('Y-m-d H:i'),
             ],
-        ]);
+        ];
+
+        // An editor may open the record but not take the end user's password
+        // away with it: only the role that may change things sees the field.
+        $admin = $request->user('admin');
+
+        if ($local !== null && $admin !== null && $admin->isAdmin()) {
+            $payload['local']['password'] = $local->password;
+        }
+
+        return response()->json($payload);
     }
 }

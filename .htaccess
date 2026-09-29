@@ -1,0 +1,22 @@
+# Hardening for the mixed legacy/Laravel tree.
+#
+# Legacy deployment serves this directory as the document root, so this file
+# is what stands between .env, config.php and the debug dumps and the
+# internet. The Laravel production docroot is public/, where public/.htaccess
+# applies instead and the paths below are not reachable at all.
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Source trees, tooling and state directories are never web content.
+    RewriteRule ^(app|bootstrap|config|database|docs|resources|routes|storage|tests|vendor|node_modules|\.git|\.github|\.idea)(/|$) - [F,L]
+
+    # The debug playground: SQL dumps, service logs, a 50MB backup zip.
+    RewriteRule ^debug(/|$) - [F,L]
+</IfModule>
+
+# Credentials and machine state must never be downloadable. config.php holds
+# the panel token, the bot token and the webhook secret in plaintext.
+<FilesMatch "(?i)^(\.env.*|\.ht.*|\.user\.ini|php\.ini|config\.php|composer\.(json|lock)|package(-lock)?\.json|.*\.(sql|log|bak|old|sqlite|sqlite3|key|pem|p12))$">
+    Require all denied
+</FilesMatch>

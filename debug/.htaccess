@@ -1,0 +1,3 @@
+# Nothing in this directory is web content: SQL dumps, service logs and
+# ad-hoc probe scripts live here for the filesystem only.
+Require all denied

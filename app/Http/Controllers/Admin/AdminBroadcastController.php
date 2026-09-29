@@ -12,6 +12,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Str;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -25,6 +26,24 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  */
 class AdminBroadcastController extends Controller
 {
+    /**
+     * What a broadcast may attach: the sniffed content type has to be an image
+     * or an MP4, the extension has to be one Telegram will render, and the file
+     * has to stay under ten megabytes.
+     *
+     * `application/mp4` sits beside `video/mp4` because that is what Symfony's
+     * extension table reports for an .mp4 name, while finfo on the bytes of a
+     * real upload says `video/mp4`. Both are legitimate spellings of the same
+     * container, and accepting either keeps the rule honest on every platform.
+     */
+    private const MEDIA_RULES = [
+        'nullable',
+        'file',
+        'mimes:jpg,jpeg,png,gif,webp,mp4',
+        'mimetypes:image/jpeg,image/png,image/gif,image/webp,video/mp4,application/mp4',
+        'max:10240',
+    ];
+
     public function __construct(
         private readonly BroadcastService $broadcast,
     ) {}
@@ -51,6 +70,7 @@ class AdminBroadcastController extends Controller
         $data = $request->validate([
             'message' => ['required', 'string', 'max:4096'],
             'test' => ['sometimes', 'boolean'],
+            'media' => self::MEDIA_RULES,
         ]);
 
         /** @var Admin $admin */
@@ -61,7 +81,9 @@ class AdminBroadcastController extends Controller
         $upload = $request->file('media');
 
         if ($upload instanceof UploadedFile && $upload->isValid()) {
-            $name = time().'_'.basename($upload->getClientOriginalName());
+            // The name is the server's own: the client's filename would decide
+            // the extension of whatever lands in storage.
+            $name = Str::random(24).'.'.($upload->guessExtension() ?? 'bin');
 
             $media = $this->broadcast->mediaStoragePath().'/'.$name;
 
@@ -106,6 +128,17 @@ class AdminBroadcastController extends Controller
      */
     public function progress(Request $request): StreamedResponse
     {
+        // SameSite does not protect a plain GET, and this stream is the thing
+        // that runs the fan-out: a page on another origin must be refused
+        // before the loop starts. The header is absent on older browsers, where
+        // the admin-role check on the route and the session cookie are what
+        // remain.
+        $fetchSite = $request->header('Sec-Fetch-Site');
+
+        if ($fetchSite !== null && $fetchSite !== 'same-origin' && $fetchSite !== 'none') {
+            abort(403);
+        }
+
         return response()->stream(function () use ($request): void {
             $this->streamHeaders();
 

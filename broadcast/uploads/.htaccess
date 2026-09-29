@@ -1,0 +1,22 @@
+# Uploaded media must stay downloadable - Telegram fetches these files back
+# over HTTP using the request host - but nothing in here may ever execute.
+
+# Belt: strip any PHP handler this directory could have inherited.
+<IfModule mod_mime.c>
+    RemoveHandler .php .phtml .phar .php3 .php4 .php5 .php7 .php8
+    RemoveType .php .phtml .phar
+</IfModule>
+<IfModule mod_php.c>
+    php_flag engine off
+</IfModule>
+<IfModule mod_php7.c>
+    php_flag engine off
+</IfModule>
+<IfModule mod_php8.c>
+    php_flag engine off
+</IfModule>
+
+# Suspend: refuse script-like names outright, whatever the config says.
+<FilesMatch "(?i)\.(php|phtml|phar|php\d|pl|py|cgi|jsp|asp|aspx|sh|htaccess|htpasswd|ini)$">
+    Require all denied
+</FilesMatch>

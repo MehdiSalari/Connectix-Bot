@@ -1,4 +1,13 @@
 <?php
+// Same admin gate as broadcast_start.php: this endpoint is the loop that
+// actually delivers the campaign, so an anonymous visitor could otherwise
+// trigger sends just by opening the URL.
+session_start();
+if (!isset($_SESSION['admin_id']) || empty($_SESSION['admin_id'])) {
+    http_response_code(401);
+    exit;
+}
+
 header('Content-Type: text/event-stream');
 header('Cache-Control: no-cache');
 

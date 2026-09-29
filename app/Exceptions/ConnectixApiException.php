@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Exceptions;
 
+use App\Support\LogRedaction;
 use Exception;
 use Throwable;
 
@@ -23,8 +24,10 @@ class ConnectixApiException extends Exception
 
     public static function fromResponse(string $endpoint, int $status, string $body): self
     {
+        // The body is whatever the panel saw fit to answer with; it is masked
+        // so a payload carrying credentials cannot reach the log file.
         return new self(
-            sprintf('Connectix API [%s] returned HTTP %d: %s', $endpoint, $status, self::summarise($body)),
+            sprintf('Connectix API [%s] returned HTTP %d: %s', $endpoint, $status, LogRedaction::mask(self::summarise($body))),
             $endpoint,
             $status,
         );
@@ -33,7 +36,7 @@ class ConnectixApiException extends Exception
     public static function transport(string $endpoint, string $reason): self
     {
         return new self(
-            sprintf('Connectix API [%s] could not be reached: %s', $endpoint, $reason),
+            sprintf('Connectix API [%s] could not be reached: %s', $endpoint, LogRedaction::mask($reason)),
             $endpoint,
         );
     }

@@ -3,11 +3,13 @@
 # ==========================================
 config.php
 debug/*.*
+!debug/.htaccess
 .vscode/*
 assets/videos/guide/*
 assets/images/avatars/*
 !assets/images/avatars/bot-avatar-sample.jpg
 broadcast/uploads/*
+!broadcast/uploads/.htaccess
 broadcast/*.json
 broadcast/*.txt
 setup/*.json

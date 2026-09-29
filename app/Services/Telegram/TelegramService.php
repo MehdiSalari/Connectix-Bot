@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Telegram;
 
 use App\Exceptions\TelegramApiException;
+use App\Support\LogRedaction;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Response;
@@ -151,12 +152,17 @@ class TelegramService
                     'chat_id' => $chatId,
                 ], $params));
         } catch (ConnectionException $e) {
+            // The bot token is the first path segment of the request URL, and
+            // Guzzle appends that URL to its error message - without this mask
+            // every timeout would write the live token to the log file.
+            $reason = LogRedaction::mask($e->getMessage());
+
             Log::error('Telegram transport failure.', [
                 'method' => $method,
-                'error' => $e->getMessage(),
+                'error' => $reason,
             ]);
 
-            throw TelegramApiException::transport($method, $e->getMessage());
+            throw TelegramApiException::transport($method, $reason);
         } finally {
             if (is_resource($file)) {
                 fclose($file);
@@ -349,12 +355,17 @@ class TelegramService
             $response = $this->client()
                 ->post($this->baseUrl($token).'/'.$method, $this->body($params));
         } catch (ConnectionException $e) {
+            // The bot token is the first path segment of the request URL, and
+            // Guzzle appends that URL to its error message - without this mask
+            // every timeout would write the live token to the log file.
+            $reason = LogRedaction::mask($e->getMessage());
+
             Log::error('Telegram transport failure.', [
                 'method' => $method,
-                'error' => $e->getMessage(),
+                'error' => $reason,
             ]);
 
-            throw TelegramApiException::transport($method, $e->getMessage());
+            throw TelegramApiException::transport($method, $reason);
         }
 
         return $this->decode($method, $response);

@@ -34,8 +34,17 @@ class LegacyVerifyCommand extends Command
             return self::FAILURE;
         }
 
+        // The option names tables, which end up as identifiers in the queries
+        // below: only names this application already knows are accepted, the
+        // same rule legacy:import applies.
         $only = $this->option('only');
-        $tables = $only === [] ? $source->tables() : $only;
+        $tables = $only === [] ? $source->tables() : array_values(array_intersect($only, $source->tables()));
+
+        if ($tables === []) {
+            $this->error('None of the given --only tables are tables of this application.');
+
+            return self::FAILURE;
+        }
 
         $rows = [];
         $missing = 0;

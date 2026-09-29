@@ -12,6 +12,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\Cookie;
 
@@ -31,6 +32,13 @@ class AdminLoginController extends Controller
     private const REMEMBER_DAYS = 30;
 
     private const INVALID = 'Invalid email or password';
+
+    /**
+     * A real bcrypt digest used when no such admin exists, so a miss costs the
+     * same time as a hit and the response cannot be used to learn which
+     * addresses are registered.
+     */
+    private const DECOY_HASH = '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi';
 
     public function show(Request $request): RedirectResponse|View
     {
@@ -53,7 +61,18 @@ class AdminLoginController extends Controller
 
         $admin = Admin::query()->where('email', $email)->first();
 
-        if ($admin === null || ! Hash::check($password, $admin->password)) {
+        // One hash check either way: the decoy keeps the unknown-address case
+        // from answering faster than the wrong-password case.
+        $hash = $admin?->password ?? self::DECOY_HASH;
+
+        if (! Hash::check($password, $hash) || $admin === null) {
+            // The route is throttled; the log makes an attempt that never got
+            // far enough to be throttled visible after the fact.
+            Log::warning('Admin login rejected.', [
+                'email' => $email,
+                'ip' => $request->ip(),
+            ]);
+
             return redirect()->route('admin.login')
                 ->withErrors(['credentials' => self::INVALID])
                 ->withInput();
@@ -62,7 +81,7 @@ class AdminLoginController extends Controller
         Auth::guard('admin')->login($admin);
 
         return redirect()->intended(route('admin.dashboard'))
-            ->withCookie($this->rememberToken($admin));
+            ->withCookie($this->rememberToken($request, $admin));
     }
 
     public function logout(Request $request): RedirectResponse
@@ -113,7 +132,7 @@ class AdminLoginController extends Controller
         return [(string) $data['email'], (string) $data['password']];
     }
 
-    private function rememberToken(Admin $admin): Cookie
+    private function rememberToken(Request $request, Admin $admin): Cookie
     {
         return \Illuminate\Support\Facades\Cookie::make(
             self::COOKIE,
@@ -121,7 +140,10 @@ class AdminLoginController extends Controller
             self::REMEMBER_DAYS * 24 * 60,
             '/',
             null,
-            false,
+            // The seller token itself: marked Secure whenever the panel is
+            // served over TLS, so it cannot be read off the wire. Hardcoding
+            // false (what legacy did) would send it in the clear forever.
+            $request->isSecure(),
             true,
             false,
             'Lax',

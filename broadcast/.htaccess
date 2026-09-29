@@ -1,0 +1,6 @@
+# Campaign state only: broadcast_data.json holds the queued message and
+# admin chat id, broadcast_done.txt the cursor. The PHP endpoints themselves
+# keep running, gated by their own admin session check.
+<FilesMatch "\.(json|txt)$">
+    Require all denied
+</FilesMatch>

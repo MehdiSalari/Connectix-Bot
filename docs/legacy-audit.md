@@ -592,3 +592,75 @@ The rewrite keeps the same sequence and makes each part its own step.
 * The wizard against a real MySQL account. The tests run it on SQLite, and the
   `CREATE DATABASE IF NOT EXISTS` branch and the privilege failures it exists for
   have not been exercised.
+
+## 18. Security hardening (Phase 17)
+
+The audit's live findings (section 8) plus everything that surfaced while the
+wizard landed, fixed and pinned by tests:
+
+* **Log redaction has one home.** `App\Support\LogRedaction` masks the bot
+  token inside `api.telegram.org/bot<id>:<secret>/method` URLs, bare
+  `<id>:AA...` tokens, `password=`/`token:`/`api_key=` pairs, `Bearer <token>`
+  (which has no `=` for the pair rule to find), and runs of twelve or more
+  digits down to their last four - then squishes everything into a single line
+  of at most 300 characters. `TelegramService`, `TelegramApiException`,
+  `ConnectixApiException` and the wizard's failure log all go through it, and
+  `config/database.php` sets `mask_bindings_in_exception_messages` on every
+  connection so a failed query never renders a plaintext client password or
+  seller token. With `APP_DEBUG=false` the PHP error handler is asked to drop
+  argument lists too (`zend.exception_ignore_args`).
+* **The webhook fails closed.** A blank `TELEGRAM_WEBHOOK_SECRET` is a
+  misconfiguration, not an open door: `VerifyTelegramWebhook` answers 403
+  instead of trusting anyone, because the installer always writes a random
+  64-character secret before it registers the hook.
+* **Sign-in is rate-limited and does not leak.** The login POST is throttled
+  to five attempts per minute per email+IP, the unknown-address case pays the
+  same single bcrypt check as the wrong-password case (`DECOY_HASH`), a
+  rejection logs only the email and IP, and the remembered seller-token cookie
+  is marked `Secure` whenever the request arrived over TLS.
+* **Authorization gaps closed.** The client-details endpoint now hands the
+  end user's password only to the `admin` role, `broadcast/progress` moved from
+  `admin,editor` to `admin` (it is the loop that sends), and it additionally
+  refuses any request whose `Sec-Fetch-Site` header is not `same-origin` or
+  `none`. Every other route already sat behind `admin.auth` + `admin.role`.
+* **Uploads cannot become code.** The Laravel broadcast accepts only
+  jpg/png/gif/webp/mp4 by extension and sniffed type under 10MB, stored under a
+  server-generated name. The legacy `broadcast_start.php` got the same shape
+  with a wider document allow-list and a 50MB ceiling, rejects the file with a
+  JSON error instead of silently dropping it, and `broadcast_progress.php`
+  (the send loop itself) now requires the admin session it was missing.
+* **Legacy XSS and session holes.** `users/profile.php` - which answered any
+  visitor and embedded the seller panel token in its HTML - is behind the same
+  `$_SESSION['admin_id']` gate as its siblings; its `userPic` parameter only
+  survives as an `https://` URL; and every raw `name`/`avatar` echo in
+  `users/profile.php`, `users/user.php` and `users/index.php` now goes through
+  `htmlspecialchars` or `addslashes` (the avatar also sits inside a JS string).
+* **The bank gateway can be told apart from a stranger.** When
+  `BANK_SMS_SECRET` is configured, `POST /bank/sms` requires it in
+  `X-Bank-Sms-Secret` (compared with `hash_equals`) and is rate-limited to 60
+  a minute; unset, the legacy contract holds and no header is needed. The SMS
+  text that reaches the log has its digit runs masked.
+* **Response headers.** `SecurityHeaders` (outermost in the stack, so even the
+  installer's redirects carry it) sends `X-Content-Type-Options: nosniff`,
+  `X-Frame-Options: DENY`, `Referrer-Policy: same-origin`, a `Permissions-
+  Policy`, a CSP of `default-src 'self'` with inline styles/scripts,
+  `fonts.bunny.net`, image and `data:` allowances plus the Vite dev origin
+  only outside production, and HSTS strictly on TLS requests.
+* **Legacy HTTP lockdown.** Root `.htaccess` denies `.env*`, `config.php`,
+  `*.sql`, `*.log`, archives and the tooling trees (`app/`, `vendor/`,
+  `storage/`, `tests/`, ...) over HTTP; `debug/.htaccess` denies the directory
+  outright (SQL dumps, a 50MB backup zip, probe scripts); `setup/.htaccess`
+  denies `*.json`/`*.txt` so `bot_config.json` is filesystem-only while
+  `setup_progress.php` stays reachable; `broadcast/.htaccess` denies the job
+  state files; `broadcast/uploads/.htaccess` strips every script handler and
+  refuses script-like names while the media itself stays downloadable for
+  Telegram. Documented defaults moved to `.env.example` (`APP_ENV=production`,
+  `APP_DEBUG=false`, commented `SESSION_SECURE_COOKIE`, `BANK_SMS_SECRET`) and
+  `config.example.php` now carries unmistakable `<...-token>` placeholders.
+
+Covered by `tests/Feature/SecurityHardeningTest` (headers, login throttle,
+upload rejection, role and origin gates, client password, bank secret) and
+`tests/Unit/LogRedactionTest`; the suite stands at 395 tests, 1242 assertions.
+
+Left to the operator: rotating the bot token is only necessary if `config.php`
+has ever left the machine - it has never been tracked by git.
