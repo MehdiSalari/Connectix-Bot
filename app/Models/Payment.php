@@ -6,6 +6,7 @@ namespace App\Models;
 
 use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -27,10 +28,35 @@ class Payment extends Model
     protected function casts(): array
     {
         return [
-            'is_paid' => PaymentStatus::class,
             'method' => PaymentMethod::class,
             'created_at' => 'datetime',
         ];
+    }
+
+    /**
+     * Normalise the tri-state `is_paid` column.
+     *
+     * The column is a nullable VARCHAR, and a plain enum cast cannot express
+     * the pending state: Laravel hands back null for a null attribute instead
+     * of an enum, so every call to `isPending()` on a fresh card order would
+     * have been "call a method on null".
+     *
+     * Reading therefore always yields a PaymentStatus, with null mapping to
+     * Pending, and writing Pending stores a real null so the value on disk
+     * stays exactly what legacy wrote.
+     */
+    protected function isPaid(): Attribute
+    {
+        return Attribute::make(
+            get: static fn (mixed $value): PaymentStatus => PaymentStatus::fromDatabase($value),
+            set: static function (mixed $value): ?string {
+                $status = $value instanceof PaymentStatus
+                    ? $value
+                    : PaymentStatus::fromDatabase($value);
+
+                return $status === PaymentStatus::Pending ? null : $status->value;
+            },
+        );
     }
 
     /**
