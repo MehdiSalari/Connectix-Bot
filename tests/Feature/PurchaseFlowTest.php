@@ -415,14 +415,17 @@ class PurchaseFlowTest extends TestCase
         );
     }
 
-    public function test_a_group_without_usable_plans_is_refused_and_the_state_is_cleared(): void
+    public function test_an_unknown_group_is_refused_with_the_legacy_alert_and_keeps_the_state(): void
     {
         $user = $this->makeUser();
 
         $this->app->make(PurchaseHandler::class)->handle($this->press('buy_group:unknown'), $user);
 
-        $this->assertSame('هیچ پلن معتبری در این گروه وجود ندارد.', $this->lastAlert());
-        $this->assertSame([], $this->state($user));
+        $this->assertSame('هیچ پلنی در این گروه یافت نشد!', $this->lastAlert());
+
+        $state = $this->state($user);
+
+        $this->assertSame('unknown', $state['group'] ?? null, 'legacy left the chosen group in state');
     }
 
     public function test_the_plan_menu_formats_the_label_the_way_legacy_did(): void
@@ -1149,6 +1152,57 @@ class PurchaseFlowTest extends TestCase
         $this->assertSame('نام کاربری و یا رمز عبور اشتباه است.', $this->lastMessage());
         $this->assertNull(Client::query()->first());
         $this->assertSame([], $this->state($user));
+    }
+
+    // -----------------------------------------------------------------
+    // The "usual account" renewal
+    // -----------------------------------------------------------------
+
+    public function test_the_usual_account_button_opens_the_classic_picker(): void
+    {
+        $user = $this->makeUser();
+        $this->makeClient($user);
+
+        $this->app->make(RenewHandler::class)->handle($this->press('always_select:0'), $user);
+
+        $this->assertSame('📦 کدوم اکانت رو تمدید کنم؟', $this->lastMessage());
+
+        $labels = $this->labels($this->lastKeyboard());
+
+        $this->assertSame('🟢 فعال | acme-user|always_acc:acme-user', $labels[1] ?? null);
+        $this->assertSame('↪️ | بازگشت|main_menu', end($labels));
+    }
+
+    public function test_the_usual_account_goes_straight_to_its_own_renewal_checkout(): void
+    {
+        $user = $this->makeUser();
+        $this->makeClient($user);
+
+        $this->app->make(RenewHandler::class)->handle($this->press('always_acc:acme-user'), $user);
+
+        $state = $this->state($user);
+
+        $this->assertSame(UserStateService::ACTION_RENEW, $state['action'] ?? null);
+        $this->assertSame('acme-user', $state['acc'] ?? null);
+
+        $labels = $this->labels($this->lastKeyboard());
+
+        $this->assertSame('💳 | کارت به کارت|pay_card:120,000', $labels[0] ?? null);
+        $this->assertStringContainsString('روش پرداخت', $this->lastMessage());
+    }
+
+    public function test_the_account_detail_renew_button_accepts_the_origin_suffix(): void
+    {
+        $user = $this->makeUser();
+        $this->makeClient($user);
+
+        $this->app->make(RenewHandler::class)->handle($this->press('renew_acc:acme-user:accounts'), $user);
+
+        $this->assertSame('', $this->lastAlert());
+        $this->assertStringContainsString(
+            'آخرین اشتراک خریداری شده برای اکانت acme-user',
+            $this->lastMessage(),
+        );
     }
 
     // -----------------------------------------------------------------

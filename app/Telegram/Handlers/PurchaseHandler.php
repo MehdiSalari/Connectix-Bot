@@ -153,11 +153,21 @@ class PurchaseHandler implements UpdateHandler
     {
         $this->purchase->chooseGroup($user, $group);
 
+        // Legacy told an unknown group (no plans at all) from an unusable one
+        // (plans without a valid device count) with two different alerts, and
+        // left the chosen group in state either way.
+        if ($this->plans->plansForGroup($group) === []) {
+            $this->telegram->answerCallbackQueryQuietly(
+                $update->callbackId(),
+                'هیچ پلنی در این گروه یافت نشد!',
+            );
+
+            return;
+        }
+
         $counts = $this->purchase->deviceCountsFor($group);
 
         if ($counts === []) {
-            $this->state->clear($user);
-
             $this->telegram->answerCallbackQueryQuietly(
                 $update->callbackId(),
                 'هیچ پلن معتبری در این گروه وجود ندارد.',

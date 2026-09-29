@@ -263,7 +263,12 @@ class TelegramGatewayTest extends TestCase
         $this->assertDatabaseMissing('users', ['chat_id' => '555']);
 
         Http::assertSent(fn ($request) => str_contains($request->url(), 'sendMessage')
-            && str_contains($request['text'], 'عضو شوید'));
+            && str_contains($request['text'], 'عضو کانال اطلاع رسانی شوید'));
+
+        Http::assertSent(fn ($request) => str_contains($request->url(), 'sendMessage')
+            && str_contains((string) $request['reply_markup'], '✅ | بررسی عضویت')
+            && str_contains((string) $request['reply_markup'], 'main_menu')
+            && str_contains((string) $request['reply_markup'], '🔗 | عضویت در کانال'));
     }
 
     public function test_the_channel_gate_lets_a_member_through(): void

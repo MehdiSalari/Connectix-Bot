@@ -147,7 +147,7 @@ class TelegramGateway
             return true;
         }
 
-        $this->refuse($update, $chatId, 'برای استفاده از ربات باید در کانال ما عضو شوید.', true);
+        $this->refuse($update, $chatId, 'لطفا برای استفاده از ربات، عضو کانال اطلاع رسانی شوید. 🙏🏼', true);
 
         return false;
     }
@@ -168,14 +168,14 @@ class TelegramGateway
 
             if ($channel !== '') {
                 $keyboard[] = [[
-                    'text' => 'عضویت در کانال',
+                    'text' => '🔗 | عضویت در کانال',
                     'url' => 'https://t.me/'.$channel,
                 ]];
             }
 
             $keyboard[] = [[
-                'text' => '🔄 | بررسی مجدد',
-                'callback_data' => 'check_join',
+                'text' => '✅ | بررسی عضویت',
+                'callback_data' => 'main_menu',
             ]];
 
             $params['reply_markup'] = json_encode([

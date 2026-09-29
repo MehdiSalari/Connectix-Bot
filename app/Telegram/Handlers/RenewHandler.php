@@ -45,7 +45,9 @@ class RenewHandler implements UpdateHandler
 
         return $data === 'renew'
             || str_starts_with($data, 'renew_acc:')
-            || str_starts_with($data, 'renew_plan:');
+            || str_starts_with($data, 'renew_plan:')
+            || str_starts_with($data, 'always_select')
+            || str_starts_with($data, 'always_acc:');
     }
 
     public function handle(TelegramUpdate $update, User $user): void
@@ -58,8 +60,20 @@ class RenewHandler implements UpdateHandler
             return;
         }
 
+        if (str_starts_with($data, 'always_select')) {
+            $this->showUsualAccounts($update, $user);
+
+            return;
+        }
+
+        if (str_starts_with($data, 'always_acc:')) {
+            $this->renewUsualAccount($update, $user, $this->usernameArgument($data));
+
+            return;
+        }
+
         if (str_starts_with($data, 'renew_acc:')) {
-            $this->showCurrentPlan($update, $user, $this->argument($data));
+            $this->showCurrentPlan($update, $user, $this->usernameArgument($data));
 
             return;
         }
@@ -73,6 +87,16 @@ class RenewHandler implements UpdateHandler
     private function argument(string $data): string
     {
         return explode(':', $data, 2)[1] ?? '';
+    }
+
+    /**
+     * The account name inside a callback, without the origin suffix legacy
+     * appended when the button came from the account detail
+     * (`renew_acc:username:accounts`).
+     */
+    private function usernameArgument(string $data): string
+    {
+        return explode(':', $this->argument($data), 2)[0];
     }
 
     // -----------------------------------------------------------------
@@ -91,7 +115,7 @@ class RenewHandler implements UpdateHandler
         $rows = [];
 
         foreach ($this->purchase->accountsNewestFirst($user) as $client) {
-            [$label, $status] = $this->describe($client->id);
+            [$label, $status] = $this->purchase->describeAccount((string) $client->id);
 
             $rows[] = [
                 ['text' => $label, 'callback_data' => 'renew_acc:'.$client->username],
@@ -109,6 +133,63 @@ class RenewHandler implements UpdateHandler
         ];
 
         $this->render($update, $user, $this->messages->make('renew'), $rows);
+    }
+
+    /**
+     * The "stick with the usual one" picker behind `always_select:0`.
+     *
+     * Port of the `select` branch of `always()`: the heading is legacy's, the
+     * buttons carry the `always_acc:` prefix so an old message keeps working,
+     * and the only way out is home.
+     */
+    private function showUsualAccounts(TelegramUpdate $update, User $user): void
+    {
+        $rows = [];
+
+        foreach ($this->purchase->accountsNewestFirst($user) as $client) {
+            [$label, $status] = $this->purchase->describeAccount((string) $client->id);
+
+            $rows[] = [
+                ['text' => $label, 'callback_data' => 'always_acc:'.$client->username],
+                ['text' => $status.' | '.$client->username, 'callback_data' => 'always_acc:'.$client->username],
+            ];
+        }
+
+        if ($rows === []) {
+            $rows[] = [['text' => '🤷🏻 | اکانتی به تلگرام شما متصل نیست', 'callback_data' => 'not']];
+        }
+
+        $rows[] = [['text' => '↪️ | بازگشت', 'callback_data' => 'main_menu']];
+
+        $this->render($update, $user, '📦 کدوم اکانت رو تمدید کنم؟', $rows);
+    }
+
+    /**
+     * The usual account straight to its own renewal checkout.
+     *
+     * Port of the `acc` branch of `always()`: the account's current plan is
+     * taken as the renewal subject and the shared checkout opens on it, so
+     * this button never asks which plan to renew.
+     */
+    private function renewUsualAccount(TelegramUpdate $update, User $user, string $username): void
+    {
+        $client = $this->purchase->accountByUsername($username);
+
+        if ($client === null || (string) $client->chat_id !== (string) $user->chat_id) {
+            $this->telegram->answerCallbackQueryQuietly(
+                $update->callbackId(),
+                'این اکانت به حساب تلگرام شما متصل نیست.',
+            );
+
+            return;
+        }
+
+        $this->state->startRenewal($user, $username);
+
+        $data = $this->connectix->getClientData((string) $client->id);
+        $plan = $data !== null ? $this->purchase->currentPlan($data) : null;
+
+        $this->showPaymentMethods($update, $user, (string) ($plan['name'] ?? ''));
     }
 
     /**
@@ -142,7 +223,7 @@ class RenewHandler implements UpdateHandler
             return;
         }
 
-        $plan = $this->currentPlan($data);
+        $plan = $this->purchase->currentPlan($data);
 
         if ($plan === null) {
             $this->telegram->answerCallbackQueryQuietly(
@@ -229,74 +310,6 @@ class RenewHandler implements UpdateHandler
         ];
 
         $this->render($update, $user, $text, $rows);
-    }
-
-    // -----------------------------------------------------------------
-    // Accounts
-    // -----------------------------------------------------------------
-
-    /**
-     * The label and status legacy showed for an account in the picker.
-     *
-     * Port of the plan selection inside `keyboard('renew')` and
-     * `keyboard('accounts')`: the first active plan wins, otherwise the first
-     * queued one, otherwise the account reads as having no subscription.
-     *
-     * @return array{0: string, 1: string}
-     */
-    private function describe(string $clientId): array
-    {
-        $data = $this->connectix->getClientData($clientId);
-
-        if ($data === null) {
-            return ['بدون اشتراک', '🔴 غیرفعال'];
-        }
-
-        $plan = $this->currentPlan($data);
-
-        if ($plan === null) {
-            return ['بدون اشتراک', '🔴 غیرفعال'];
-        }
-
-        $title = (string) ($this->plans->parsePlanTitle((string) $plan['name'], true)['text'] ?? '');
-
-        $isActive = ($plan['is_active'] ?? false) == true;
-
-        return [$title, $isActive ? '🟢 فعال' : '🔵 در صف'];
-    }
-
-    /**
-     * The plan an account is currently on: the first active one, else the
-     * first queued one.
-     *
-     * @param  array<string, mixed>  $client
-     * @return array<string, mixed>|null
-     */
-    private function currentPlan(array $client): ?array
-    {
-        $plans = $client['plans'] ?? [];
-
-        if (! is_array($plans)) {
-            return null;
-        }
-
-        $queued = null;
-
-        foreach ($plans as $plan) {
-            if (! is_array($plan)) {
-                continue;
-            }
-
-            if (($plan['is_active'] ?? false) == true) {
-                return $plan;
-            }
-
-            if ($queued === null && ($plan['is_in_queue'] ?? false)) {
-                $queued = $plan;
-            }
-        }
-
-        return $queued;
     }
 
     // -----------------------------------------------------------------

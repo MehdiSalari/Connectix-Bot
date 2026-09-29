@@ -744,3 +744,60 @@ Legacy keyboards carry the `new_menu` callback
 * **Wallet row on first contact.** `ensureWallet()` guarantees the zero
   balance wallet as soon as the user is seen, rather than wherever legacy
   happened to create it first.
+
+## 20. Message and button parity audit
+
+A systematic diff of every Persian string and every `callback_data` in
+`bot.php` / `functions.php` against `app/**` found a class of defect the suite
+could not see: four handlers the registry *named* were never written, and
+`class_exists` skipped them silently. Every home-menu button that reached for
+one answered "این گزینه منقضی شده است." while all 433 tests stayed green.
+
+### Dead buttons, now implemented
+
+| Callback | Legacy source | Handler |
+|---|---|---|
+| `accounts` | bot.php:417 + `keyboard('accounts')` | `AccountHandler` (new) |
+| `showClient_<id>` | `callBackCheck()` -> `showClient()` | `AccountHandler` |
+| `wallet` | bot.php:510 | `WalletHandler` (new) |
+| `wallet_increase:<n>` | `callBackCheck()` -> `walletReqs('increase')` | `WalletHandler` |
+| `support` | bot.php:501 | `SupportHandler` (new) |
+| `faq` | bot.php:492 | `FaqHandler` (new, registered) |
+| `always_select:<n>` | `callBackCheck()` -> `always('select')` | `RenewHandler` |
+| `always_acc:<user>` | `callBackCheck()` -> `always('acc')` | `RenewHandler` |
+| `check_join` | never existed in legacy | removed; the gate button is `✅ | بررسی عضویت` -> `main_menu` again |
+| `ShareContactHandler` | no such legacy flow | dropped from the registry (dead reference) |
+
+`AccountHandler` ports the list (`keyboard('accounts')`: empty state, add row,
+two buttons per account) and the detail page (`showClient()`): credentials,
+subscription link, active plan, queued plans with gift days, and the
+`renew_acc:<user>:accounts` action button. It refuses a client id that does
+not belong to the caller - legacy did not check, but a forged callback would
+otherwise leak another user's password.
+
+### Text parity fixes
+
+* **Channel gate**: `لطفا برای استفاده از ربات، عضو کانال اطلاع رسانی شوید. 🙏🏼`
+  with `🔗 | عضویت در کانال` (url) and `✅ | بررسی عضویت` -> `main_menu`
+  (bot.php:62, functions.php:3650), replacing the rewrite's own wording and
+  the orphaned `check_join` callback.
+* **Group selection**: an unknown group answers `هیچ پلنی در این گروه یافت
+  نشد!` while a group whose plans have no usable device count answers
+  `هیچ پلن معتبری در این گروه وجود ندارد.` - legacy had two alerts
+  (functions.php:1786/1797), the rewrite had merged them; the chosen group
+  stays in state both ways.
+* **`renew_acc:<user>:accounts`**: the origin suffix the account detail adds
+  is stripped before the lookup, so the detail page's renew button no longer
+  lands on "این اکانت به حساب تلگرام شما متصل نیست."
+* **The `always_select` picker** posts legacy's own heading
+  (`📦 کدوم اکانت رو تمدید کنم؟`, functions.php:1093) and jumps straight to
+  the checkout of the account's current plan, exactly as `always('acc')` did.
+
+### Regression net
+
+`HomeMenuButtonsTest` presses every callback the bot's own keyboards emit
+(including `showClient_`, `wallet_increase:0`, `always_acc:`) through
+`HandlerRegistry::firstSupporting()` and fails on any unclaimed button;
+`AccountMenuTest`, `WalletMenuTest` and `SupportFaqMenuTest` render each page
+and pin its text and keyboard against the legacy strings. The suite stands at
+449 tests, 1509 assertions.

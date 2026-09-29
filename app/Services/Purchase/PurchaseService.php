@@ -300,6 +300,70 @@ class PurchaseService
     }
 
     /**
+     * The label and status legacy showed for an account in the pickers.
+     *
+     * Port of the plan selection inside `keyboard('renew')` and
+     * `keyboard('accounts')`: the first active plan wins, otherwise the first
+     * queued one, otherwise the account reads as having no subscription.
+     *
+     * @return array{0: string, 1: string}
+     */
+    public function describeAccount(string $clientId): array
+    {
+        $data = $this->connectix->getClientData($clientId);
+
+        if ($data === null) {
+            return ['بدون اشتراک', '🔴 غیرفعال'];
+        }
+
+        $plan = $this->currentPlan($data);
+
+        if ($plan === null) {
+            return ['بدون اشتراک', '🔴 غیرفعال'];
+        }
+
+        $title = (string) ($this->plans->parsePlanTitle((string) $plan['name'], true)['text'] ?? '');
+
+        $isActive = ($plan['is_active'] ?? false) == true;
+
+        return [$title, $isActive ? '🟢 فعال' : '🔵 در صف'];
+    }
+
+    /**
+     * The plan an account is currently on: the first active one, else the
+     * first queued one.
+     *
+     * @param  array<string, mixed>  $client
+     * @return array<string, mixed>|null
+     */
+    public function currentPlan(array $client): ?array
+    {
+        $plans = $client['plans'] ?? [];
+
+        if (! is_array($plans)) {
+            return null;
+        }
+
+        $queued = null;
+
+        foreach ($plans as $plan) {
+            if (! is_array($plan)) {
+                continue;
+            }
+
+            if (($plan['is_active'] ?? false) == true) {
+                return $plan;
+            }
+
+            if ($queued === null && ($plan['is_in_queue'] ?? false)) {
+                $queued = $plan;
+            }
+        }
+
+        return $queued;
+    }
+
+    /**
      * The panel client id for the account held in state.
      *
      * A new account resolves to the literal 'new', the placeholder

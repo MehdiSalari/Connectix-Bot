@@ -168,14 +168,14 @@ class KeyboardFactory
 
         if ($channel !== '') {
             $rows[] = [[
-                'text' => 'عضویت در کانال',
+                'text' => '🔗 | عضویت در کانال',
                 'url' => 'https://t.me/'.$channel,
             ]];
         }
 
         $rows[] = [[
-            'text' => '🔄 | بررسی مجدد',
-            'callback_data' => 'check_join',
+            'text' => '✅ | بررسی عضویت',
+            'callback_data' => 'main_menu',
         ]];
 
         return ['inline_keyboard' => $rows];
