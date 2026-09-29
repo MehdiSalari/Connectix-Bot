@@ -4,12 +4,15 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Enums\WalletOperation;
+use App\Enums\WalletTransactionType;
 use App\Models\Client;
 use App\Models\HandledUpdate;
 use App\Models\Payment;
 use App\Models\SmsPayment;
 use App\Models\User;
 use App\Models\Wallet;
+use App\Models\WalletTransaction;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use PHPUnit\Framework\Attributes\Test;
@@ -345,8 +348,104 @@ class SyncAndBackgroundTest extends TestCase
     }
 
     // -----------------------------------------------------------------
+    // connectix:sync-wallets
+    // -----------------------------------------------------------------
+
+    #[Test]
+    public function it_imports_a_panel_wallet_with_its_transaction_history(): void
+    {
+        $this->fakePanelWallets();
+
+        $this->artisan('connectix:sync-wallets')->assertSuccessful();
+
+        $wallet = Wallet::query()->where('chat_id', '553')->first();
+
+        $this->assertNotNull($wallet);
+        $this->assertSame(1250000, $wallet->balanceAmount());
+        $this->assertSame(2, $wallet->transactions()->count());
+
+        $deposit = $wallet->transactions()->orderBy('id')->first();
+        $purchase = $wallet->transactions()->orderByDesc('id')->first();
+
+        $this->assertSame(1250000, $deposit->amount);
+        $this->assertSame(WalletOperation::Increase, $deposit->operation);
+        $this->assertSame(WalletTransactionType::CardToCard, $deposit->type);
+        $this->assertSame('2024-07-31 10:00:00', $deposit->created_at->toDateTimeString());
+
+        // The panel sends no transaction id for a purchase, which legacy turned
+        // into a BUY, and its timestamp is Jalali.
+        $this->assertSame(200000, $purchase->amount);
+        $this->assertSame(WalletOperation::Decrease, $purchase->operation);
+        $this->assertSame(WalletTransactionType::Buy, $purchase->type);
+        $this->assertSame('2024-08-02 14:30:00', $purchase->created_at->toDateTimeString());
+    }
+
+    #[Test]
+    public function syncing_wallets_twice_does_not_duplicate_the_history(): void
+    {
+        $this->fakePanelWallets();
+
+        $this->artisan('connectix:sync-wallets')->assertSuccessful();
+        $this->artisan('connectix:sync-wallets')
+            ->expectsOutputToContain('0 transactions')
+            ->assertSuccessful();
+
+        $this->assertSame(1, Wallet::query()->count());
+        $this->assertSame(2, WalletTransaction::query()->count());
+    }
+
+    #[Test]
+    public function a_wallet_without_a_chat_id_is_skipped(): void
+    {
+        Http::fake([
+            self::BASE.'/v1/seller/telegram-wallets' => Http::response([
+                'data' => [['id' => 'w1', 'chat_id' => 'null', 'balance' => '500']],
+            ], 200),
+        ]);
+
+        $this->artisan('connectix:sync-wallets')
+            ->expectsOutputToContain('1 skipped')
+            ->assertSuccessful();
+
+        $this->assertSame(0, Wallet::query()->count());
+    }
+
+    // -----------------------------------------------------------------
     // Helpers
     // -----------------------------------------------------------------
+
+    /**
+     * A panel wallet list with the Jalali timestamps and the amount separators
+     * legacy `setup.php` had to cope with.
+     */
+    private function fakePanelWallets(): void
+    {
+        Http::fake([
+            self::BASE.'/v1/seller/telegram-wallets' => Http::response([
+                'data' => [['id' => 'w1', 'chat_id' => '553', 'balance' => '1,250,000']],
+            ], 200),
+            self::BASE.'/v1/seller/telegram-wallets/w1*' => Http::response([
+                'wallet' => [
+                    'transactions' => [
+                        [
+                            'amount' => '1,250,000',
+                            'type' => 'INCREASE',
+                            'transaction_id' => 'CARD_TO_CARD',
+                            'status' => 'SUCCESS',
+                            'created_at' => '1403-05-10 10:00:00',
+                        ],
+                        [
+                            'amount' => '200,000',
+                            'type' => 'DECREASE',
+                            'transaction_id' => null,
+                            'status' => 'SUCCESS',
+                            'created_at' => '1403-05-12 14:30:00',
+                        ],
+                    ],
+                ],
+            ], 200),
+        ]);
+    }
 
     private function fakePanelClient(string $clientId, string $chatId): void
     {

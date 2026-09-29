@@ -228,6 +228,52 @@ class ConnectixService
     }
 
     // -----------------------------------------------------------------
+    // Wallets
+    // -----------------------------------------------------------------
+
+    /**
+     * Every wallet the panel holds for this seller.
+     *
+     * Port of the wallet half of legacy `setup.php`, which listed them from
+     * `/v1/seller/telegram-wallets` on every install.
+     *
+     * @return array<int, array<string, mixed>>
+     *
+     * @throws ConnectixApiException
+     */
+    public function listWallets(): array
+    {
+        $payload = $this->get('/v1/seller/telegram-wallets');
+
+        $wallets = $payload['data'] ?? null;
+
+        if (! is_array($wallets)) {
+            throw new ConnectixApiException(
+                'The panel returned an unexpected wallet list: the "data" key is missing or is not a list.',
+                '/v1/seller/telegram-wallets',
+            );
+        }
+
+        return array_values(array_filter($wallets, 'is_array'));
+    }
+
+    /**
+     * One wallet with its transactions.
+     *
+     * @return array<string, mixed>|null
+     *
+     * @throws ConnectixApiException
+     */
+    public function getWallet(string $walletId, string $status = 'All'): ?array
+    {
+        $payload = $this->get("/v1/seller/telegram-wallets/{$walletId}", ['status' => $status]);
+
+        $wallet = $payload['wallet'] ?? null;
+
+        return is_array($wallet) ? $wallet : null;
+    }
+
+    // -----------------------------------------------------------------
     // Seller
     // -----------------------------------------------------------------
 

@@ -476,7 +476,50 @@ idempotence legacy lacked.
   `config/connectix_bot.php` no longer reads the avatar paths from a misspelled
   `CONNECTIX_BOT_BOT_AVATAR_*` pair that no `.env` could ever set.
 
-## 15. Open items this audit could not settle
+## 15. Legacy data migration (Phase 16)
+
+The rewrite keeps the legacy table and column names, so the common case - a
+reseller who deploys the new code onto the database the old code already used -
+needs no migration at all: `migrate` only adds what is new. `legacy:import`
+covers the other case, a fresh Laravel database filled from an old install.
+
+| Legacy `setup.php` data half | Laravel equivalent |
+| --- | --- |
+| `CREATE TABLE IF NOT EXISTS ...` for users, clients, payments, wallets, wallet_transactions | the schema migration, run by `migrate` |
+| insert/update each panel client plus its user | `connectix:sync-clients` (Phase 15) |
+| `telegram-wallets` import with `ON DUPLICATE KEY UPDATE` | `connectix:sync-wallets` |
+| `INSERT IGNORE` into `wallet_transactions` | `connectix:sync-wallets` |
+| a `SELECT` on every table afterwards | `legacy:verify` |
+
+* `legacy:import` reads the old database through a dedicated read-only
+  `legacy` connection (`LEGACY_DB_*` in `.env`). Nothing in the request path
+  ever opens it, so leaving the keys empty keeps the old database unreachable.
+  A SQLite export can be imported as easily as a live server.
+* It only ever inserts. Every row is matched on its natural key (`admins.email`,
+  `users.chat_id`, `wallets.chat_id`, `clients.id`, `payments.order_number`,
+  and the primary key for the two ledgers), so a run that is interrupted and
+  repeated converges instead of duplicating, and nothing is ever deleted or
+  updated. Rollback is therefore the backup taken before the run, not an undo
+  command.
+* Writing requires `--confirm`; without it the command walks the same rows and
+  only reports what it would do. `--only=users,clients` limits the run.
+* A row that cannot be mapped - no natural key, unknown column, constraint
+  violation - is counted, logged and skipped. It is never silently dropped.
+* `legacy:verify` compares the counts table by table and fails when a legacy
+  row is still missing locally, which is the check to run against a copy before
+  the live bot is pointed at it.
+* The panel half of the legacy installer is `connectix:sync-clients` plus the
+  new `connectix:sync-wallets`, which is scheduled daily at 03:00. The wallet
+  import keeps three legacy details: the balance is overwritten because the
+  panel is the authority, a transaction without a `transaction_id` that is a
+  decrease is recorded as a `BUY`, and the panel's Jalali timestamps are
+  converted to Gregorian (`App\Support\JalaliCalendar`, the same arithmetic
+  conversion legacy used) before they are stored. History is matched on the
+  tuple that identifies a row - wallet, amount, operation, status, type and
+  timestamp - so a repeated run does not duplicate it, because the panel does
+  not expose an id for every transaction.
+
+## 16. Open items this audit could not settle
 
 * The `payments` receipt column set. Receipts are forwarded to the
   administrators as Telegram photos, never stored (Phase 9), matching legacy,
@@ -484,4 +527,4 @@ idempotence legacy lacked.
 * Whether a percentage above 100 is reachable through the panel UI. The clamp
   is safe either way, but if the panel forbids it the clamp is inert.
 * The real production schema. Only the dump and a local SQLite database have
-  been verified; `migrate` against production MySQL is Phase 16.
+  been verified; `migrate` against production MySQL is still untested.

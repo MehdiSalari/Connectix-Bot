@@ -3,6 +3,7 @@
 use App\Console\Commands\PruneCommand;
 use App\Console\Commands\SyncClientsCommand;
 use App\Console\Commands\SyncUserProfilesCommand;
+use App\Console\Commands\SyncWalletsCommand;
 use Illuminate\Support\Facades\Schedule;
 
 /*
@@ -31,6 +32,16 @@ Schedule::command(SyncClientsCommand::class, ['--pages' => 20])
 
 Schedule::command(SyncUserProfilesCommand::class, ['--limit' => 100, '--delay' => 900])
     ->hourlyAt(20)
+    ->withoutOverlapping();
+
+/*
+| The wallet ledger. Legacy imported balances and the whole transaction history
+| once, from the installer, and never again. Running it daily before the client
+| sync keeps the admin panel's wallet page showing what the panel actually holds
+| and backfills history for a bot that was installed without it.
+*/
+Schedule::command(SyncWalletsCommand::class)
+    ->dailyAt('03:00')
     ->withoutOverlapping();
 
 Schedule::command(PruneCommand::class)

@@ -114,6 +114,32 @@ return [
             // 'trust_server_certificate' => env('DB_TRUST_SERVER_CERTIFICATE', 'false'),
         ],
 
+        /*
+         * The legacy install, read only.
+         *
+         * `legacy:import` and `legacy:verify` read the old tables through this
+         * connection and write into the default one. It is only used by those
+         * two commands, so leaving `LEGACY_DB_DATABASE` empty keeps the old
+         * install completely unreachable - nothing in the request path ever
+         * touches it.
+         */
+        'legacy' => [
+            'driver' => env('LEGACY_DB_CONNECTION', 'mysql'),
+            'url' => env('LEGACY_DB_URL'),
+            'host' => env('LEGACY_DB_HOST', '127.0.0.1'),
+            'port' => env('LEGACY_DB_PORT', '3306'),
+            'database' => env('LEGACY_DB_DATABASE'),
+            'username' => env('LEGACY_DB_USERNAME'),
+            'password' => env('LEGACY_DB_PASSWORD'),
+            'unix_socket' => env('LEGACY_DB_SOCKET', ''),
+            'charset' => env('LEGACY_DB_CHARSET', 'utf8mb4'),
+            'collation' => env('LEGACY_DB_COLLATION', 'utf8mb4_unicode_ci'),
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'strict' => true,
+            'engine' => null,
+        ],
+
     ],
 
     /*
