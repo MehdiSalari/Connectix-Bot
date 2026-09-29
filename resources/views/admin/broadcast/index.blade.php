@@ -54,12 +54,23 @@
                 sendBtn.textContent = 'در حال شروع...';
 
                 const fd = new FormData(form);
-                fd.set('test', document.getElementById('broadcast-test').checked ? '1' : '0');
+                const isTest = document.getElementById('broadcast-test').checked;
+                fd.set('test', isTest ? '1' : '0');
 
                 fetch(form.action, { method: 'POST', body: fd, headers: { 'X-Requested-With': 'XMLHttpRequest' } })
                     .then(function (r) { return r.json(); })
                     .then(function (data) {
                         logCard.style.display = 'block';
+
+                        // A test goes straight to the administrator's own chat,
+                        // so the answer is the result - no progress stream.
+                        if (isTest) {
+                            appendLog(data.description || data.message, data.success ? 'success' : 'error');
+                            sendBtn.disabled = false;
+                            sendBtn.textContent = 'شروع ارسال';
+                            return;
+                        }
+
                         if (! data.ok) { appendLog('خطا در شروع ارسال', 'error'); sendBtn.disabled = false; sendBtn.textContent = 'شروع ارسال'; return; }
 
                         const es = new EventSource(data.progress_url);

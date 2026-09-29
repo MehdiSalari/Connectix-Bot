@@ -299,9 +299,20 @@ return [
     | `usleep(333000)` that throttled the broadcast progress stream to roughly
     | three messages per second so Telegram never rejected the fan-out.
     |
+    | `flood_retry_after_cap` bounds how long a single recipient may stall the
+    | run when Telegram answers 429 Too Many Requests. Legacy ignored the
+    | `parameters.retry_after` it was given and lost that recipient; the cap
+    | keeps a shared host from parking one HTTP request for a minute, so past
+    | the cap the recipient is reported as failed and the loop moves on.
+    |
+    | `flood_retries` is how often one recipient is retried after a flood
+    | answer before it is given up on.
+    |
     */
 
     'broadcast' => [
         'delay_us' => (int) env('CONNECTIX_BOT_BROADCAST_DELAY_US', 333000),
+        'flood_retry_after_cap' => (int) env('CONNECTIX_BOT_BROADCAST_FLOOD_CAP', 10),
+        'flood_retries' => (int) env('CONNECTIX_BOT_BROADCAST_FLOOD_RETRIES', 1),
     ],
 ];

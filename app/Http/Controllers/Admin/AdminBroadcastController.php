@@ -39,11 +39,12 @@ class AdminBroadcastController extends Controller
     }
 
     /**
-     * Validate and persist a new job.
+     * Validate and either send a test message or start a real broadcast.
      *
      * Mirrors broadcast_start.php: the media file, if any, is parked next to
-     * the job state, the counter is reset, and the page is told to open the
-     * progress stream.
+     * the job state, a test is delivered to the administrator's own chat right
+     * away and its media deleted, and a real run is persisted for the progress
+     * stream to pick up.
      */
     public function start(Request $request): JsonResponse
     {
@@ -67,11 +68,26 @@ class AdminBroadcastController extends Controller
             $upload->move($this->broadcast->mediaStoragePath(), $name);
         }
 
+        if ($request->boolean('test')) {
+            [$ok, $error] = $this->broadcast->sendTest(
+                (string) $data['message'],
+                $media,
+                (string) $admin->chat_id,
+            );
+
+            return response()->json([
+                'success' => $ok,
+                'test' => true,
+                'message' => $ok ? 'تست با موفقیت ارسال شد!' : 'خطا در ارسال تست',
+                'description' => $error,
+            ]);
+        }
+
         $this->broadcast->persist(
             (string) $data['message'],
             $media,
             (string) $admin->chat_id,
-            (bool) $request->boolean('test'),
+            false,
         );
 
         return response()->json([

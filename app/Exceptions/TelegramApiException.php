@@ -18,6 +18,7 @@ class TelegramApiException extends Exception
         string $message,
         private readonly ?string $description = null,
         private readonly ?int $errorCode = null,
+        private readonly ?int $retryAfter = null,
         ?Throwable $previous = null,
     ) {
         parent::__construct($message, 0, $previous);
@@ -33,6 +34,7 @@ class TelegramApiException extends Exception
             sprintf('Telegram API call [%s] failed: %s', $method, $description),
             $description,
             isset($payload['error_code']) ? (int) $payload['error_code'] : null,
+            isset($payload['parameters']['retry_after']) ? (int) $payload['parameters']['retry_after'] : null,
         );
     }
 
@@ -52,5 +54,17 @@ class TelegramApiException extends Exception
     public function errorCode(): ?int
     {
         return $this->errorCode;
+    }
+
+    /**
+     * The `parameters.retry_after` of a flood-control (429) answer, in seconds.
+     *
+     * Telegram answers an over-rate send with a non-ok envelope plus the number
+     * of seconds the caller must wait, so a fan-out can pause instead of losing
+     * the recipient.
+     */
+    public function retryAfter(): ?int
+    {
+        return $this->retryAfter;
     }
 }

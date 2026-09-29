@@ -163,6 +163,8 @@ Found while porting, fixed where the port touched them:
 | Coupon panel outage | `array_filter(null)`, fatal in PHP 8 | `rejectionReason()` returns a distinct "cannot verify" message instead of blaming the user's code |
 | Receipt spam | unvalidated | Phase 9 |
 | Bank SMS replay | duplicate check only | Phase 15 |
+| Broadcast without a session | `broadcast_progress.php` only required `config.php` | behind `admin.auth` + `admin.role:admin` (Phase 14) |
+| Flood-control loss | `parameters.retry_after` ignored, recipient dropped | bounded wait and retry, then reported (Phase 14) |
 
 ## 9. Branding
 
@@ -350,7 +352,59 @@ create/adjust, order decision, settings save, guide add/delete, broadcast
 start) requires `admin`. Legacy only checked that *some* session existed, so
 this is the intended Phase 12/13 behaviour, not a parity break.
 
-## 13. Open items this audit could not settle
+## 13. Broadcast system (Phase 14)
+
+The fan-out was built with the panel in Phase 13; this phase closed the gaps
+that were left against `broadcast_start.php` and `broadcast_progress.php`.
+
+### Test send is immediate
+
+* Legacy answered the "test" checkbox inside `broadcast_start.php`: it sent
+  the message (or `تست موفق از پنل ادمین`) to the administrator's own chat,
+  deleted the uploaded media and returned `{success, message, description}`
+  as JSON. `AdminBroadcastController::start` now does exactly that through
+  `BroadcastService::sendTest()` and never writes a job, so no progress
+  stream is opened for a test.
+* Legacy sent a test image by public HTTPS URL and every other media type as a
+  local `CURLFile`. The rewrite uploads all types as multipart form data, so
+  nothing has to be published under a web-reachable path.
+
+### Rate limiting
+
+* The pacing is the legacy `usleep(333000)` - about three messages per second -
+  now `connectix_bot.broadcast.delay_us`.
+* Telegram answers an over-rate send with a non-ok envelope carrying
+  `parameters.retry_after`. Legacy ignored it and lost that recipient.
+  `TelegramApiException` now carries `retryAfter()` and
+  `BroadcastService::deliver()` waits up to
+  `connectix_bot.broadcast.flood_retry_after_cap` seconds and retries the same
+  recipient `connectix_bot.broadcast.flood_retries` times, so a large install
+  gets through the flood limit instead of silently dropping users. The cap
+  matters on shared hosting: one slow recipient must not park the request that
+  is streaming progress for everyone else. Past the cap the failure is
+  reported in the per-recipient log like any other error.
+* The single fixed delay of legacy was the only throttle; there is no queue,
+  worker or scheduler anywhere in this path.
+
+### State and resume
+
+* `broadcast_start.json` holds the job and `broadcast_done.stamp` the count of
+  recipients already sent to, both under `storage/app/broadcast`. A run reads
+  the counter and skips everything at or below it, so a browser refresh, a
+  dropped connection or a PHP timeout resumes instead of re-sending - the same
+  two-file design legacy used, moved out of the code directory.
+* Both files and the uploaded media are deleted once the stream finishes.
+* Recipient selection is the legacy one: every `users.chat_id` that is not
+  empty. Test mode uses the administrator's chat id instead of the user table.
+
+### Authorization
+
+`broadcast_progress.php` only called `config.php`: it checked no session, so
+any request that reached the file while a job was pending ran the fan-out.
+Both routes are behind `admin.auth` and `admin.role:admin` now. This is a
+security fix, not a parity break; it is listed in section 8 as well.
+
+## 14. Open items this audit could not settle
 
 * The `payments` receipt column set. Receipts are forwarded to the
   administrators as Telegram photos, never stored (Phase 9), matching legacy,
