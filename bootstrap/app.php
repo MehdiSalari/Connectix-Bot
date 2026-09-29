@@ -11,7 +11,15 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        //
+        // The Telegram webhook is a server-to-server POST authenticated by the
+        // X-Telegram-Bot-Api-Secret-Token header, so a CSRF token cannot exist.
+        $middleware->validateCsrfTokens(except: [
+            'telegram/*',
+        ]);
+
+        $middleware->alias([
+            'telegram.webhook' => \App\Http\Middleware\VerifyTelegramWebhook::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //
