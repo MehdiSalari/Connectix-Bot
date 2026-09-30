@@ -67,13 +67,23 @@ class AppServiceProvider extends ServiceProvider
             return;
         }
 
-        // A deployment that publishes an https APP_URL generates every
-        // redirect and asset URL as https, even on the plain http entry the
-        // tunnel still accepts: the admin login redirects to http:// today
-        // and the Secure session cookie never survives that hop.
-        if (str_starts_with((string) config('app.url'), 'https://')) {
+        // An https APP_URL has to keep producing https URLs through the
+        // tunnel — the origin only ever sees plain http — but forcing it
+        // unconditionally broke the local entry: the admin login form then
+        // posted to https://127.0.0.1:8000, where nothing speaks TLS, so the
+        // button appeared dead. Force https only for a request that really
+        // arrived over TLS (the tunnel forwards `X-Forwarded-Proto`), and let
+        // the session cookie's Secure flag follow the same signal: marked
+        // Secure on the tunnel, dropped on plain http, where the browser
+        // would otherwise throw the cookie away and log the admin straight
+        // back out.
+        $secure = $this->requestArrivedOverTls();
+
+        if ($secure && str_starts_with((string) config('app.url'), 'https://')) {
             URL::forceScheme('https');
         }
+
+        config(['session.secure' => $secure]);
 
         // Before the HTTP kernel: EncryptCookies and the session refuse to boot
         // without a key, so a freshly unpacked release could not even render the
@@ -97,5 +107,28 @@ class AppServiceProvider extends ServiceProvider
 
             return Limit::perMinute(5)->by($email.'|'.$request->ip());
         });
+    }
+
+    /**
+     * Whether the request reached the origin over TLS — directly, or through
+     * the tunnel, which forwards the scheme Cloudflare saw.
+     *
+     * The origin only ever listens on plain http, so `isSecure()` on its own
+     * always answers no and every generated URL would come out http://, the
+     * hop the Secure session cookie does not survive. The forwarded header is
+     * the only place the tunnel's scheme is visible from here.
+     */
+    private function requestArrivedOverTls(): bool
+    {
+        $request = $this->app['request'];
+
+        if ($request->isSecure()) {
+            return true;
+        }
+
+        $forwarded = (string) $request->headers->get('X-Forwarded-Proto', '');
+        $scheme = strtolower(trim(explode(',', $forwarded)[0]));
+
+        return $scheme === 'https';
     }
 }

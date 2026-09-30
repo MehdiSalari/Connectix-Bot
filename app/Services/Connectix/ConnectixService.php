@@ -278,8 +278,18 @@ class ConnectixService
     /**
      * Every wallet the panel holds for this seller.
      *
-     * Port of the wallet half of legacy `setup.php`, which listed them from
+     * Port of the wallet half of legacy `setup/setup.php`, which listed them from
      * `/v1/seller/telegram-wallets` on every install.
+     *
+     * The live panel wraps the rows in a paginator envelope:
+     *
+     *     {"data": {"current_page": 1, "last_page": 1, "data": [{...}], ...}}
+     *
+     * A flat `{"data": [{...}]}` list is still accepted, because that is the
+     * shape legacy assumed (and the shape every fixture in the suite uses).
+     * Reading the envelope as the list yields two "wallets" that are actually
+     * the paginator's own arrays, so nothing is ever imported - which is why
+     * this unwraps `data.data` and then follows `last_page`.
      *
      * @return array<int, array<string, mixed>>
      *
@@ -287,18 +297,35 @@ class ConnectixService
      */
     public function listWallets(): array
     {
-        $payload = $this->get('/v1/seller/telegram-wallets');
+        $wallets = [];
 
-        $wallets = $payload['data'] ?? null;
+        for ($page = 1; $page <= 50; $page++) {
+            // The first request keeps legacy's exact URL (no query string);
+            // only the follow-up pages carry `page=N`.
+            $payload = $page === 1
+                ? $this->get('/v1/seller/telegram-wallets')
+                : $this->get('/v1/seller/telegram-wallets', ['page' => $page]);
+            $data = $payload['data'] ?? null;
 
-        if (! is_array($wallets)) {
-            throw new ConnectixApiException(
-                'The panel returned an unexpected wallet list: the "data" key is missing or is not a list.',
-                '/v1/seller/telegram-wallets',
-            );
+            if (! is_array($data)) {
+                throw new ConnectixApiException(
+                    'The panel returned an unexpected wallet list: the "data" key is missing or is not a list.',
+                    '/v1/seller/telegram-wallets',
+                );
+            }
+
+            $envelope = array_is_list($data) ? [] : $data;
+            $rows = is_array($envelope['data'] ?? null) ? $envelope['data'] : $data;
+            $lastPage = max(1, (int) ($envelope['last_page'] ?? 1));
+
+            $wallets = array_merge($wallets, array_values(array_filter($rows, 'is_array')));
+
+            if ($page >= $lastPage) {
+                break;
+            }
         }
 
-        return array_values(array_filter($wallets, 'is_array'));
+        return $wallets;
     }
 
     /**

@@ -1,129 +1,81 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="fa" dir="rtl" data-theme="dark" data-accent="violet">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="dark light">
     <title>{{ $appName }} | Login</title>
-    <style>
-        * { box-sizing: border-box; }
 
-        body {
-            font-family: 'Segoe UI', Arial, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            margin: 0;
-            padding: 20px;
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
+    <script>
+        (function () {
+            try {
+                var stored = localStorage.getItem('cx-theme');
+                document.documentElement.dataset.theme = stored ||
+                    (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+                document.documentElement.dataset.accent = localStorage.getItem('cx-accent') || 'violet';
+            } catch (e) {
+                document.documentElement.dataset.theme = 'dark';
+            }
+        })();
+    </script>
 
-        .main {
-            background: #fff;
-            width: 100%;
-            max-width: 420px;
-            border-radius: 16px;
-            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
-            overflow: hidden;
-            padding: 40px 30px;
-        }
-
-        .bot-avatar {
-            width: 100px;
-            height: 100px;
-            border-radius: 50%;
-            margin: 0 auto 20px auto;
-            background: linear-gradient(135deg, #95009f, #667eea);
-            color: #fff;
-            font-size: 42px;
-            font-weight: 700;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        h2 {
-            text-align: center;
-            color: #333;
-            margin: 0 0 30px 0;
-            font-size: 28px;
-            font-weight: 600;
-        }
-
-        .input-group { margin-bottom: 20px; }
-
-        label {
-            display: block;
-            margin-bottom: 8px;
-            font-weight: 600;
-            color: #444;
-            font-size: 14px;
-        }
-
-        input[type="email"],
-        input[type="password"] {
-            width: 100%;
-            padding: 14px 16px;
-            border: 2px solid #e1e1e1;
-            border-radius: 12px;
-            font-size: 16px;
-            transition: border-color 0.3s ease, box-shadow 0.3s ease;
-        }
-
-        input[type="email"]:focus,
-        input[type="password"]:focus {
-            outline: none;
-            border-color: #95009f;
-            box-shadow: 0 0 0 4px rgba(149, 0, 159, 0.15);
-        }
-
-        input[type="submit"] {
-            width: 100%;
-            padding: 14px;
-            background: #95009f;
-            color: white;
-            border: none;
-            border-radius: 12px;
-            font-size: 16px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: background 0.4s ease;
-            margin-top: 10px;
-        }
-
-        input[type="submit"]:hover { background: #78008c; }
-
-        .error {
-            color: #e74c3c;
-            text-align: center;
-            margin-top: 15px;
-            font-size: 14px;
-        }
-    </style>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ asset('css/connectix.css') }}?v={{ trim((string) config('app.version', '4')) }}">
 </head>
 <body>
-    <div class="main">
-        <div class="bot-avatar">C</div>
-        <h2>{{ $appName }} Login</h2>
+    <div class="auth">
+        <div class="auth-card">
+            <div class="bot-avatar">C</div>
 
-        <form action="{{ route('admin.login.attempt') }}" method="post">
-            @csrf
-            <div class="input-group">
-                <label for="email">Email</label>
-                <input type="email" id="email" name="email" value="{{ old('email') }}" placeholder="example@domain.com" required>
-            </div>
+            <h2>{{ $appName }} Login</h2>
+            <p class="sub">پنل مدیریت ربات — برای ادامه وارد شوید</p>
 
-            <div class="input-group">
-                <label for="password">Password</label>
-                <input type="password" id="password" name="password" placeholder="••••••••" required autocomplete="current-password">
-            </div>
+            <form action="{{ route('admin.login.attempt') }}" method="post">
+                @csrf
+                <div class="input-group">
+                    <label for="email">Email</label>
+                    <input type="email" id="email" name="email" value="{{ old('email') }}"
+                           placeholder="example@domain.com" required autofocus autocomplete="username">
+                </div>
 
-            <input type="submit" value="Login">
+                <div class="input-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" name="password" placeholder="••••••••"
+                           required autocomplete="current-password">
+                </div>
 
-            @if ($errors->any())
-                <p class="error">{{ $errors->first() }}</p>
-            @endif
-        </form>
+                <input type="submit" value="Login">
+
+                @if ($errors->any())
+                    <p class="error">{{ $errors->first() }}</p>
+                @endif
+            </form>
+
+            <p class="muted" style="margin-top:22px">
+                <button type="button" class="icon-btn" data-theme-toggle aria-label="تغییر روشنایی">◐</button>
+            </p>
+        </div>
     </div>
+
+    <script>
+        (function () {
+            var root = document.documentElement;
+            var toggle = document.querySelector('[data-theme-toggle]');
+            if (!toggle) return;
+
+            var paint = function () {
+                toggle.textContent = root.dataset.theme === 'light' ? '☾' : '☀';
+            };
+            paint();
+
+            toggle.addEventListener('click', function () {
+                root.dataset.theme = root.dataset.theme === 'light' ? 'dark' : 'light';
+                try { localStorage.setItem('cx-theme', root.dataset.theme); } catch (e) {}
+                paint();
+            });
+        })();
+    </script>
 </body>
 </html>

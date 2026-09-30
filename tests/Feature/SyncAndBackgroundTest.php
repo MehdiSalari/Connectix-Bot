@@ -411,6 +411,81 @@ class SyncAndBackgroundTest extends TestCase
     }
 
     // -----------------------------------------------------------------
+    // The live panel's response envelope
+    // -----------------------------------------------------------------
+
+    /**
+     * The panel really answers `{"data": {"current_page": ..., "data": [...]}}`.
+     * Reading that envelope as the list yields the paginator's own arrays as
+     * "wallets", so the sync skipped everything and imported nothing.
+     */
+    #[Test]
+    public function the_paginated_wallet_envelope_from_the_live_panel_is_unwrapped(): void
+    {
+        Http::fake([
+            self::BASE.'/v1/seller/telegram-wallets/w9*' => Http::response([
+                'wallet' => ['transactions' => []],
+            ], 200),
+            self::BASE.'/v1/seller/telegram-wallets' => Http::response([
+                'data' => [
+                    'current_page' => 1,
+                    'last_page' => 1,
+                    'per_page' => 15,
+                    'total' => 1,
+                    'data' => [
+                        ['id' => 'w9', 'chat_id' => '553', 'balance' => '99,000'],
+                    ],
+                ],
+            ], 200),
+        ]);
+
+        $this->artisan('connectix:sync-wallets')
+            ->expectsOutputToContain('1 wallet(s) on the panel')
+            ->expectsOutputToContain('1 wallets (1 created, 0 updated)')
+            ->assertSuccessful();
+
+        $wallet = Wallet::query()->where('chat_id', '553')->first();
+        $this->assertNotNull($wallet);
+        $this->assertSame(99000, (int) $wallet->balance);
+    }
+
+    /** Every reported page is fetched, not just the first one. */
+    #[Test]
+    public function the_wallet_list_follows_the_reported_page_count(): void
+    {
+        Http::fake([
+            self::BASE.'/v1/seller/telegram-wallets/w1*' => Http::response(['wallet' => ['transactions' => []]], 200),
+            self::BASE.'/v1/seller/telegram-wallets/w2*' => Http::response(['wallet' => ['transactions' => []]], 200),
+            self::BASE.'/v1/seller/telegram-wallets?page=2' => Http::response([
+                'data' => [
+                    'current_page' => 2,
+                    'last_page' => 2,
+                    'data' => [
+                        ['id' => 'w2', 'chat_id' => '554', 'balance' => '2,000'],
+                    ],
+                ],
+            ], 200),
+            self::BASE.'/v1/seller/telegram-wallets' => Http::response([
+                'data' => [
+                    'current_page' => 1,
+                    'last_page' => 2,
+                    'data' => [
+                        ['id' => 'w1', 'chat_id' => '553', 'balance' => '1,000'],
+                    ],
+                ],
+            ], 200),
+        ]);
+
+        $this->artisan('connectix:sync-wallets')
+            ->expectsOutputToContain('2 wallet(s) on the panel')
+            ->assertSuccessful();
+
+        $this->assertSame(2, Wallet::query()->count());
+        $this->assertSame(1000, (int) Wallet::query()->where('chat_id', '553')->value('balance'));
+        $this->assertSame(2000, (int) Wallet::query()->where('chat_id', '554')->value('balance'));
+    }
+
+    // -----------------------------------------------------------------
     // Helpers
     // -----------------------------------------------------------------
 

@@ -1,144 +1,48 @@
 <!DOCTYPE html>
-<html lang="fa" dir="rtl">
+<html lang="fa" dir="rtl" data-theme="dark" data-accent="violet">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="robots" content="noindex, nofollow">
+    <meta name="color-scheme" content="dark light">
     <title>@yield('title', 'نصب') | Connectix</title>
+
+    <script>
+        (function () {
+            try {
+                var stored = localStorage.getItem('cx-theme');
+                document.documentElement.dataset.theme = stored ||
+                    (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+                document.documentElement.dataset.accent = localStorage.getItem('cx-accent') || 'violet';
+            } catch (e) {
+                document.documentElement.dataset.theme = 'dark';
+            }
+        })();
+    </script>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ asset('css/connectix.css') }}?v={{ trim((string) config('app.version', '4')) }}">
     <style>
-        * { box-sizing: border-box; }
-
-        body {
-            margin: 0;
-            padding: 0 0 60px 0;
-            min-height: 100vh;
-            background: linear-gradient(135deg, #eef2ff 0%, #f5f0ff 100%);
-            color: #2b2b2b;
-            font-family: Vazirmatn, 'Segoe UI', Tahoma, sans-serif;
-            font-size: 15px;
-            line-height: 1.9;
-        }
-
-        .wrap { max-width: 900px; margin: 0 auto; padding: 0 16px; }
-
-        header {
-            background: linear-gradient(135deg, #95009f 0%, #667eea 100%);
-            color: #fff;
-            padding: 26px 0 22px 0;
-            margin-bottom: 26px;
-        }
-
-        header h1 { margin: 0; font-size: 24px; font-weight: 700; }
-        header p { margin: 6px 0 0 0; opacity: .9; font-size: 14px; }
-
-        .card {
-            background: #fff;
-            border-radius: 14px;
-            box-shadow: 0 10px 30px rgba(31, 41, 55, .08);
-            padding: 24px;
-            margin-bottom: 20px;
-        }
-
-        .card h2 { margin: 0 0 6px 0; font-size: 19px; }
-        .card h3 { margin: 22px 0 10px 0; font-size: 16px; color: #444; }
-        .hint { color: #6b7280; font-size: 13px; margin: 0 0 18px 0; }
-
-        .steps { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 18px; }
-
-        .steps a, .steps span {
-            font-size: 12px;
-            padding: 4px 10px;
-            border-radius: 999px;
-            background: #f3f4f6;
-            color: #6b7280;
-            text-decoration: none;
-        }
-
-        .steps .current { background: #95009f; color: #fff; font-weight: 700; }
-        .steps .done { background: #dcfce7; color: #166534; }
-
-        .bar { height: 8px; background: #e5e7eb; border-radius: 999px; overflow: hidden; margin-bottom: 20px; }
-        .bar > div { height: 100%; background: linear-gradient(90deg, #a78bfa, #6366f1); }
-
-        label { display: block; font-weight: 600; font-size: 14px; margin-bottom: 6px; }
-
-        input[type=text], input[type=email], input[type=password], input[type=url], input[type=number], select {
-            width: 100%;
-            padding: 11px 14px;
-            border: 1px solid #d1d5db;
-            border-radius: 10px;
-            font-size: 15px;
-            background: #fff;
-            color: #111;
-        }
-
-        input:focus, select:focus {
-            outline: none;
-            border-color: #a78bfa;
-            box-shadow: 0 0 0 4px rgba(167, 139, 250, .18);
-        }
-
-        .field { margin-bottom: 16px; }
-        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0 16px; }
-        .check { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; font-weight: 500; }
-        .check input { width: 18px; height: 18px; }
-
-        button {
-            background: #95009f;
-            color: #fff;
-            border: 0;
-            border-radius: 10px;
-            padding: 12px 22px;
-            font-size: 15px;
-            font-weight: 600;
-            font-family: inherit;
-            cursor: pointer;
-        }
-
-        button:hover { background: #78008c; }
-        button.secondary { background: #4b5563; }
-        button.secondary:hover { background: #374151; }
-        button.danger { background: #b91c1c; }
-        button.danger:hover { background: #991b1b; }
-        .actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 8px; }
-
-        .alert { border-radius: 10px; padding: 12px 16px; margin-bottom: 16px; font-size: 14px; }
-        .alert.ok { background: #dcfce7; color: #14532d; border: 1px solid #86efac; }
-        .alert.bad { background: #fee2e2; color: #7f1d1d; border: 1px solid #fca5a5; }
-        .alert.warn { background: #fef3c7; color: #78350f; border: 1px solid #fcd34d; }
-
-        table { width: 100%; border-collapse: collapse; font-size: 14px; }
-        th, td { text-align: right; padding: 8px 10px; border-bottom: 1px solid #eee; vertical-align: top; }
-        th { color: #6b7280; font-weight: 600; }
-
-        .row-ok::before { content: '✓'; color: #16a34a; font-weight: 700; margin-left: 6px; }
-        .row-no::before { content: '✗'; color: #dc2626; font-weight: 700; margin-left: 6px; }
-        .row-warn::before { content: '!'; color: #d97706; font-weight: 700; margin-left: 6px; }
-
-        .log {
-            background: #111827;
-            color: #4ade80;
-            font-family: Consolas, 'Courier New', monospace;
-            font-size: 12.5px;
-            direction: ltr;
-            text-align: left;
-            padding: 14px;
-            border-radius: 10px;
-            max-height: 320px;
-            overflow: auto;
-            white-space: pre-wrap;
-        }
-
-        code { background: #f3f4f6; border-radius: 6px; padding: 1px 6px; font-size: 13px; }
-        .muted { color: #6b7280; font-size: 13px; }
-        ul.plain { list-style: none; padding: 0; margin: 8px 0; }
+        /* Installer-only spacing on top of the shared design system. */
+        body { padding-bottom: 60px; }
+        .card { padding: 26px; }
+        .card h2 { margin-bottom: 6px; }
+        .card h3 { margin-top: 22px; }
+        .field + .field { margin-top: 4px; }
+        .grid { align-items: start; }
     </style>
 </head>
 <body>
-    <header>
-        <div class="wrap">
-            <h1>نصب Connectix</h1>
-            <p>راه‌اندازی اولیه، پیکربندی و اتصال به پنل فروش Connectix</p>
+    <header class="hero">
+        <div class="wrap flex items-center justify-between gap-4">
+            <div>
+                <h1>نصب Connectix</h1>
+                <p>راه‌اندازی اولیه، پیکربندی و اتصال به پنل فروش Connectix</p>
+            </div>
+            <button type="button" class="icon-btn" data-theme-toggle aria-label="تغییر روشنایی"
+                    style="background:rgba(255,255,255,.18);border-color:rgba(255,255,255,.35);color:#fff">◐</button>
         </div>
     </header>
 
@@ -189,9 +93,28 @@
             @yield('content')
         </div>
 
-        <p class="muted" style="text-align:center">
+        <p class="muted center">
             وضعیت: {{ $progress['state']->label() }}
         </p>
     </div>
+
+    <script>
+        (function () {
+            var root = document.documentElement;
+            var toggle = document.querySelector('[data-theme-toggle]');
+            if (!toggle) return;
+
+            var paint = function () {
+                toggle.textContent = root.dataset.theme === 'light' ? '☾' : '☀';
+            };
+            paint();
+
+            toggle.addEventListener('click', function () {
+                root.dataset.theme = root.dataset.theme === 'light' ? 'dark' : 'light';
+                try { localStorage.setItem('cx-theme', root.dataset.theme); } catch (e) {}
+                paint();
+            });
+        })();
+    </script>
 </body>
 </html>

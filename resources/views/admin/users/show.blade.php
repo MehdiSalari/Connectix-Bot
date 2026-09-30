@@ -57,12 +57,15 @@
             </thead>
             <tbody>
                 @forelse ($user->clientsByChatId as $client)
-                    <tr>
+                    <tr data-client-details="{{ $client->id }}"
+                        data-client-label="{{ $client->username ? '@'.$client->username : $client->id }}">
                         <td dir="ltr">{{ $client->id }}</td>
                         <td dir="ltr">{{ $client->username ?? '-' }}</td>
                         <td>{{ $client->count_of_devices ?? '-' }}</td>
                         <td>{{ $client->created_at?->format('Y-m-d H:i') }}</td>
-                        <td><button type="button" class="btn ghost client-details" data-id="{{ $client->id }}">جزئیات</button></td>
+                        <td><button type="button" class="btn ghost client-details"
+                                    data-client-details="{{ $client->id }}"
+                                    data-client-label="{{ $client->username ? '@'.$client->username : $client->id }}">جزئیات</button></td>
                     </tr>
                 @empty
                     <tr><td colspan="5" class="muted">اکانتی ثبت نشده است.</td></tr>
@@ -127,37 +130,6 @@
         </table>
     </div>
 
-    <div id="client-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.45); align-items:center; justify-content:center; z-index:50">
-        <div class="card" style="max-width:640px; width:90%; margin:0">
-            <h2>جزئیات اکانت</h2>
-            <pre id="client-detail" style="white-space:pre-wrap; direction:ltr; text-align:left; font-size:13px; max-height:60vh; overflow:auto">در حال بارگذاری...</pre>
-            <button type="button" id="client-modal-close" class="btn ghost">بستن</button>
-        </div>
-    </div>
-
-    <script>
-        (function () {
-            const modal = document.getElementById('client-modal');
-            const detail = document.getElementById('client-detail');
-
-            document.querySelectorAll('.client-details').forEach(function (btn) {
-                btn.addEventListener('click', function () {
-                    modal.style.display = 'flex';
-                    detail.textContent = 'در حال بارگذاری...';
-
-                    fetch("{{ route('admin.clients.show', ':id') }}".replace(':id', encodeURIComponent(btn.dataset.id)))
-                        .then(function (r) { return r.json(); })
-                        .then(function (data) {
-                            if (data.error) { detail.textContent = data.error; return; }
-                            detail.textContent = JSON.stringify(data, null, 2);
-                        })
-                        .catch(function () { detail.textContent = 'خطا در دریافت اطلاعات.'; });
-                });
-            });
-
-            document.getElementById('client-modal-close').addEventListener('click', function () {
-                modal.style.display = 'none';
-            });
-        })();
-    </script>
+    {{-- مودال جزئیات اکانت از layouts/admin می‌آید (partials.client-details) و
+         همین‌جا با data-client-details روی هر سطر/دکمه باز می‌شود. --}}
 @endsection

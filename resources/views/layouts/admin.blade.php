@@ -1,208 +1,101 @@
 <!DOCTYPE html>
-<html lang="fa" dir="rtl">
+<html lang="fa" dir="rtl" data-theme="dark" data-accent="violet">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ $appName ?? 'پنل مدیریت' }} | {{ $title ?? '' }}</title>
-    <style>
-        * { box-sizing: border-box; }
+    <meta name="color-scheme" content="dark light">
+    <title>{{ $appName ?? 'پنل مدیریت' }}{{ isset($title) && $title !== '' ? ' | '.$title : '' }}</title>
 
-        body {
-            font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
-            background: #eef1f6;
-            margin: 0;
-            padding: 0;
-            min-height: 100vh;
-        }
+    {{-- Theme is resolved before the first paint so the panel never flashes. --}}
+    <script>
+        (function () {
+            try {
+                var stored = localStorage.getItem('cx-theme');
+                var theme = stored || (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+                document.documentElement.dataset.theme = theme;
+                document.documentElement.dataset.accent = localStorage.getItem('cx-accent') || 'violet';
+            } catch (e) {
+                document.documentElement.dataset.theme = 'dark';
+            }
+        })();
+    </script>
 
-        .shell { display: flex; min-height: 100vh; }
-
-        .sidebar {
-            width: 232px;
-            background: linear-gradient(180deg, #5b1a63 0%, #43104b 100%);
-            color: #fff;
-            flex-shrink: 0;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .sidebar .brand {
-            padding: 22px 20px 18px 20px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.12);
-            font-size: 17px;
-            font-weight: 700;
-        }
-
-        .sidebar .brand small { display: block; font-weight: 400; font-size: 12px; opacity: 0.75; }
-
-        .sidebar nav a {
-            display: block;
-            color: rgba(255, 255, 255, 0.9);
-            text-decoration: none;
-            padding: 12px 22px;
-            font-size: 14px;
-            border-right: 3px solid transparent;
-        }
-
-        .sidebar nav a:hover, .sidebar nav a.active {
-            background: rgba(255, 255, 255, 0.08);
-            border-right-color: #ffb647;
-        }
-
-        .sidebar .foot {
-            margin-top: auto;
-            padding: 16px 20px;
-            border-top: 1px solid rgba(255, 255, 255, 0.12);
-            font-size: 13px;
-        }
-
-        .sidebar .foot .who { opacity: 0.85; margin-bottom: 8px; }
-
-        .main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
-
-        .topbar {
-            background: #fff;
-            padding: 14px 24px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            border-bottom: 1px solid #e4e8f0;
-        }
-
-        .topbar h1 { margin: 0; font-size: 18px; color: #333; }
-
-        .content { padding: 24px; max-width: 1100px; width: 100%; margin: 0 auto; }
-
-        .card {
-            background: #fff;
-            border-radius: 12px;
-            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.06);
-            padding: 22px;
-            margin-bottom: 20px;
-        }
-
-        button, .btn {
-            display: inline-block;
-            background: #6b1a75;
-            color: #fff;
-            border: none;
-            border-radius: 8px;
-            padding: 9px 18px;
-            font-size: 14px;
-            cursor: pointer;
-            text-decoration: none;
-        }
-
-        button:hover, .btn:hover { background: #5b1550; }
-
-        .btn.danger { background: #c0392b; }
-        .btn.danger:hover { background: #a93226; }
-        .btn.ghost { background: #f0eef6; color: #5b1a63; }
-        .btn.ghost:hover { background: #e2ddef; }
-
-        table { width: 100%; border-collapse: collapse; font-size: 14px; }
-
-        th, td { padding: 10px 12px; text-align: right; border-bottom: 1px solid #edf0f5; }
-
-        th { color: #667; font-weight: 600; background: #fafbfd; }
-
-        tr:hover td { background: #f8f9fb; }
-
-        .badge {
-            display: inline-block;
-            padding: 3px 10px;
-            border-radius: 20px;
-            font-size: 12px;
-            background: #eef0f4;
-            color: #444;
-        }
-
-        .badge.ok { background: #d9f2e2; color: #146b38; }
-        .badge.wait { background: #fff3d6; color: #8a6d1a; }
-        .badge.no { background: #fde3e2; color: #9c2b25; }
-
-        label { display: block; font-size: 13px; font-weight: 600; color: #444; margin: 12px 0 6px 0; }
-
-        input[type="text"], input[type="number"], input[type="password"],
-        input[type="email"], input[type="url"], textarea, select {
-            width: 100%;
-            padding: 10px 12px;
-            border: 2px solid #e1e1e1;
-            border-radius: 10px;
-            font-size: 14px;
-            font-family: inherit;
-        }
-
-        input:focus, textarea:focus, select:focus {
-            outline: none;
-            border-color: #95009f;
-        }
-
-        textarea { min-height: 110px; resize: vertical; }
-
-        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 22px; }
-
-        .stat {
-            background: #fff;
-            border-radius: 12px;
-            padding: 18px;
-            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.06);
-        }
-
-        .stat .k { font-size: 13px; color: #889; }
-        .stat .v { font-size: 24px; font-weight: 700; color: #333; margin-top: 6px; }
-
-        .flash { border-radius: 10px; padding: 12px 16px; margin-bottom: 18px; font-size: 14px; }
-
-        .flash.success { background: #d9f2e2; color: #146b38; }
-        .flash.warning { background: #fff3d6; color: #8a6d1a; }
-        .flash.error { background: #fde3e2; color: #9c2b25; }
-
-        .pager { margin-top: 16px; display: flex; gap: 8px; justify-content: center; align-items: center; font-size: 14px; }
-
-        .muted { color: #889; font-size: 13px; }
-
-        .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; }
-
-        .row > div { flex: 1; min-width: 180px; }
-
-        .inline-form { display: inline-block; }
-
-        .inline-form button { padding: 5px 12px; font-size: 13px; margin: 0 2px; }
-    </style>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ asset('css/connectix.css') }}?v={{ trim((string) config('app.version', '4')) }}">
 </head>
 <body>
-    @php($admin = auth('admin')->user())
+    @php
+        $admin = auth('admin')->user();
+    @endphp
     <div class="shell">
-        <aside class="sidebar">
+        <aside class="sidebar" id="sidebar">
             <div class="brand">
-                {{ $appName ?? 'پنل مدیریت' }}
-                <small>Connectix Bot</small>
+                <span class="mark">C</span>
+                <span class="name">
+                    {{ $appName ?? 'پنل مدیریت' }}
+                    <small>Connectix Bot</small>
+                </span>
             </div>
+
             <nav>
-                <a href="{{ route('admin.dashboard') }}" class="{{ ($active = $active ?? '') === 'dashboard' ? 'active' : '' }}">🏠 داشبورد</a>
-                <a href="{{ route('admin.users.index') }}" class="{{ $active === 'users' ? 'active' : '' }}">👥 کاربران</a>
-                <a href="{{ route('admin.orders.index') }}" class="{{ $active === 'orders' ? 'active' : '' }}">🧾 سفارش‌ها</a>
-                <a href="{{ route('admin.wallet-transactions.index') }}" class="{{ $active === 'wallet' ? 'active' : '' }}">👝 تراکنش‌های کیف پول</a>
-                <a href="{{ route('admin.sms-payments.index') }}" class="{{ $active === 'sms' ? 'active' : '' }}">💳 پیامک‌های بانکی</a>
-                <a href="{{ route('admin.settings.show') }}" class="{{ $active === 'settings' ? 'active' : '' }}">⚙️ تنظیمات ربات</a>
-                <a href="{{ route('admin.guides.index') }}" class="{{ $active === 'guides' ? 'active' : '' }}">📹 مدیریت راهنماها</a>
-                <a href="{{ route('admin.broadcast.show') }}" class="{{ $active === 'broadcast' ? 'active' : '' }}">📣 پیام همگانی</a>
+                @php
+                    // Icon + label per destination. `$active` is supplied by each view.
+                    $nav = [
+                        'dashboard' => ['route' => 'admin.dashboard', 'label' => 'داشبورد', 'icon' => '<path d="M4 13h6V4H4v9Zm0 7h6v-5H4v5Zm10 0h6v-9h-6v9Zm0-16v5h6V4h-6Z"/>'],
+                        'users'     => ['route' => 'admin.users.index', 'label' => 'کاربران', 'icon' => '<path d="M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm0 2c-3.3 0-6 1.8-6 4v2h12v-2c0-2.2-2.7-4-6-4Zm8-1a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm.5 3c-.6 0-1.2.1-1.7.3 1.1 1 1.7 2.2 1.7 3.7v2h4v-2c0-2.2-2.2-4-4-4Z"/>'],
+                        'orders'    => ['route' => 'admin.orders.index', 'label' => 'سفارش‌ها', 'icon' => '<path d="M6 2h12a1 1 0 0 1 1 1v18l-3-2-2 2-2-2-2 2-2-2-3 2V3a1 1 0 0 1 1-1Zm2 5v2h8V7H8Zm0 4v2h8v-2H8Zm0 4v2h5v-2H8Z"/>'],
+                        'wallet'    => ['route' => 'admin.wallet-transactions.index', 'label' => 'تراکنش‌های کیف پول', 'icon' => '<path d="M3 6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v1h1a1 1 0 0 1 1 1v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6Zm2 0v12h14V9h-4a2 2 0 0 0-2 2v2a2 2 0 0 0 2 2h4V7H5Zm11 6.5a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3Z"/>'],
+                        'sms'       => ['route' => 'admin.sms-payments.index', 'label' => 'پیامک‌های بانکی', 'icon' => '<path d="M4 4h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H8l-4 4V6a2 2 0 0 1 2-2Zm3 4v2h10V8H7Zm0 4v2h7v-2H7Z"/>'],
+                        'settings'  => ['route' => 'admin.settings.show', 'label' => 'تنظیمات ربات', 'icon' => '<path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Zm9 4a7.5 7.5 0 0 0-.1-1.2l2-1.6-2-3.4-2.4 1a7.6 7.6 0 0 0-2-1.2L16.1 3H11.9l-.4 2.6c-.7.3-1.4.7-2 1.2l-2.4-1-2 3.4 2 1.6a7.7 7.7 0 0 0 0 2.4l-2 1.6 2 3.4 2.4-1c.6.5 1.3.9 2 1.2l.4 2.6h4.2l.4-2.6c.7-.3 1.4-.7 2-1.2l2.4 1 2-3.4-2-1.6c.1-.4.1-.8.1-1.2Z"/>'],
+                        'guides'    => ['route' => 'admin.guides.index', 'label' => 'راهنماها', 'icon' => '<path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm-2 14.5v-9l7 4.5-7 4.5Z"/>'],
+                        'broadcast' => ['route' => 'admin.broadcast.show', 'label' => 'پیام همگانی', 'icon' => '<path d="M18 8a3 3 0 0 1 0 6v3a1 1 0 0 1-1.5.9L11 15H7a3 3 0 0 1 0-6h4l5.5-3.9A1 1 0 0 1 18 6v2Zm-9 4a1 1 0 1 0 0 2 1 1 0 0 0 0-2ZM5 9a1 1 0 0 1 1 1v4a1 1 0 1 1-2 0v-4a1 1 0 0 1 1-1Z"/>'],
+                    ];
+                    $active = $active ?? '';
+                @endphp
+
+                @foreach ($nav as $key => $item)
+                    <a href="{{ route($item['route']) }}" class="{{ $active === $key ? 'active' : '' }}">
+                        <span class="ico">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">{!! $item['icon'] !!}</svg>
+                        </span>
+                        <span>{{ $item['label'] }}</span>
+                    </a>
+                @endforeach
             </nav>
+
             <div class="foot">
                 <div class="who">
-                    {{ $admin->email ?? '' }} · {{ $admin?->role?->label() ?? '' }}
+                    <span class="avatar">{{ mb_strtoupper(mb_substr((string) ($admin?->email ?? 'G'), 0, 1)) }}</span>
+                    <span>
+                        {{ $admin->email ?? '' }}<br>
+                        <span class="small">{{ $admin?->role?->label() ?? '' }}</span>
+                    </span>
                 </div>
                 <form action="{{ route('admin.logout') }}" method="post" class="inline-form">
                     @csrf
-                    <button type="submit" class="btn ghost">خروج</button>
+                    <button type="submit" class="ghost" style="width:100%">خروج از حساب</button>
                 </form>
             </div>
         </aside>
 
         <div class="main">
             <div class="topbar">
-                <h1>{{ $title ?? '' }}</h1>
+                <div class="flex items-center gap-3">
+                    <button type="button" class="burger" data-nav-toggle aria-label="باز و بسته کردن منو">☰</button>
+                    <h1>{{ $title ?? '' }}</h1>
+                </div>
+
+                <div class="tools">
+                    <div class="swatches" role="group" aria-label="رنگ پوسته">
+                        @foreach (['violet', 'cyan', 'emerald', 'rose', 'amber', 'blue'] as $tone)
+                            <button type="button" class="swatch {{ $tone }}" data-accent="{{ $tone }}"
+                                    aria-pressed="false" title="پوسته {{ $tone }}"></button>
+                        @endforeach
+                    </div>
+                    <button type="button" class="icon-btn" data-theme-toggle aria-label="تغییر روشنایی">◐</button>
+                </div>
             </div>
 
             <div class="content">
@@ -242,5 +135,62 @@
             </div>
         </div>
     </div>
+
+    {{-- جزئیات اکانت روی همه‌ی صفحات در دسترس است: هر المنتی با
+         data-client-details="<client id>" همین مودال را باز می‌کند. --}}
+    @include('partials.client-details')
+
+    <script>
+        (function () {
+            var root = document.documentElement;
+
+            // Mobile navigation drawer.
+            document.querySelectorAll('[data-nav-toggle]').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    document.body.classList.toggle('nav-open');
+                });
+            });
+            document.addEventListener('click', function (event) {
+                if (document.body.classList.contains('nav-open') &&
+                    !event.target.closest('#sidebar') && !event.target.closest('[data-nav-toggle]')) {
+                    document.body.classList.remove('nav-open');
+                }
+            });
+            document.addEventListener('keydown', function (event) {
+                if (event.key === 'Escape') document.body.classList.remove('nav-open');
+            });
+
+            // Light / dark.
+            var toggle = document.querySelector('[data-theme-toggle]');
+            if (toggle) {
+                var paint = function () {
+                    toggle.textContent = root.dataset.theme === 'light' ? '☾' : '☀';
+                    toggle.title = root.dataset.theme === 'light' ? 'حالت تاریک' : 'حالت روشن';
+                };
+                paint();
+                toggle.addEventListener('click', function () {
+                    root.dataset.theme = root.dataset.theme === 'light' ? 'dark' : 'light';
+                    try { localStorage.setItem('cx-theme', root.dataset.theme); } catch (e) {}
+                    paint();
+                });
+            }
+
+            // Accent palette.
+            var swatches = document.querySelectorAll('.swatch[data-accent]');
+            var paintSwatches = function () {
+                swatches.forEach(function (s) {
+                    s.setAttribute('aria-pressed', String(s.dataset.accent === root.dataset.accent));
+                });
+            };
+            paintSwatches();
+            swatches.forEach(function (s) {
+                s.addEventListener('click', function () {
+                    root.dataset.accent = s.dataset.accent;
+                    try { localStorage.setItem('cx-accent', s.dataset.accent); } catch (e) {}
+                    paintSwatches();
+                });
+            });
+        })();
+    </script>
 </body>
 </html>
