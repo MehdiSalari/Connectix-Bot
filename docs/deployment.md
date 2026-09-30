@@ -286,3 +286,18 @@ not assumed:
   to `storage/framework/schedule-run.log`.
 * **Hand-signed webhook tests** must post the *parsed* `.env` secret - see
   the quoting warning in §9.
+
+## 16. Final release record (v4.0.0, 2026-09-30)
+
+* **Identity**: `version.txt` = `4.0.0`, tag `v4.0.0` on branch
+  `laravel-rewrite`; the release candidate was tagged `v4.0.0-rc.1`
+  (`6fa49a8`) after 455 tests passed.
+* **Suite**: `php artisan test` = 455 passed (1526 assertions); Pint clean.
+* **Human-verified on production data**: admin login, wizard step advance,
+  payment acceptance for order `CX26093001` (a transient panel timeout was
+  caught, retried and the account delivered), renewal of an account whose
+  plans had all expired, and a test broadcast delivered to the admin chat.
+* **Rollback**: unchanged - `git checkout v3.3.6` (or the §12 backup) plus
+  pointing the webhook at the legacy URL, as described in §13.
+* **Backups**: `C:\xampp\backup-connectix\` holds the pre-release `mysqldump`,
+  `.env` and `storage/app/connectix/`.
