@@ -143,6 +143,11 @@ Route::prefix('admin')->name('admin.')->group(function (): void {
         Route::get('clients/{client}', [AdminClientController::class, 'show'])
             ->middleware('admin.role:admin,editor')
             ->name('clients.show');
+        // Deletion touches the seller panel as well as the local row, so it is
+        // admin only - an editor may read a client but not erase one.
+        Route::delete('clients/{client}', [AdminClientController::class, 'destroy'])
+            ->middleware('admin.role:admin')
+            ->name('clients.destroy');
 
         // Orders and payment approval
         Route::get('orders', [AdminOrderController::class, 'index'])

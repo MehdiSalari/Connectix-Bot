@@ -1,8 +1,8 @@
-@extends('layouts.admin', ['title' => 'مدیریت راهنماها', 'active' => 'guides'])
+@extends('layouts.admin', ['title' => 'مدیریت آموزش‌ها', 'active' => 'guides'])
 
 @section('content')
     <div class="card">
-        <h2>راهنماهای استاندارد</h2>
+        <h2>آموزش‌های استاندارد</h2>
         <p class="muted">برای هر پلتفرم یا ویدیوی MP4 (حداکثر ۱۰ مگابایت) بارگذاری کنید یا یک لینک بدهید.</p>
 
         <form method="post" action="{{ route('admin.guides.store') }}" enctype="multipart/form-data">
@@ -39,13 +39,13 @@
             </table>
 
             <div style="margin-top:16px">
-                <button type="submit">ذخیره راهنماها</button>
+                <button type="submit">ذخیره آموزش‌ها</button>
             </div>
         </form>
     </div>
 
     <div class="card">
-        <h2>راهنمای اختصاصی جدید</h2>
+        <h2>آموزش اختصاصی جدید</h2>
         <form method="post" action="{{ route('admin.guides.store') }}" enctype="multipart/form-data">
             @csrf
             <div class="row">
@@ -69,7 +69,7 @@
     </div>
 
     <div class="card">
-        <h2>راهنماهای اختصاصی موجود ({{ count($customItems) }})</h2>
+        <h2>آموزش‌های اختصاصی موجود ({{ count($customItems) }})</h2>
         <table>
             <thead>
                 <tr>
@@ -100,14 +100,14 @@
                         </td>
                     </tr>
                 @empty
-                    <tr><td colspan="3" class="muted">راهنمای اختصاصی وجود ندارد.</td></tr>
+                    <tr><td colspan="3" class="muted">آموزش اختصاصی وجود ندارد.</td></tr>
                 @endforelse
             </tbody>
         </table>
     </div>
 
     <div class="card">
-        <h2>حذف راهنمای استاندارد</h2>
+        <h2>حذف آموزش استاندارد</h2>
         <form method="post" action="{{ route('admin.guides.destroy') }}" class="row" onsubmit="return confirm('حذف شود؟')">
             @csrf
             <div>

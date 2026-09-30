@@ -7,6 +7,7 @@ namespace App\Services\Telegram;
 use DOMDocument;
 use DOMXPath;
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Throwable;
@@ -75,6 +76,56 @@ class TelegramProfileService
         }
 
         return $this->parse($profile, $response->body());
+    }
+
+    /**
+     * The bot's own identity, loaded the way the legacy panel loaded it: the
+     * username from getMe, then the same public t.me page scrape a user avatar
+     * goes through (legacy wrote it to assets/images/avatars/bot-avatar.jpg).
+     *
+     * The answer is cached for six hours so a page render never waits on
+     * Telegram, and a failure is cached for only fifteen minutes so a blip
+     * does not leave the header without a photo for the rest of the day.
+     * Unit tests return an empty profile on purpose: rendering a page must not
+     * scrape the network.
+     *
+     * @return array{username: ?string, avatar: ?string}
+     */
+    public function botProfile(): array
+    {
+        $empty = ['username' => null, 'avatar' => null];
+
+        if (app()->runningUnitTests()) {
+            return $empty;
+        }
+
+        $cached = Cache::get('telegram.bot.profile');
+
+        if (is_array($cached)) {
+            return $cached;
+        }
+
+        $profile = $empty;
+
+        try {
+            $me = app(TelegramService::class)->getMe();
+            $username = is_array($me) ? ($me['username'] ?? null) : null;
+
+            if (is_string($username) && trim($username) !== '') {
+                $profile['username'] = trim($username);
+                $profile['avatar'] = $this->fetch($profile['username'])['avatar'];
+            }
+        } catch (Throwable $e) {
+            Log::warning('The bot profile could not be loaded.', ['error' => $e->getMessage()]);
+
+            Cache::put('telegram.bot.profile', $profile, now()->addMinutes(15));
+
+            return $profile;
+        }
+
+        Cache::put('telegram.bot.profile', $profile, now()->addHours(6));
+
+        return $profile;
     }
 
     /**

@@ -9,6 +9,7 @@ use App\Models\Payment;
 use App\Models\User;
 use App\Models\Wallet;
 use App\Services\Panel\PanelSettingsService;
+use App\Services\Telegram\TelegramProfileService;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
@@ -42,6 +43,8 @@ class AdminDashboardController extends Controller
 
         return view('admin.dashboard', [
             'appName' => app(PanelSettingsService::class)->appName(),
+            // عکس ربات از صفحه‌ی عمومی t.me خود ربات می‌آید (مثل عکس کاربران).
+            'bot' => app(TelegramProfileService::class)->botProfile(),
             'admin' => $admin,
             'stats' => [
                 'users' => User::query()->count(),

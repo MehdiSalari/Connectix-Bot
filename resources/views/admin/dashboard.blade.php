@@ -1,6 +1,18 @@
 @extends('layouts.admin', ['title' => 'داشبورد', 'active' => 'dashboard'])
 
 @section('content')
+    {{-- عکس برنامه: مثل پنل قدیمی، از صفحه‌ی عمومی t.me خودِ ربات گرفته می‌شود
+         (TelegramProfileService::botProfile آن را کش می‌کند). --}}
+    <div class="card">
+        <div class="cell-user lg">
+            <span class="avatar lg">{{ mb_substr(trim((string) $appName) !== '' ? (string) $appName : 'R', 0, 1) }}@if ($bot['avatar'] ?? null)<img src="{{ $bot['avatar'] }}" alt="" loading="lazy" onerror="this.remove()">@endif</span>
+            <div>
+                <h2>پنل مدیریت {{ $appName }}</h2>
+                <p class="muted">@if (! empty($bot['username']))<span dir="ltr">&#64;{{ $bot['username'] }}</span> · @endifخوش آمدید{{ isset($admin?->email) ? '، '.$admin->email : '' }}</p>
+            </div>
+        </div>
+    </div>
+
     <div class="grid">
         <div class="stat">
             <div class="k">کاربران</div>

@@ -28,7 +28,12 @@
                 @forelse ($users as $user)
                     <tr>
                         <td dir="ltr">{{ $user->chat_id }}</td>
-                        <td>{{ $user->name ?? '-' }}</td>
+                        <td>
+                            <span class="cell-user">
+                                <span class="avatar">{{ mb_substr(trim((string) ($user->name ?? '')) !== '' ? (string) $user->name : (string) $user->chat_id, 0, 1) }}@if ($user->avatar)<img src="{{ $user->avatar }}" alt="" loading="lazy" onerror="this.remove()">@endif</span>
+                                <span>{{ $user->name ?? '-' }}</span>
+                            </span>
+                        </td>
                         <td dir="ltr">{{ $user->telegram_id ?? '-' }}</td>
                         <td>{{ $user->wallet ? number_format($user->wallet->balanceAmount()) : '—' }}</td>
                         <td>{{ $user->hasUsedTest() ? 'بله' : 'خیر' }}</td>

@@ -655,6 +655,11 @@ button:disabled, .btn:disabled, button[disabled] {
 .btn.sm, button.sm { padding: 6px 12px; font-size: var(--fs-sm); border-radius: 10px; }
 
 .inline-form { display: inline-block; }
+
+/* Author display rules (.inline-form, .cell-user ...) outrank the UA's
+   [hidden] rule, so hidden must be restated here or an element the JS hides
+   (the modal's delete form) would stay visible. */
+[hidden] { display: none !important; }
 .inline-form button { padding: 6px 13px; font-size: var(--fs-sm); }
 
 .actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 14px; }
@@ -1716,3 +1721,89 @@ tbody tr:hover { background: color-mix(in srgb, var(--accent) 12%, transparent);
     .content { padding: 18px 16px 60px; }
     .modal-card { border-radius: 22px; }
 }
+
+/* ------------------------------------------------- forms & selects ------ */
+
+/* Settings wraps its cards in a single <form> instead of dropping them
+   straight into .content, so the flex-column gap that spaces every other page
+   never reached them and the boxes touched. Only that form is a direct child
+   of .content, so the fix is scoped to it. */
+.content > form {
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+}
+
+/* Native <option> lists are painted by the OS, not by the page: without an
+   explicit color-scheme they stay light inside the dark theme, and the
+   option/option colors below are what the dropdown actually paints from.
+   Applied globally so every select in the panel looks the same. */
+:root:not([data-theme="light"]) { color-scheme: dark; --select-option-bg: #111632; }
+[data-theme="light"]             { color-scheme: light; --select-option-bg: #ffffff; }
+
+select {
+    color: var(--text);
+    background-color: var(--surface-2);
+}
+
+select option,
+select optgroup {
+    background-color: var(--select-option-bg);
+    color: var(--text);
+}
+
+select optgroup {
+    font-style: normal;
+    font-weight: 700;
+    color: var(--text-dim);
+}
+
+/* A gradient is not honoured on an <option> - the browser paints the flat
+   color only, which is why the checked row showed a transparent background
+   with the page's default text color on top. */
+select option:checked {
+    background-color: var(--accent);
+    color: var(--on-accent);
+}
+
+select option:disabled {
+    color: var(--text-faint);
+}
+
+/* ------------------------------------------------- avatars & identity --- */
+
+/* An identity is a letter fallback with the real photo layered on top: when
+   the photo is missing - or the CDN link dies - removing the <img> (which the
+   views do onerror) reveals the letter underneath instead of an empty hole. */
+.avatar { position: relative; overflow: hidden; }
+
+.avatar img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: inherit;
+}
+
+.avatar.lg {
+    width: 56px;
+    height: 56px;
+    flex-basis: 56px;
+    font-size: 20px;
+}
+
+.cell-user {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+}
+
+.cell-user > div { min-width: 0; }
+
+/* The row actions keep two buttons on one line inside the table cell without
+   turning the <td> itself into a flex container (which would break the table
+   layout). */
+.cell-actions { white-space: nowrap; }
+.cell-actions .inline-form + .inline-form { margin-inline-start: 6px; }

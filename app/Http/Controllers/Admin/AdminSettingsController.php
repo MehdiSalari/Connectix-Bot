@@ -9,6 +9,7 @@ use App\Exceptions\TelegramApiException;
 use App\Http\Controllers\Controller;
 use App\Services\Connectix\ConnectixService;
 use App\Services\Panel\PanelSettingsService;
+use App\Services\Telegram\TelegramProfileService;
 use App\Services\Payment\SmsPaymentService;
 use App\Services\Telegram\TelegramService;
 use Illuminate\Http\RedirectResponse;
@@ -57,6 +58,8 @@ class AdminSettingsController extends Controller
 
         return view('admin.settings.index', [
             'appName' => $this->settings->appName(),
+            // عکس ربات، همان‌طور که پنل قدیمی می‌گرفت: از t.me ربات.
+            'bot' => app(TelegramProfileService::class)->botProfile(),
             'effective' => $effective,
         ]);
     }

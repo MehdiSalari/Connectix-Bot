@@ -5,7 +5,13 @@
         @csrf
 
         <div class="card">
-            <h2>برند ربات</h2>
+            <div class="cell-user lg">
+                <span class="avatar lg">{{ mb_substr(trim((string) $appName) !== '' ? (string) $appName : 'R', 0, 1) }}@if ($bot['avatar'] ?? null)<img src="{{ $bot['avatar'] }}" alt="" loading="lazy" onerror="this.remove()">@endif</span>
+                <div>
+                    <h2>برند ربات</h2>
+                    <p class="muted">@if (! empty($bot['username']))<span dir="ltr">&#64;{{ $bot['username'] }}</span> · @endif{{ $appName }}</p>
+                </div>
+            </div>
             <div class="row">
                 <div>
                     <label>نام ربات</label>

@@ -200,10 +200,18 @@ class ClientSyncService
             $client->id = $clientId;
         }
 
+        // A payload without a plan list says nothing about the status, so the
+        // value already on the row is kept instead of being cleared.
+        $planStatus = array_key_exists('plans', $detail) && is_array($detail['plans'])
+            ? Client::planStatusFromPlans($detail['plans'])
+            : $client->plan_status;
+
         $client->forceFill([
             'count_of_devices' => (int) ($detail['count_of_devices'] ?? 0),
             'username' => (string) ($detail['username'] ?? ''),
             'password' => (string) ($detail['password'] ?? ''),
+            'expire_date' => $this->expireDate($detail),
+            'plan_status' => $planStatus,
             'chat_id' => $this->chatId($detail) ?? '',
             'user_id' => $userId,
             'created_at' => $client->created_at ?? now(),
@@ -214,6 +222,24 @@ class ClientSyncService
         }
 
         return $isNew ? 1 : 0;
+    }
+
+    /**
+     * The expiry arrives as a Jalali timestamp, and sometimes as the literal
+     * string "null". Anything unusable becomes an empty value so the profile
+     * list shows نامشخص instead of a wrong date.
+     */
+    private function expireDate(array $detail): ?string
+    {
+        $expireDate = $detail['expire_date'] ?? null;
+
+        if (! is_string($expireDate)) {
+            return null;
+        }
+
+        $expireDate = trim($expireDate);
+
+        return ($expireDate === '' || strtolower($expireDate) === 'null') ? null : $expireDate;
     }
 
     /**

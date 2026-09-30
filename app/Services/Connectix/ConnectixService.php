@@ -176,6 +176,26 @@ class ConnectixService
     }
 
     /**
+     * Delete a client from the panel.
+     *
+     * `POST /v1/seller/clients/delete` is the panel's own route: its verb was
+     * probed against the live API (a GET on it answers 405 with Allow: POST)
+     * rather than guessed, and it takes the client id under `id`, like every
+     * other clients/* route here. Callers delete the local row only after this
+     * succeeds, so the two copies of an account cannot drift apart.
+     *
+     * @return array<string, mixed>
+     *
+     * @throws ConnectixApiException
+     */
+    public function deleteClient(string $clientId): array
+    {
+        return $this->post('/v1/seller/clients/delete', [
+            'id' => $clientId,
+        ]);
+    }
+
+    /**
      * One page of the seller client list, used by the sync command.
      *
      * The listing lives at `/v1/seller/clients`; the bare `/v1/seller` the

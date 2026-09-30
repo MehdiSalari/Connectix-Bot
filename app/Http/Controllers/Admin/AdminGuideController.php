@@ -105,7 +105,7 @@ class AdminGuideController extends Controller
             $slug = $this->safeTitle($title);
 
             if ($slug === '' || $slug === '.') {
-                $errors[] = 'عنوان راهنمای اختصاصی معتبر نیست.';
+                $errors[] = 'عنوان آموزش اختصاصی معتبر نیست.';
             } else {
                 $video = $request->file('custom_video');
                 $link = trim((string) $request->input('custom_link', ''));
@@ -132,7 +132,7 @@ class AdminGuideController extends Controller
             return back()->with('guide_errors', $errors);
         }
 
-        return back()->with('success', 'راهنماها با موفقیت ذخیره شدند.');
+        return back()->with('success', 'آموزش‌ها با موفقیت ذخیره شدند.');
     }
 
     /**
@@ -155,7 +155,7 @@ class AdminGuideController extends Controller
             $base = $this->guidePath().'/'.$name;
         } else {
             if ($name !== $this->safeTitle($name)) {
-                return back()->with('error', 'نام راهنما نامعتبر است.');
+                return back()->with('error', 'نام آموزش نامعتبر است.');
             }
 
             $base = $this->customPath().'/'.$name;
@@ -163,7 +163,7 @@ class AdminGuideController extends Controller
 
         File::delete($base.'.mp4', $base.'.txt');
 
-        return back()->with('success', 'راهنما حذف شد.');
+        return back()->with('success', 'آموزش حذف شد.');
     }
 
     // -----------------------------------------------------------------

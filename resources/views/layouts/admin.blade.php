@@ -23,7 +23,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="{{ asset('css/connectix.css') }}?v={{ trim((string) config('app.version', '4')) }}">
+    <link rel="stylesheet" href="{{ asset('css/connectix.css') }}?v={{ \App\Support\AssetVersion::css() }}">
 </head>
 <body>
     @php
@@ -51,7 +51,7 @@
                         'wallet'    => ['route' => 'admin.wallet-transactions.index', 'label' => 'تراکنش‌های کیف پول', 'icon' => '<path d="M3 6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v1h1a1 1 0 0 1 1 1v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6Zm2 0v12h14V9h-4a2 2 0 0 0-2 2v2a2 2 0 0 0 2 2h4V7H5Zm11 6.5a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3Z"/>'],
                         'sms'       => ['route' => 'admin.sms-payments.index', 'label' => 'پیامک‌های بانکی', 'icon' => '<path d="M4 4h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H8l-4 4V6a2 2 0 0 1 2-2Zm3 4v2h10V8H7Zm0 4v2h7v-2H7Z"/>'],
                         'settings'  => ['route' => 'admin.settings.show', 'label' => 'تنظیمات ربات', 'icon' => '<path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Zm9 4a7.5 7.5 0 0 0-.1-1.2l2-1.6-2-3.4-2.4 1a7.6 7.6 0 0 0-2-1.2L16.1 3H11.9l-.4 2.6c-.7.3-1.4.7-2 1.2l-2.4-1-2 3.4 2 1.6a7.7 7.7 0 0 0 0 2.4l-2 1.6 2 3.4 2.4-1c.6.5 1.3.9 2 1.2l.4 2.6h4.2l.4-2.6c.7-.3 1.4-.7 2-1.2l2.4 1 2-3.4-2-1.6c.1-.4.1-.8.1-1.2Z"/>'],
-                        'guides'    => ['route' => 'admin.guides.index', 'label' => 'راهنماها', 'icon' => '<path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm-2 14.5v-9l7 4.5-7 4.5Z"/>'],
+                        'guides'    => ['route' => 'admin.guides.index', 'label' => 'آموزش‌ها', 'icon' => '<path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm-2 14.5v-9l7 4.5-7 4.5Z"/>'],
                         'broadcast' => ['route' => 'admin.broadcast.show', 'label' => 'پیام همگانی', 'icon' => '<path d="M18 8a3 3 0 0 1 0 6v3a1 1 0 0 1-1.5.9L11 15H7a3 3 0 0 1 0-6h4l5.5-3.9A1 1 0 0 1 18 6v2Zm-9 4a1 1 0 1 0 0 2 1 1 0 0 0 0-2ZM5 9a1 1 0 0 1 1 1v4a1 1 0 1 1-2 0v-4a1 1 0 0 1 1-1Z"/>'],
                     ];
                     $active = $active ?? '';

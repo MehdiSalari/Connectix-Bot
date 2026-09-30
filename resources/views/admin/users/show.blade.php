@@ -2,8 +2,16 @@
 
 @section('content')
     <div class="card">
-        <h2>{{ $user->name ?? 'بدون نام' }} <span class="muted">· شناسه گفتگو {{ $user->chat_id }}</span></h2>
-        <p class="muted">تلگرام: {{ $user->telegram_id ?? '-' }} · عضویت: {{ $user->created_at?->format('Y-m-d H:i') }} · اکانت تست: {{ $user->hasUsedTest() ? 'استفاده شده' : 'استفاده نشده' }}</p>
+        {{-- عکس کاربر از پروفایل عمومی تلگرام می‌آید (users.avatar که
+             connectix:sync-users از https://t.me/{username} پر می‌کند)؛ اگر
+             عکسی نباشد حرف اول نام نشان داده می‌شود. --}}
+        <div class="cell-user lg">
+            <span class="avatar lg">{{ mb_substr(trim((string) ($user->name ?? '')) !== '' ? (string) $user->name : (string) $user->chat_id, 0, 1) }}@if ($user->avatar)<img src="{{ $user->avatar }}" alt="" loading="lazy" onerror="this.remove()">@endif</span>
+            <div>
+                <h2>{{ $user->name ?? 'بدون نام' }} <span class="muted">· شناسه گفتگو {{ $user->chat_id }}</span></h2>
+                <p class="muted">تلگرام: {{ $user->telegram_id ?? '-' }} · عضویت: {{ $user->created_at?->format('Y-m-d H:i') }} · اکانت تست: {{ $user->hasUsedTest() ? 'استفاده شده' : 'استفاده نشده' }}</p>
+            </div>
+        </div>
     </div>
 
     <div class="card">
@@ -52,6 +60,7 @@
                     <th>نام کاربری</th>
                     <th>تعداد دستگاه</th>
                     <th>تاریخ ساخت</th>
+                    <th>وضعیت</th>
                     <th></th>
                 </tr>
             </thead>
@@ -63,12 +72,29 @@
                         <td dir="ltr">{{ $client->username ?? '-' }}</td>
                         <td>{{ $client->count_of_devices ?? '-' }}</td>
                         <td>{{ $client->created_at?->format('Y-m-d H:i') }}</td>
-                        <td><button type="button" class="btn ghost client-details"
+                        <td>
+                            {{-- فعال/در صف/غیرفعال از وضعیت پلن پنل می‌آید (همان
+                                 قاعده‌ای که ربات قدیمی استفاده می‌کرد) و تا وقتی
+                                 پلن‌ها خوانده نشده‌اند از پنجره‌ی پایان اشتراک؛
+                                 اگر هیچ‌کدام معلوم نباشد نامشخص، نه حدس. --}}
+                            <span class="badge {{ $client->statusBadge()['tone'] }}"@if($client->expire_date) title="پایان اشتراک: {{ $client->expire_date }}"@endif>{{ $client->statusBadge()['label'] }}</span>
+                        </td>
+                        <td class="cell-actions">
+                            <button type="button" class="btn ghost client-details"
                                     data-client-details="{{ $client->id }}"
-                                    data-client-label="{{ $client->username ? '@'.$client->username : $client->id }}">جزئیات</button></td>
+                                    data-client-label="{{ $client->username ? '@'.$client->username : $client->id }}">جزئیات</button>
+                            @if (auth('admin')->user()?->isAdmin())
+                                <form method="post" action="{{ route('admin.clients.destroy', $client) }}" class="inline-form"
+                                      onsubmit="return confirm('این اکانت از دیتابیس و از پنل Connectix حذف شود؟')">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button type="submit" class="btn danger">حذف</button>
+                                </form>
+                            @endif
+                        </td>
                     </tr>
                 @empty
-                    <tr><td colspan="5" class="muted">اکانتی ثبت نشده است.</td></tr>
+                    <tr><td colspan="6" class="muted">اکانتی ثبت نشده است.</td></tr>
                 @endforelse
             </tbody>
         </table>

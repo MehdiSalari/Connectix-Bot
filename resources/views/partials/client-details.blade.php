@@ -30,6 +30,19 @@
 
         <footer class="modal-foot">
             <span class="muted grow" id="client-details-source"></span>
+            {{-- حذف، فقط برای ادمین: هم از دیتابیس محلی و هم از پنل Connectix
+                 (کنترلر اول پنل را خبر می‌کند و اگر پنل نپذیرد چیزی پاک نمی‌شود).
+                 آدرس با :id قالب است و اسکریپت هنگام باز شدن شناسه را می‌گذارد. --}}
+            @if (auth('admin')->user()?->isAdmin())
+                <form method="post" id="client-details-delete-form" class="inline-form" hidden
+                      action="{{ route('admin.clients.destroy', ['client' => ':id']) }}"
+                      data-action="{{ route('admin.clients.destroy', ['client' => ':id']) }}"
+                      onsubmit="return confirm('این اکانت از دیتابیس و از پنل Connectix حذف شود؟')">
+                    @csrf
+                    @method('DELETE')
+                    <button type="submit" class="btn danger">حذف اکانت</button>
+                </form>
+            @endif
             <button type="button" class="btn ghost" data-modal-close>بستن</button>
         </footer>
     </div>
@@ -373,6 +386,12 @@
             sub.textContent = 'در حال دریافت اطلاعات از پنل Connectix…';
             source.textContent = '';
 
+            var deleteForm = document.getElementById('client-details-delete-form');
+            if (deleteForm) {
+                deleteForm.action = deleteForm.dataset.action.replace(':id', encodeURIComponent(id));
+                deleteForm.hidden = false;
+            }
+
             load(id);
 
             var closeBtn = modal.querySelector('.modal-head [data-modal-close]');
@@ -384,6 +403,10 @@
             openId = null;
             modal.hidden = true;
             document.body.style.overflow = '';
+
+            var deleteForm = document.getElementById('client-details-delete-form');
+            if (deleteForm) deleteForm.hidden = true;
+
             if (lastFocus && lastFocus.focus) lastFocus.focus();
         }
 

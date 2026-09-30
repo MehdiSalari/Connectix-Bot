@@ -73,7 +73,7 @@ class AdminGuideTest extends TestCase
             ->assertOk()
             ->assertSee('android')
             ->assertSee('windows')
-            ->assertSee('راهنمای اختصاصی');
+            ->assertSee('آموزش اختصاصی');
     }
 
     public function test_uploading_a_video_writes_mp4_and_drops_a_previous_link(): void
