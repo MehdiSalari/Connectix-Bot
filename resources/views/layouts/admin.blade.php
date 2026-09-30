@@ -37,6 +37,8 @@
                     {{ $appName ?? 'پنل مدیریت' }}
                     <small>Connectix Bot</small>
                 </span>
+                <button type="button" class="nav-close" data-nav-close
+                        aria-label="بستن منو">✕</button>
             </div>
 
             <nav>
@@ -145,20 +147,34 @@
             var root = document.documentElement;
 
             // Mobile navigation drawer.
-            document.querySelectorAll('[data-nav-toggle]').forEach(function (btn) {
+            var navToggles = document.querySelectorAll('[data-nav-toggle]');
+            var setNav = function (open) {
+                document.body.classList.toggle('nav-open', open);
+                navToggles.forEach(function (btn) { btn.setAttribute('aria-expanded', String(open)); });
+            };
+            navToggles.forEach(function (btn) {
                 btn.addEventListener('click', function () {
-                    document.body.classList.toggle('nav-open');
+                    setNav(!document.body.classList.contains('nav-open'));
                 });
+            });
+            document.querySelectorAll('[data-nav-close]').forEach(function (btn) {
+                btn.addEventListener('click', function () { setNav(false); });
             });
             document.addEventListener('click', function (event) {
                 if (document.body.classList.contains('nav-open') &&
                     !event.target.closest('#sidebar') && !event.target.closest('[data-nav-toggle]')) {
-                    document.body.classList.remove('nav-open');
+                    setNav(false);
                 }
             });
             document.addEventListener('keydown', function (event) {
-                if (event.key === 'Escape') document.body.classList.remove('nav-open');
+                if (event.key === 'Escape') setNav(false);
             });
+            // The drawer only exists below 981px; never leave an open drawer
+            // locking the page once the layout goes back to the full sidebar.
+            var desktopQuery = window.matchMedia('(min-width: 981px)');
+            var syncLayout = function () { if (desktopQuery.matches) setNav(false); };
+            if (typeof desktopQuery.addEventListener === 'function') desktopQuery.addEventListener('change', syncLayout);
+            else if (typeof desktopQuery.addListener === 'function') desktopQuery.addListener(syncLayout);
 
             // Light / dark.
             var toggle = document.querySelector('[data-theme-toggle]');
