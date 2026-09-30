@@ -793,6 +793,22 @@ otherwise leak another user's password.
   (`📦 کدوم اکانت رو تمدید کنم؟`, functions.php:1093) and jumps straight to
   the checkout of the account's current plan, exactly as `always('acc')` did.
 
+### The WebApp row
+
+The home keyboard's `👨🏻‍💻 | پنل مدیریت` / `👤 | پروفایل` row carries a
+`web_app` button that legacy pointed at `app.php` by swapping `bot.php` out of
+the current URL (functions.php:3316). Two things no longer hold: the Laravel
+webhook lives at `/telegram/webhook` (nothing to swap), and `app.php` - the
+Telegram WebApp with the client cards - was never ported, so
+`CONNECTIX_BOT_WEBAPP_URL` has no candidate default. The first live end-to-end
+`/start` against `https://lcl-laravel.mehdisite.ir` proved how load-bearing
+this is: Telegram rejected the derived `http://.../telegram/webhook` URL with
+`Only HTTPS links are allowed` and the whole `sendMessage` failed, so the user
+received no welcome message at all. Operator decision during that session:
+emit the row **only while `CONNECTIX_BOT_WEBAPP_URL` is configured** - a
+missing row costs less than a missing welcome message, and the button returns
+verbatim once an operator points the variable at a real WebApp.
+
 ### Regression net
 
 `HomeMenuButtonsTest` presses every callback the bot's own keyboards emit

@@ -59,7 +59,11 @@ class KeyboardFactory
             ['text' => '👝 |  کیف پول', 'callback_data' => 'wallet'],
         ];
 
-        $rows[] = [$this->panelButton($chatId)];
+        $panel = $this->panelButton($chatId);
+
+        if ($panel !== null) {
+            $rows[] = [$panel];
+        }
 
         $channel = $this->settings->channelTelegram();
 
@@ -115,11 +119,22 @@ class KeyboardFactory
     /**
      * Admins get the management panel; everyone else gets their profile.
      *
-     * @return array<string, mixed>
+     * Legacy always emitted this row and derived its URL by swapping bot.php
+     * for app.php in the current URL. The Laravel webhook lives at
+     * /telegram/webhook and legacy app.php was never ported, so the derived
+     * URL is not a WebApp and Telegram rejects the whole message. The row is
+     * therefore emitted only while an operator has configured
+     * CONNECTIX_BOT_WEBAPP_URL.
+     *
+     * @return array<string, mixed>|null
      */
-    private function panelButton(string|int $chatId): array
+    private function panelButton(string|int $chatId): ?array
     {
-        $url = $this->webAppUrl();
+        $url = $this->settings->webAppUrl();
+
+        if ($url === null || $url === '') {
+            return null;
+        }
 
         $button = [
             'web_app' => ['url' => $url],
@@ -130,30 +145,6 @@ class KeyboardFactory
         }
 
         return ['text' => '👤 | پروفایل'] + $button;
-    }
-
-    /**
-     * The WebApp entry point.
-     *
-     * Legacy rewrote the current URL, replacing bot.php with app.php, so the
-     * panel was reachable at whatever path the webhook was installed on. The
-     * configured URL wins; otherwise the request URL is rewritten the same way.
-     */
-    private function webAppUrl(): string
-    {
-        $configured = $this->settings->webAppUrl();
-
-        if ($configured !== null && $configured !== '') {
-            return $configured;
-        }
-
-        $request = request();
-
-        if ($request === null) {
-            return '';
-        }
-
-        return str_replace('bot.php', 'app.php', $request->fullUrl());
     }
 
     /**

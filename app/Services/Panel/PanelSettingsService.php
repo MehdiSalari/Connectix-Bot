@@ -153,7 +153,8 @@ class PanelSettingsService
     }
 
     /**
-     * The configured WebApp base URL, or null to derive it from the request.
+     * The configured WebApp base URL, or null when no WebApp is configured
+     * (the home keyboard then omits the panel/profile row).
      */
     public function webAppUrl(): ?string
     {

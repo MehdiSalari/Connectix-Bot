@@ -153,6 +153,10 @@ php artisan telegram:webhook remove   # detach before a cutover or rollback
   `info` output of the working install before changing anything.
 * `getWebhookInfo`'s `last_error_message` is the first place to look when
   users report silence.
+* Hand-testing the endpoint with `curl` needs the **parsed** `.env` value:
+  `TELEGRAM_WEBHOOK_SECRET` is stored quoted, and posting the raw line
+  including the quotes fails verification with 403 `{"ok":false}` even when
+  the registered secret is correct.
 
 ## 10. Cache and config optimization
 

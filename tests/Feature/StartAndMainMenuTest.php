@@ -157,6 +157,8 @@ class StartAndMainMenuTest extends TestCase
 
     public function test_an_admin_gets_the_management_panel_button(): void
     {
+        config(['connectix_bot.webapp_url' => 'https://example.test/app.php']);
+
         $user = $this->makeUser(555);
 
         $this->app->make(StartHandler::class)->handle($this->update('/start'), $user);
@@ -167,10 +169,14 @@ class StartAndMainMenuTest extends TestCase
             $labels,
             static fn (string $label): bool => str_starts_with($label, '👨🏻‍💻 | پنل مدیریت')
         ), 'an admin id should render the management panel button');
+
+        $this->assertSame('https://example.test/app.php', $this->panelButtonUrl());
     }
 
     public function test_a_normal_user_gets_the_profile_button(): void
     {
+        config(['connectix_bot.webapp_url' => 'https://example.test/app.php']);
+
         $user = $this->makeUser(777);
 
         $this->app->make(StartHandler::class)->handle($this->update('/start', 777), $user);
@@ -181,6 +187,49 @@ class StartAndMainMenuTest extends TestCase
             $labels,
             static fn (string $label): bool => str_starts_with($label, '👤 | پروفایل')
         ));
+
+        $this->assertSame('https://example.test/app.php', $this->panelButtonUrl());
+    }
+
+    public function test_the_panel_row_is_hidden_without_a_configured_webapp_url(): void
+    {
+        config(['connectix_bot.webapp_url' => null]);
+
+        $user = $this->makeUser(555);
+
+        $this->app->make(StartHandler::class)->handle($this->update('/start'), $user);
+
+        $keyboard = $this->lastKeyboard();
+
+        $this->assertNull(
+            $this->panelButtonUrl($keyboard),
+            'no web_app button may be emitted while CONNECTIX_BOT_WEBAPP_URL is empty'
+        );
+
+        $labels = $this->labelsAndCallbacks($keyboard);
+
+        foreach (['👨🏻‍💻 | پنل مدیریت', '👤 | پروفایل'] as $prefix) {
+            $this->assertEmpty(
+                array_filter($labels, static fn (string $label): bool => str_starts_with($label, $prefix)),
+                "the '{$prefix}' row must not appear without a WebApp URL"
+            );
+        }
+    }
+
+    /**
+     * The url carried by the home keyboard's WebApp button, if any.
+     */
+    private function panelButtonUrl(?array $keyboard = null): ?string
+    {
+        foreach ($keyboard ?? $this->lastKeyboard() as $row) {
+            foreach ($row as $button) {
+                if (isset($button['web_app']['url'])) {
+                    return (string) $button['web_app']['url'];
+                }
+            }
+        }
+
+        return null;
     }
 
     public function test_the_trial_row_appears_when_the_panel_offers_a_free_plan(): void

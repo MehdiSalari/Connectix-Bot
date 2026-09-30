@@ -288,10 +288,10 @@ return [
     | Web app
     |--------------------------------------------------------------------------
     |
-    | The Telegram WebApp entry point. When null the application URL is
-    | derived from the incoming request, matching legacy behaviour where
-    | bot.php was swapped for app.php in the current URL.
-    |
+    | The Telegram WebApp entry point. When empty the home keyboard omits the
+    | panel/profile row: legacy derived the URL by swapping bot.php for
+    | app.php in the current URL, and that legacy WebApp has no Laravel
+    | equivalent to point at.
     */
 
     'webapp_url' => env('CONNECTIX_BOT_WEBAPP_URL'),
