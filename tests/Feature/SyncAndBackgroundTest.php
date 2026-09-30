@@ -50,7 +50,7 @@ class SyncAndBackgroundTest extends TestCase
     public function it_syncs_a_panel_client_into_users_and_clients(): void
     {
         Http::fake([
-            self::BASE.'/v1/seller?page=*' => Http::response([
+            self::BASE.'/v1/seller/clients?page=*' => Http::response([
                 'clients' => [
                     'data' => [['id' => 'abc']],
                     'total' => 1,
@@ -104,7 +104,7 @@ class SyncAndBackgroundTest extends TestCase
         ]);
 
         Http::fake([
-            self::BASE.'/v1/seller?page=*' => Http::response([
+            self::BASE.'/v1/seller/clients?page=*' => Http::response([
                 'clients' => ['data' => [['id' => 'abc']]],
             ], 200),
             self::BASE.'/v1/seller/clients/show?id=*' => Http::response([
@@ -135,7 +135,7 @@ class SyncAndBackgroundTest extends TestCase
     public function syncing_skips_a_client_whose_detail_cannot_be_read(): void
     {
         Http::fake([
-            self::BASE.'/v1/seller?page=*' => Http::response([
+            self::BASE.'/v1/seller/clients?page=*' => Http::response([
                 'clients' => ['data' => [['id' => 'abc']]],
             ], 200),
             self::BASE.'/v1/seller/clients/show?id=*' => Http::response(['client' => null], 200),
@@ -450,7 +450,7 @@ class SyncAndBackgroundTest extends TestCase
     private function fakePanelClient(string $clientId, string $chatId): void
     {
         Http::fake([
-            self::BASE.'/v1/seller?page=*' => Http::response([
+            self::BASE.'/v1/seller/clients?page=*' => Http::response([
                 'clients' => ['data' => [['id' => $clientId]]],
             ], 200),
             self::BASE.'/v1/seller/clients/show?id=*' => Http::response([

@@ -364,6 +364,29 @@ class PurchaseService
     }
 
     /**
+     * The last plan purchased for an account, active or not.
+     *
+     * The panel lists plans newest first, so `plans[0]` is what the renewal
+     * screen's "آخرین اشتراک خریداری شده" refers to. Legacy read exactly that
+     * (`$lastPlan = $clientPlans[0]` in `renew('acc:...')`), which is why an
+     * expired account still reaches its renewal checkout instead of hitting
+     * the "no subscription" alert an active-or-queued match would give.
+     *
+     * @param  array<string, mixed>  $client
+     * @return array<string, mixed>|null
+     */
+    public function latestPlan(array $client): ?array
+    {
+        $plans = $client['plans'] ?? [];
+
+        if (is_array($plans) && is_array($plans[0] ?? null)) {
+            return $plans[0];
+        }
+
+        return $this->currentPlan($client);
+    }
+
+    /**
      * The panel client id for the account held in state.
      *
      * A new account resolves to the literal 'new', the placeholder

@@ -178,13 +178,17 @@ class ConnectixService
     /**
      * One page of the seller client list, used by the sync command.
      *
+     * The listing lives at `/v1/seller/clients`; the bare `/v1/seller` the
+     * first port used answers 404 on the live panel, which left the panel
+     * import and `connectix:sync-clients` unable to fetch a single row.
+     *
      * @return array<string, mixed>
      *
      * @throws ConnectixApiException
      */
     public function listClients(int $page = 1): array
     {
-        return $this->get('/v1/seller', ['page' => $page]);
+        return $this->get('/v1/seller/clients', ['page' => $page]);
     }
 
     // -----------------------------------------------------------------
@@ -480,6 +484,19 @@ class ConnectixService
         $request = $authenticated
             ? $this->client()->withToken($bearer)
             : $this->client();
+
+        // A GET names an existing record, so a transient transport failure is
+        // worth another attempt before the caller sees an error: a live paid
+        // order was lost to one 10s connect timeout on clients/show. POSTs are
+        // left alone - retrying clients/store would create a second account.
+        if ($verb === 'get') {
+            $request = $request->retry(
+                max(1, (int) config('connectix_bot.connectix.get_attempts', 3)),
+                500,
+                static fn (\Throwable $e): bool => $e instanceof ConnectionException,
+                false,
+            );
+        }
 
         try {
             $response = $verb === 'get'

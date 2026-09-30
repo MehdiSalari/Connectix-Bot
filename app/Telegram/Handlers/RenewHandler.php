@@ -187,7 +187,7 @@ class RenewHandler implements UpdateHandler
         $this->state->startRenewal($user, $username);
 
         $data = $this->connectix->getClientData((string) $client->id);
-        $plan = $data !== null ? $this->purchase->currentPlan($data) : null;
+        $plan = $data !== null ? $this->purchase->latestPlan($data) : null;
 
         $this->showPaymentMethods($update, $user, (string) ($plan['name'] ?? ''));
     }
@@ -223,7 +223,7 @@ class RenewHandler implements UpdateHandler
             return;
         }
 
-        $plan = $this->purchase->currentPlan($data);
+        $plan = $this->purchase->latestPlan($data);
 
         if ($plan === null) {
             $this->telegram->answerCallbackQueryQuietly(

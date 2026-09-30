@@ -52,6 +52,11 @@ return [
     | using a static bearer token. Verification of the peer certificate is
     | enabled by default; it was disabled in legacy for no good reason.
     |
+    | get_attempts: how many times an idempotent GET is sent before a
+    | transport failure is given up on (one live order was lost to a single
+    | 10s connect timeout). POSTs are never retried - a second clients/store
+    | would create a second account.
+    |
     */
 
     'connectix' => [
@@ -60,6 +65,7 @@ return [
         'panel_url' => env('CONNECTIX_PANEL_URL', 'https://seller.connectix.vip'),
         'timeout' => (int) env('CONNECTIX_API_TIMEOUT', 30),
         'connect_timeout' => (int) env('CONNECTIX_API_CONNECT_TIMEOUT', 10),
+        'get_attempts' => (int) env('CONNECTIX_API_GET_ATTEMPTS', 3),
         'verify_tls' => (bool) env('CONNECTIX_VERIFY_TLS', true),
         'user_agent' => env(
             'CONNECTIX_USER_AGENT',

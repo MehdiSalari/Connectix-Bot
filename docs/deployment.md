@@ -249,3 +249,40 @@ git diff --check && git status    # clean tree
 Then the human checks: `/start` through the real Telegram client answers
 with the welcome message, the admin panel signs in, one wallet purchase and
 one card receipt complete on production data.
+
+## 15. Verified deployment record (2026-09-30)
+
+The first production cutover pass against `https://lcl-laravel.mehdisite.ir`
+ran every check in §14 plus the live probes below. Each line was observed,
+not assumed:
+
+* **Environment**: `APP_ENV=production`, `APP_DEBUG=false`,
+  `APP_URL=https://...`. With debug off an unhandled exception renders the
+  plain framework page (verified: the method-not-allowed page dropped from
+  ~900 KB of stack trace to a 1 KB body).
+* **Scheme and client ip**: the site is published through a Cloudflare
+  tunnel whose `cloudflared` connects from loopback, so `bootstrap/app.php`
+  trusts `127.0.0.1`/`::1` and `AppServiceProvider` forces https whenever
+  `APP_URL` is an https URL. Before that, `/admin` redirected to `http://`,
+  where the `Secure` login cookie is dropped and every rate limit shared one
+  address. Verified after the change: `/admin` answers `302` to
+  `https://.../admin/login`, and `http://` entry points are upgraded too.
+* **Webhook**: `telegram:webhook info` shows this host, `pending_update_count`
+  0; a hand-signed POST answers `200 {"ok":true}` both through Cloudflare and
+  straight at the local origin; a forged admin `/start` produced a real
+  delivered welcome message with no log entry.
+* **`connectix:setup status`**: all checks `[OK]`, including live Telegram
+  `getMe` (`@EchoSafedBot`) and a seller-panel round trip ("توکن فروشنده
+  پذیرفته شد").
+* **Migrations**: `migrate:status` all ran, `migrate --force --pretend`
+  reports nothing to migrate.
+* **Backups** (§12) live outside both document roots in
+  `C:\xampp\backup-connectix\`: dated `mysqldump`, the `.env`, and
+  `storage/app/connectix/`. Legacy code is held by tag `v3.3.6`.
+* **Schedule**: the crontab entries exist (`schedule:list`), and on a host
+  without cron the Windows task `ConnectixSchedule` runs
+  `schedule:run` every 5 minutes (PHP `C:\Progra~1\php\php-8.5.8\php.exe`,
+  XAMPP's own PHP is 8.2 and fails Composer's platform check). Output appends
+  to `storage/framework/schedule-run.log`.
+* **Hand-signed webhook tests** must post the *parsed* `.env` secret - see
+  the quoting warning in §9.

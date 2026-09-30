@@ -987,6 +987,41 @@ class PurchaseFlowTest extends TestCase
         ], $this->labels($this->lastKeyboard()));
     }
 
+    /**
+     * The renewal screen promises the *last purchased* plan, so an expired
+     * account (every plan inactive, none queued) must still reach its
+     * checkout. Legacy read `plans[0]` for exactly this case; matching on an
+     * active-or-queued plan first answered the live panel's expired account
+     * with the "no subscription" alert instead of the renewal buttons.
+     */
+    public function test_an_expired_account_still_reaches_renewal_with_its_last_plan(): void
+    {
+        $user = $this->makeUser();
+
+        $this->makeClient($user);
+
+        $this->panelClient = [
+            'id' => 'panel-uuid',
+            'username' => 'acme-user',
+            'password' => 'pass1234',
+            'count_of_devices' => 1,
+            'plans' => [[
+                'name' => '(1x) Unlimited-1M',
+                'is_active' => false,
+                'is_in_queue' => false,
+            ]],
+        ];
+
+        $this->app->make(RenewHandler::class)->handle($this->press('renew_acc:acme-user'), $user);
+
+        $this->assertSame([
+            '🔃 | تمدید با همین پلن|renew_plan:(1x) Unlimited-1M',
+            '➕ | انتخاب پلن دیگر|group',
+            '🏡 | خانه|main_menu',
+            '↪️ | بازگشت|renew',
+        ], $this->labels($this->lastKeyboard()));
+    }
+
     public function test_an_account_of_another_chat_cannot_be_renewed(): void
     {
         $user = $this->makeUser();
