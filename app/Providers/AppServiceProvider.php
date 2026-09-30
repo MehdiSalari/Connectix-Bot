@@ -12,6 +12,7 @@ use App\Services\Telegram\AdminGuard;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
 
@@ -64,6 +65,14 @@ class AppServiceProvider extends ServiceProvider
             // suite has no business writing that file. The service itself is
             // tested directly in tests/Feature/SetupTest.php instead.
             return;
+        }
+
+        // A deployment that publishes an https APP_URL generates every
+        // redirect and asset URL as https, even on the plain http entry the
+        // tunnel still accepts: the admin login redirects to http:// today
+        // and the Secure session cookie never survives that hop.
+        if (str_starts_with((string) config('app.url'), 'https://')) {
+            URL::forceScheme('https');
         }
 
         // Before the HTTP kernel: EncryptCookies and the session refuse to boot

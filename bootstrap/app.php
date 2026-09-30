@@ -13,6 +13,15 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // The public site is published through a Cloudflare tunnel:
+        // cloudflared connects from the loopback interface and forwards the
+        // client's real address and the original scheme in X-Forwarded-*.
+        // Only loopback is trusted, so a direct LAN client cannot spoof
+        // either one - and without this the app believes every request is
+        // plain http, which broke admin login (redirects to http:// drop the
+        // Secure session cookie) and collapsed every rate limit onto one ip.
+        $middleware->trustProxies(at: ['127.0.0.1', '::1']);
+
         // The Telegram webhook is a server-to-server POST authenticated by the
         // X-Telegram-Bot-Api-Secret-Token header, so a CSRF token cannot exist.
         // The bank SMS gateway is another server-to-server POST: legacy had no
