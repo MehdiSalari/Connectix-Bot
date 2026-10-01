@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Unit;
 
 use App\Services\Connectix\ConnectixService;
+use App\Services\Panel\PanelSettingsService;
 use App\Services\Plan\PlanService;
 use Tests\TestCase;
 
@@ -24,8 +25,10 @@ class PlanTitleParserTest extends TestCase
     {
         parent::setUp();
 
-        // The parser never calls the panel, so a bare client is enough.
-        $this->plans = new PlanService(new ConnectixService);
+        // The parser never calls the panel, so a bare client is enough; the
+        // settings service is only read for the group labels, and it falls back
+        // to config when the override table is not there (as it is not here).
+        $this->plans = new PlanService(new ConnectixService, app(PanelSettingsService::class));
     }
 
     public function test_it_parses_a_plain_monthly_plan(): void

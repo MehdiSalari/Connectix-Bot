@@ -22,6 +22,13 @@
             </div>
 
             <div class="tools">
+                {{-- Deep link into the seller panel. Hidden until the payload
+                     arrives, because the id is only known then (the row's own
+                     data is not trusted here). target=_blank + rel=noopener:
+                     the panel is a foreign origin and must not get a handle
+                     on this window. --}}
+                <a class="btn ghost" id="client-details-panel-link" hidden
+                   target="_blank" rel="noopener noreferrer">مشاهده در پنل Connectix</a>
                 <button type="button" class="icon-btn" data-modal-close aria-label="بستن">✕</button>
             </div>
         </header>
@@ -32,12 +39,16 @@
             <span class="muted grow" id="client-details-source"></span>
             {{-- حذف، فقط برای ادمین: هم از دیتابیس محلی و هم از پنل Connectix
                  (کنترلر اول پنل را خبر می‌کند و اگر پنل نپذیرد چیزی پاک نمی‌شود).
-                 آدرس با :id قالب است و اسکریپت هنگام باز شدن شناسه را می‌گذارد. --}}
+                 تایید با دیالوگ پنل است، نه confirm() مرورگر؛ دکمه هم‌اندازه‌ی
+                 بقیه‌ی دکمه‌ها (class btn، نه یک استایل جدا) تا کف مودال یکدست
+                 بماند. آدرس با :id قالب است و اسکریپت هنگام باز شدن شناسه را می‌گذارد. --}}
             @if (auth('admin')->user()?->isAdmin())
                 <form method="post" id="client-details-delete-form" class="inline-form" hidden
                       action="{{ route('admin.clients.destroy', ['client' => ':id']) }}"
                       data-action="{{ route('admin.clients.destroy', ['client' => ':id']) }}"
-                      onsubmit="return confirm('این اکانت از دیتابیس و از پنل Connectix حذف شود؟')">
+                      data-confirm="این اکانت از دیتابیس و از پنل Connectix حذف می‌شود. این کار برگشت‌پذیر نیست."
+                      data-confirm-title="حذف اکانت"
+                      data-confirm-accept="حذف کن">
                     @csrf
                     @method('DELETE')
                     <button type="submit" class="btn danger">حذف اکانت</button>
@@ -59,6 +70,7 @@
         var sub = document.getElementById('client-details-sub');
         var avatar = document.getElementById('client-details-avatar');
         var source = document.getElementById('client-details-source');
+        var panelLink = document.getElementById('client-details-panel-link');
 
         var openId = null;
         var token = 0;          // هر باز شدن یک توکن؛ جواب دیررسیده‌ی قبلی بی‌اثر می‌شود
@@ -314,12 +326,19 @@
 
             var heading = (c.name && String(c.name).trim())
                 ? String(c.name).trim()
-                : (c.username ? '@' + c.username : 'جزئیات اکانت');
+                : (c.username ? c.username : 'جزئیات اکانت');
 
             title.textContent = heading;
             avatar.textContent = heading.trim().charAt(0).toUpperCase() || 'C';
-            sub.textContent = c.username ? '@' + c.username : (c.id || '');
+            sub.textContent = c.username ? c.username : (c.id || '');
             source.textContent = c.added_by ? 'ارائه‌دهنده: ' + c.added_by : '';
+
+            // The panel link is server-built, so it is set with setAttribute
+            // rather than assigned to .href from the payload object.
+            if (panelLink && payload.panel_url) {
+                panelLink.setAttribute('href', String(payload.panel_url));
+                panelLink.hidden = false;
+            }
 
             body.replaceChildren();
             body.appendChild(chips(c));
@@ -333,6 +352,10 @@
 
         function showError(message) {
             body.replaceChildren();
+
+            // A failed load leaves the previous account's panel link on screen,
+            // which would point at an account this modal is not showing.
+            if (panelLink) panelLink.hidden = true;
 
             var box = el('div', 'state bad');
             box.appendChild(el('span', 'glyph', '⚠'));
@@ -379,12 +402,16 @@
             lastFocus = document.activeElement;
 
             modal.hidden = false;
-            document.body.style.overflow = 'hidden';
+            window.cxLayerOpen(modal);
 
             title.textContent = label || 'جزئیات اکانت';
             avatar.textContent = '…';
             sub.textContent = 'در حال دریافت اطلاعات از پنل Connectix…';
             source.textContent = '';
+
+            // Reset from the previous account: otherwise a stale href stays
+            // clickable during the load of the next one.
+            if (panelLink) panelLink.hidden = true;
 
             var deleteForm = document.getElementById('client-details-delete-form');
             if (deleteForm) {
@@ -402,7 +429,7 @@
             token++;                      // جواب‌های در راه را بی‌اثر می‌کند
             openId = null;
             modal.hidden = true;
-            document.body.style.overflow = '';
+            window.cxLayerClose(modal);
 
             var deleteForm = document.getElementById('client-details-delete-form');
             if (deleteForm) deleteForm.hidden = true;
@@ -428,7 +455,7 @@
         });
 
         document.addEventListener('keydown', function (event) {
-            if (event.key === 'Escape' && !modal.hidden) close();
+            if (event.key === 'Escape' && !modal.hidden && window.cxIsTopLayer(modal)) close();
         });
     })();
 </script>

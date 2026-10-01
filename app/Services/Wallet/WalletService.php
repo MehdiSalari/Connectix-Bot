@@ -11,6 +11,7 @@ use App\Exceptions\TelegramApiException;
 use App\Models\Wallet;
 use App\Models\WalletTransaction;
 use App\Services\Telegram\TelegramService;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
@@ -135,6 +136,24 @@ class WalletService
         }
 
         return $wallet;
+    }
+
+    /**
+     * One user's ledger, newest first.
+     *
+     * The admin profile previews the tail of this and the history modal pages
+     * through the rest, so the whole ledger is never loaded for one page view.
+     * Ordering is on `id` as well as `created_at`: this table has no second
+     * column and `created_at` is second-resolution, so a page break inside one
+     * second used to shuffle rows between pages.
+     */
+    public function history(string|int $chatId, int $perPage = 15, int $page = 1): LengthAwarePaginator
+    {
+        return WalletTransaction::query()
+            ->where('chat_id', (string) $chatId)
+            ->orderByDesc('created_at')
+            ->orderByDesc('id')
+            ->paginate($perPage, ['*'], 'page', $page);
     }
 
     /**

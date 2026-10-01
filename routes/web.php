@@ -6,6 +6,7 @@ use App\Http\Controllers\Admin\AdminDashboardController;
 use App\Http\Controllers\Admin\AdminGuideController;
 use App\Http\Controllers\Admin\AdminLoginController;
 use App\Http\Controllers\Admin\AdminOrderController;
+use App\Http\Controllers\Admin\AdminOrderDetailsController;
 use App\Http\Controllers\Admin\AdminSettingsController;
 use App\Http\Controllers\Admin\AdminSmsPaymentController;
 use App\Http\Controllers\Admin\AdminUserController;
@@ -129,9 +130,22 @@ Route::prefix('admin')->name('admin.')->group(function (): void {
         Route::get('users/search', [AdminUserController::class, 'search'])
             ->middleware('admin.role:admin,editor')
             ->name('users.search');
-        Route::post('users/wallet/create', [AdminUserController::class, 'createWallet'])
-            ->middleware('admin.role:admin')
-            ->name('users.wallet.create');
+        // The details modal opens from a row avatar on the list. The key is
+        // the chat id, not the local row id, because that is what the list
+        // prints and what the Telegram bot identifies a user by.
+        Route::get('users/{chatId}/details', [AdminUserController::class, 'details'])
+            ->middleware('admin.role:admin,editor')
+            ->where('chatId', '[0-9]+')
+            ->name('users.details');
+        // The wallet history modal, on the profile page and the list. Read
+        // only, so an editor may open it too.
+        Route::get('users/{chatId}/wallet-history', [AdminUserController::class, 'walletHistory'])
+            ->middleware('admin.role:admin,editor')
+            ->where('chatId', '[0-9]+')
+            ->name('users.wallet-history');
+        // One wallet action, not two: the adjustment opens the wallet itself
+        // when the user has none yet, so a separate "create wallet" step
+        // could only ever be the thing an admin forgot to press first.
         Route::post('users/wallet/adjust', [AdminUserController::class, 'adjustWallet'])
             ->middleware('admin.role:admin')
             ->name('users.wallet.adjust');
@@ -156,6 +170,10 @@ Route::prefix('admin')->name('admin.')->group(function (): void {
         Route::post('orders/{payment}/decide', [AdminOrderController::class, 'decide'])
             ->middleware('admin.role:admin')
             ->name('orders.decide');
+        // The per-row detail sheet. Read only, so an editor may open it too.
+        Route::get('orders/{payment}/details', [AdminOrderDetailsController::class, 'show'])
+            ->middleware('admin.role:admin,editor')
+            ->name('orders.details');
 
         // Ledgers
         Route::get('wallet-transactions', [AdminWalletTransactionController::class, 'index'])
@@ -164,6 +182,11 @@ Route::prefix('admin')->name('admin.')->group(function (): void {
         Route::get('sms-payments', [AdminSmsPaymentController::class, 'index'])
             ->middleware('admin.role:admin,editor')
             ->name('sms-payments.index');
+        // The per-row deposit sheet: three cards of what the row is plus the
+        // purchase card below them. Read only, so an editor may open it too.
+        Route::get('sms-payments/{smsPayment}/details', [AdminSmsPaymentController::class, 'details'])
+            ->middleware('admin.role:admin,editor')
+            ->name('sms-payments.details');
 
         // Bot configuration
         Route::get('settings', [AdminSettingsController::class, 'show'])

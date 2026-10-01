@@ -4,12 +4,12 @@
     <div class="card">
         <form method="get" action="{{ route('admin.orders.index') }}" class="row">
             <div>
-                <label>جستجو (شماره سفارش، کاربر، مبلغ، پلن کد)</label>
-                <input type="text" name="search" value="{{ $search }}" placeholder="مثال: CX25012801">
+                <label for="order-search">جستجو (شماره سفارش، کاربر، مبلغ، پلن کد)</label>
+                <input type="text" id="order-search" name="search" value="{{ $search }}" placeholder="مثال: CX25012801">
             </div>
             <div>
-                <label>وضعیت</label>
-                <select name="status">
+                <label for="order-status">وضعیت</label>
+                <select name="status" id="order-status">
                     <option value="">همه</option>
                     <option value="pending" {{ $status === 'pending' ? 'selected' : '' }}>در انتظار</option>
                     <option value="0" {{ $status === '0' ? 'selected' : '' }}>رد شده</option>
@@ -17,14 +17,16 @@
                 </select>
             </div>
             <div>
-                <label>روش پرداخت</label>
-                <select name="method">
+                <label for="order-method">روش پرداخت</label>
+                <select name="method" id="order-method">
                     <option value="">همه</option>
                     <option value="card" {{ $method === 'card' ? 'selected' : '' }}>کارت به کارت</option>
                     <option value="wallet" {{ $method === 'wallet' ? 'selected' : '' }}>کیف پول</option>
                 </select>
             </div>
-            <button type="submit">اعمال</button>
+            <div style="flex:0">
+                <button type="submit">اعمال</button>
+            </div>
         </form>
     </div>
 
@@ -47,28 +49,36 @@
             <tbody>
                 @forelse ($payments as $payment)
                     <tr>
-                        <td dir="ltr">{{ $payment->order_number }}</td>
+                        <td class="ltr">{{ $payment->order_number }}</td>
                         <td>{{ $payment->user_name ?: ($payment->user?->name ?? '-') }}</td>
-                        <td dir="ltr">{{ $payment->user_telegram ?: '-' }}</td>
+                        <td class="ltr">{{ $payment->user_telegram ?: '—' }}</td>
                         <td>{{ number_format($payment->priceAmount()) }}</td>
-                        <td dir="ltr">{{ $payment->coupon ?? '-' }}</td>
-                        <td>{{ $payment->method?->label() ?? '-' }}</td>
+                        <td class="ltr">{{ $payment->coupon ?? '—' }}</td>
+                        <td>{{ $payment->method?->label() ?? '—' }}</td>
                         <td>
                             <span class="badge {{ $payment->is_paid->isDecided() ? ($payment->is_paid->value === '1' ? 'ok' : 'no') : 'wait' }}">
                                 {{ $payment->is_paid->label() }}
                             </span>
                         </td>
                         <td>{{ $payment->created_at?->format('Y-m-d H:i') }}</td>
-                        <td>
+                        <td class="cell-actions">
+                            {{-- جزئیات سفارش در همان مودالی باز می‌شود که جزئیات اکانت
+                                 را نشان می‌دهد: هر دو از همان پنل خوانده می‌شوند و
+                                 هر دو فقط-خواندنی هستند. --}}
+                            <button type="button" class="btn ghost"
+                                    data-order-details="{{ $payment->id }}"
+                                    data-order-label="{{ $payment->order_number }}">جزئیات</button>
+
                             @if ($payment->isPending())
                                 <form method="post" action="{{ route('admin.orders.decide', $payment) }}" class="inline-form">
                                     @csrf
                                     <button type="submit" name="action" value="accept" class="btn">تایید</button>
                                     <button type="submit" name="action" value="reject" class="btn danger">رد</button>
                                 </form>
-                            @else
-                                <span class="muted">—</span>
                             @endif
+                            {{-- سفارش تعیین‌شده‌شده فقط دکمه‌ی «جزئیات» دارد؛ علامت
+                                 «—» یک جای‌خالیِ تزئینی بود که در کنار دکمه
+                                 مثل یک غیب‌شدنِ داده خوانده می‌شد. --}}
                         </td>
                     </tr>
                 @empty
@@ -77,12 +87,13 @@
             </tbody>
         </table>
 
-        @if ($pages > 1)
+        @if ($payments->hasPages())
             <div class="pager">
-                <a class="btn ghost" href="{{ route('admin.orders.index', array_merge(request()->query(), ['page' => max(1, $page - 1)])) }}">قبلی</a>
-                <span>صفحه {{ $page }} از {{ $pages }}</span>
-                <a class="btn ghost" href="{{ route('admin.orders.index', array_merge(request()->query(), ['page' => min($pages, $page + 1)])) }}">بعدی</a>
+                {{ $payments->links() }}
             </div>
         @endif
     </div>
+
+    {{-- مودال جزئیات سفارش از layouts/admin می‌آید و با data-order-details روی
+         هر دکمه‌ی «جزئیات» باز می‌شود. --}}
 @endsection

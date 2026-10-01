@@ -605,4 +605,16 @@ class ConnectixService
     {
         return rtrim((string) config('connectix_bot.connectix.base_url'), '/').$endpoint;
     }
+
+    /**
+     * Deep link to one account inside the seller panel.
+     *
+     * The API base is api.connectix.vip, which is a different host from the
+     * panel the admin actually works in, so the two are not interchangeable
+     * and the panel link is built from its own configured base.
+     */
+    public function clientPanelUrl(string $clientId): string
+    {
+        return rtrim((string) config('connectix_bot.connectix.panel_url'), '/').'/client/'.rawurlencode($clientId);
+    }
 }

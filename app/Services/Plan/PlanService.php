@@ -6,6 +6,7 @@ namespace App\Services\Plan;
 
 use App\Exceptions\ConnectixApiException;
 use App\Services\Connectix\ConnectixService;
+use App\Services\Panel\PanelSettingsService;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
@@ -49,8 +50,14 @@ class PlanService
      */
     private const TITLE_PATTERN = '/^\((\d+)x\)\s*(Free-)?(?:([\d.]+)GB-)?(?:Unlimited-)?(\d+)([WMYD])?(?:\s*\+\s*(\d+)D)?\s*(.*)$/';
 
+    /**
+     * The settings service carries the plan group labels: they are editable in
+     * the panel, so `config()` alone would show a stale name in the purchase
+     * menu after an admin renames a group.
+     */
     public function __construct(
         private readonly ConnectixService $connectix,
+        private readonly PanelSettingsService $settings,
     ) {}
 
     // -----------------------------------------------------------------
@@ -349,7 +356,9 @@ class PlanService
      */
     public function parseType(string $type): string
     {
-        $groups = config('connectix_bot.plan_groups', []);
+        // The labels come from the settings service, which falls back to config
+        // for a group the admin has never renamed.
+        $groups = $this->settings->planGroupNames();
 
         return match ($type) {
             'default' => $groups['default'] ?? 'ویژه',

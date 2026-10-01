@@ -291,6 +291,19 @@ img, svg { vertical-align: middle; }
     box-shadow: 0 8px 20px -8px color-mix(in srgb, var(--accent) 80%, transparent);
 }
 
+/* With a real photo the letter is only a fallback underneath it, so the tile
+   is rounded-square rather than a circle and the photo covers it edge to edge. */
+.brand .mark.has-photo { border-radius: 11px; }
+.brand .mark img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: inherit;
+}
+.brand .mark { position: relative; overflow: hidden; }
+
 .brand .name { display: flex; flex-direction: column; line-height: 1.25; min-width: 0; }
 .brand .name small {
     font-weight: 500;
@@ -298,7 +311,14 @@ img, svg { vertical-align: middle; }
     color: var(--text-faint);
     letter-spacing: .04em;
     text-transform: uppercase;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
+
+/* A Telegram handle is English, so it must not be letter-spaced, uppercased
+   and truncated the way the static caption was. */
+.brand .name small.handle { letter-spacing: 0; text-transform: none; font-size: 12px; }
 
 .sidebar nav {
     padding: 14px 12px;
@@ -586,6 +606,22 @@ th {
 th:first-child { border-start-start-radius: var(--radius); border-end-start-radius: var(--radius); }
 th:last-child  { border-start-end-radius: var(--radius); border-end-end-radius: var(--radius); }
 
+/* An English value inside a Persian table cell: the panel is RTL, so the value
+   has to sit against the right edge like the Farsi text next to it, but read
+   left to right. `direction: ltr` alone would push it to the left edge (start
+   of an LTR box), and the existing `[dir=ltr]` cells did exactly that - a
+   chat id floating at the far end of a Persian cell. So the run is isolated
+   as LTR for ordering and aligned explicitly to the inline start of the
+   page. The panel is always rendered with dir="rtl" (both layouts hardcode
+   it), so "right" is that start edge. */
+td.ltr, th.ltr,
+.kv .cell .v.ltr,
+.mini-table td.ltr {
+    direction: ltr;
+    unicode-bidi: isolate;
+    text-align: right;
+}
+
 tbody tr { transition: background var(--dur) var(--ease); }
 tbody tr:hover td { background: color-mix(in srgb, var(--accent) 7%, transparent); }
 tbody tr:last-child td { border-bottom: 0; }
@@ -660,7 +696,9 @@ button:disabled, .btn:disabled, button[disabled] {
    [hidden] rule, so hidden must be restated here or an element the JS hides
    (the modal's delete form) would stay visible. */
 [hidden] { display: none !important; }
-.inline-form button { padding: 6px 13px; font-size: var(--fs-sm); }
+/* دکمه‌های داخل این فرم‌ها (حذف اکانت، تایید/رد سفارش، خروج) اندازه‌ی
+   استاندارد را نگه می‌دارند تا با دکمه‌ی «بستن» مودال‌ها یکی باشند؛
+   قبلاً این‌جا کوچک‌تر می‌شدند و کنار هم ناهماهنگ دیده می‌شدند. */
 
 .actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 14px; }
 
@@ -708,6 +746,74 @@ select { appearance: none; background-image: linear-gradient(45deg, transparent 
 }
 [dir="ltr"] select { background-position: calc(100% - 24px) calc(50% + 2px), calc(100% - 18px) calc(50% + 2px); }
 
+/* --------------------------------------------------------- file inputs --
+   The browser's bare file control (grey button + "no file chosen") never
+   belonged to this panel, and ::file-selector-button is the only part of a
+   file input a stylesheet may paint. So the whole control is dressed as a
+   drop-area: a dashed surface row holding a themed pill. Hover, focus and an
+   actual drag over it light up in the accent; the file name the browser
+   prints after the pill inherits the input's own colour.
+
+   The rule is selector-driven rather than a class, so every upload in the
+   app (guide videos, broadcast media, anything added later) picks it up with
+   no markup change. */
+input[type="file"] {
+    display: block;
+    width: 100%;
+    font-family: inherit;
+    font-size: var(--fs-md);
+    color: var(--text-dim);
+    padding: 9px 12px;
+    border-radius: 12px;
+    border: 1.5px dashed color-mix(in srgb, var(--text-faint) 60%, transparent);
+    background: color-mix(in srgb, var(--surface-2) 85%, transparent);
+    cursor: pointer;
+    transition: border-color var(--dur) var(--ease), background var(--dur) var(--ease),
+                box-shadow var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+
+input[type="file"]:hover {
+    border-color: color-mix(in srgb, var(--accent) 65%, transparent);
+    background: var(--accent-soft);
+    color: var(--text);
+}
+
+/* .is-dragover is toggled by the layout script while files are dragged over
+   the control; :hover alone cannot tell a drop from a pass-by. */
+input[type="file"].is-dragover {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+    color: var(--text);
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+/* The picker pill inside the row: the surface treatment of the panel's ghost
+   buttons, so «انتخاب فایل» reads as an action next to the file name. It is
+   not matched by the global `button` rules, so it carries its own states. */
+input[type="file"]::file-selector-button {
+    font-family: inherit;
+    font-size: var(--fs-sm);
+    font-weight: 600;
+    color: var(--text);
+    background: var(--surface-solid);
+    border: 1px solid var(--border-strong);
+    border-radius: 10px;
+    padding: 6px 14px;
+    margin-inline-end: 10px;
+    cursor: pointer;
+    transition: color var(--dur) var(--ease), background var(--dur) var(--ease),
+                border-color var(--dur) var(--ease);
+}
+
+input[type="file"]::file-selector-button:hover {
+    color: var(--accent-text);
+    background: var(--accent-soft);
+    border-color: var(--accent);
+}
+
+input[type="file"]:disabled { opacity: .55; cursor: not-allowed; }
+input[type="file"]:disabled::file-selector-button { cursor: not-allowed; }
+
 .field { margin-bottom: 16px; }
 
 .row {
@@ -715,6 +821,96 @@ select { appearance: none; background-image: linear-gradient(45deg, transparent 
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
     gap: 14px;
     align-items: end;
+}
+
+/* A second row of fields inside one card. Consecutive .row blocks otherwise
+   touch, so the second group of inputs reads as part of the first. */
+.row-spaced {
+    margin-top: 22px;
+}
+
+/* Two cards that share one form (the guide sections have a single save
+   button). .content lays its children out with a gap, and this form is one of
+   those children, so the cards inside it need the gap from here instead. */
+.form-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.hint {
+    font-size: var(--fs-xs, 12px);
+    margin-top: 6px;
+}
+
+/* Setup instructions for a feature the panel cannot configure by itself.
+   Collapsed by default: the docs are needed once, when wiring the phone, and
+   the toggles are what an admin comes back to. */
+.doc-note {
+    margin-top: 22px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface-2, rgba(127, 127, 127, .06));
+    padding: 4px 16px;
+}
+
+.doc-note > summary {
+    cursor: pointer;
+    padding: 12px 0;
+    font-weight: 600;
+    color: var(--text-dim);
+    list-style-position: inside;
+}
+
+.doc-note[open] > summary {
+    border-bottom: 1px solid var(--border);
+}
+
+.doc-block {
+    padding: 16px 0;
+}
+
+.doc-block + .doc-block {
+    border-top: 1px dashed var(--border);
+}
+
+.doc-title {
+    font-weight: 600;
+    margin-bottom: 6px;
+}
+
+.app-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.app-links a {
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 7px 14px;
+    font-size: var(--fs-sm, 13px);
+    color: var(--accent);
+    text-decoration: none;
+}
+
+.app-links a:hover {
+    border-color: var(--accent);
+}
+
+/* API address and payloads are English: they read left to right inside an RTL
+   page, so the block is pinned to the start edge. */
+pre.code {
+    margin-top: 10px;
+    padding: 12px 14px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--code-bg, rgba(0, 0, 0, .28));
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    overflow-x: auto;
+    white-space: pre;
 }
 
 .check {
@@ -756,34 +952,277 @@ select { appearance: none; background-image: linear-gradient(45deg, transparent 
 .badge.wait { background: var(--warn-soft); color: var(--warn); border-color: color-mix(in srgb, var(--warn) 35%, transparent); }
 .badge.no   { background: var(--danger-soft); color: var(--danger); border-color: color-mix(in srgb, var(--danger) 35%, transparent); }
 
+/* نشانِ لینک‌دار (چیپ «تلگرام: …» در پنجره‌ی جزئیات کاربر): خودِ قرص
+   می‌ماند و رنگ اکسنت می‌گوید بازش می‌شود. */
+a.badge { color: var(--accent-text); cursor: pointer; }
+a.badge:hover {
+    color: var(--accent-text);
+    background: var(--accent-soft);
+    border-color: var(--accent);
+    text-decoration: none;
+}
+
+/* جستجوی لحظه‌ای لیست کاربران هنگام رفت‌وبرگشت این کلاس را روی کارتِ
+   نتایج می‌گذارد؛ محو شدنِ کوتاه، عوض شدنِ فهرست را از یک پرشِ آنی
+   متمایز می‌کند. */
+.is-loading { opacity: .5; transition: opacity var(--dur) var(--ease); }
+
 .flash, .alert {
-    display: flex;
-    align-items: flex-start;
-    gap: 10px;
-    padding: 13px 16px;
+    position: relative;
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: start;
+    gap: 12px;
+    padding: 14px 16px;
     border-radius: var(--radius);
     font-size: var(--fs-md);
-    border: 1px solid var(--border);
+    line-height: 1.6;
+    font-weight: 500;
+    border: 1px solid var(--border-strong);
     background: var(--surface);
     backdrop-filter: var(--glass);
     -webkit-backdrop-filter: var(--glass);
-    box-shadow: var(--shadow-sm);
-    animation: rise .3s var(--ease) both;
+    box-shadow: var(--shadow-sm), var(--specular);
+    animation: flash-in .34s var(--ease) both;
+    overflow: hidden;
 }
 
+/* A tinted sheen down the inline-start edge: the tone reads from the colour
+   of the stripe before the reader has parsed a single word. */
+.flash::after, .alert::after {
+    content: '';
+    position: absolute;
+    inset-block: 0;
+    inset-inline-start: 0;
+    width: 4px;
+    background: var(--flash-tone, var(--text-faint));
+    opacity: .95;
+}
+
+@keyframes flash-in {
+    from { opacity: 0; transform: translateY(-8px) scale(.99); }
+    to   { opacity: 1; transform: none; }
+}
+
+/* The glyph moves out of the text into its own round plate, so the message
+   itself is a single unbroken block and never reflows around a symbol. */
 .flash::before, .alert::before {
+    content: '';
+    display: grid;
+    place-items: center;
+    width: 26px;
+    height: 26px;
+    flex: 0 0 26px;
+    margin-top: 1px;
+    border-radius: var(--radius-full);
+    font-size: 13px;
     font-weight: 800;
-    flex: 0 0 auto;
+    line-height: 1;
+    color: var(--flash-tone, var(--text-faint));
+    background: color-mix(in srgb, var(--flash-tone, var(--text-faint)) 16%, transparent);
+    border: 1px solid color-mix(in srgb, var(--flash-tone, var(--text-faint)) 34%, transparent);
 }
 
-.flash.success, .flash.ok, .alert.ok     { background: var(--ok-soft);     border-color: color-mix(in srgb, var(--ok) 35%, transparent); }
-.flash.success::before, .flash.ok::before, .alert.ok::before { content: '✓'; color: var(--ok); }
+.flash > *, .alert > * { min-width: 0; }
 
-.flash.warning, .flash.warn, .alert.warn { background: var(--warn-soft);   border-color: color-mix(in srgb, var(--warn) 35%, transparent); }
-.flash.warning::before, .flash.warn::before, .alert.warn::before { content: '!'; color: var(--warn); }
+.flash.success, .flash.ok, .alert.ok {
+    --flash-tone: var(--ok);
+    background: color-mix(in srgb, var(--ok-soft) 72%, var(--surface));
+    border-color: color-mix(in srgb, var(--ok) 34%, transparent);
+}
+.flash.success::before, .flash.ok::before, .alert.ok::before { content: '✓'; }
 
-.flash.error, .flash.bad, .alert.bad     { background: var(--danger-soft); border-color: color-mix(in srgb, var(--danger) 35%, transparent); }
-.flash.error::before, .flash.bad::before, .alert.bad::before { content: '✕'; color: var(--danger); }
+.flash.warning, .flash.warn, .alert.warn {
+    --flash-tone: var(--warn);
+    background: color-mix(in srgb, var(--warn-soft) 72%, var(--surface));
+    border-color: color-mix(in srgb, var(--warn) 34%, transparent);
+}
+.flash.warning::before, .flash.warn::before, .alert.warn::before { content: '!'; }
+
+.flash.error, .flash.bad, .alert.bad {
+    --flash-tone: var(--danger);
+    background: color-mix(in srgb, var(--danger-soft) 72%, var(--surface));
+    border-color: color-mix(in srgb, var(--danger) 34%, transparent);
+}
+.flash.error::before, .flash.bad::before, .alert.bad::before { content: '✕'; }
+
+/* The validation summary, which carries one line per failed field. */
+.flash.error > div + div { margin-top: 2px; }
+
+/* A dismiss button for a flash. The grid above reserves a third column for it;
+   the button is drawn by JS into the slot, so a flash without a close button
+   (server-rendered first paint, before the script runs) is unchanged. */
+.flash .flash-x {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 26px;
+    height: 26px;
+    flex: 0 0 26px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: var(--radius-full);
+    background: transparent;
+    color: var(--flash-tone, var(--text-faint));
+    font-size: 15px;
+    line-height: 1;
+    cursor: pointer;
+    box-shadow: none;
+    transform: none;
+    filter: none;
+    opacity: .65;
+    transition: opacity var(--dur) var(--ease), background var(--dur) var(--ease);
+}
+
+.flash .flash-x:hover {
+    background: color-mix(in srgb, var(--flash-tone, var(--text-faint)) 16%, transparent);
+    opacity: 1;
+}
+
+.flash .flash-x:focus-visible { outline: 2px solid var(--flash-tone, var(--accent)); outline-offset: 2px; }
+
+/* A flash being dismissed slides away instead of vanishing, so the eye can
+   follow which message left the stack. */
+.flash.leaving {
+    animation: flash-out .22s var(--ease) both;
+    pointer-events: none;
+}
+
+@keyframes flash-out {
+    to { opacity: 0; transform: translateY(-6px) scale(.98); margin-bottom: -46px; }
+}
+
+/* "یا" between two alternative inputs, so the guide table says plainly that a
+   row takes one of the two and not both. */
+.th-hint {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0;
+    text-transform: none;
+    color: var(--text-faint);
+    opacity: .7;
+}
+
+/* ------------------------------------------------- zoomable user photos --- */
+
+/* The photo viewer. Separate from the details modal because a photo has
+   nothing to read: on a phone it goes full-bleed, which is what a thumb asks
+   for when it taps an avatar. */
+.photo-lightbox {
+    position: fixed;
+    inset: 0;
+    z-index: 90;
+    display: grid;
+    place-items: center;
+    padding: 24px;
+}
+
+.photo-lightbox[hidden] { display: none; }
+
+.photo-lightbox-layer {
+    position: absolute;
+    inset: 0;
+    background: color-mix(in srgb, #05070d 82%, transparent);
+    backdrop-filter: blur(10px) saturate(140%);
+    -webkit-backdrop-filter: blur(10px) saturate(140%);
+    animation: modal-fade var(--dur) var(--ease) both;
+}
+
+.photo-lightbox-figure {
+    position: relative;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+    max-width: min(560px, 100%);
+    max-height: 100%;
+}
+
+.photo-lightbox-figure img {
+    max-width: 100%;
+    max-height: min(76vh, 760px);
+    border-radius: var(--radius-lg);
+    border: 1px solid rgba(255, 255, 255, .12);
+    box-shadow: 0 40px 90px -30px rgba(0, 0, 0, .75);
+    /* A tall photo is scaled down to fit the viewport, never cropped. */
+    object-fit: contain;
+    background: var(--surface-2);
+    animation: modal-pop var(--dur-slow) var(--ease) both;
+}
+
+.photo-lightbox-figure figcaption {
+    color: color-mix(in srgb, #fff 78%, transparent);
+    font-size: var(--fs-md);
+    font-weight: 600;
+    text-align: center;
+}
+
+.photo-lightbox-figure figcaption:empty { display: none; }
+
+.photo-lightbox-x {
+    position: absolute;
+    top: -14px;
+    inset-inline-end: -14px;
+    width: 38px;
+    height: 38px;
+    display: grid;
+    place-items: center;
+    padding: 0;
+    border-radius: var(--radius-full);
+    border: 1px solid rgba(255, 255, 255, .16);
+    background: rgba(12, 16, 26, .78);
+    color: #fff;
+    font-size: 16px;
+    line-height: 1;
+    cursor: pointer;
+    box-shadow: 0 10px 24px -10px rgba(0, 0, 0, .6);
+    transition: transform var(--dur) var(--ease), background var(--dur) var(--ease);
+}
+
+.photo-lightbox-x:hover { background: rgba(28, 34, 50, .9); transform: scale(1.06); }
+.photo-lightbox-x:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+
+/* The photo half of an avatar button. Only the photo zooms; the row's own
+   "جزئیات" affordance is a separate button, so the two intents stay
+   separate targets instead of one button that opens two different things. */
+.avatar-btn .avatar-photo {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: inherit;
+    cursor: zoom-in;
+}
+
+/* --------------------------------------------- money direction in lists --- */
+
+/* A ledger row says which way the money went before the amount is read, so the
+   direction does not have to be inferred from the word "افزایش"/"کاهش". The
+   tone is carried by the value itself plus a sign, not by the whole row, so a
+   hover highlight still reads. */
+.money-up, .money-down {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.money-up { color: var(--ok); }
+.money-down { color: var(--danger); }
+
+.money-up::before { content: '▲'; font-size: 9px; }
+.money-down::before { content: '▼'; font-size: 9px; }
+
+@media (max-width: 700px) {
+    .photo-lightbox { padding: 16px; }
+    .photo-lightbox-figure img { max-height: 72vh; border-radius: var(--radius); }
+    /* The close button would hang off the edge of a narrow screen. */
+    .photo-lightbox-x { top: -10px; inset-inline-end: 0; }
+}
 
 /* --------------------------------------------------------------- misc ----- */
 .muted { color: var(--text-faint); font-size: var(--fs-sm); }
@@ -890,8 +1329,6 @@ ul.plain { list-style: none; padding: 0; margin: 8px 0; }
     box-shadow: 0 8px 18px -10px color-mix(in srgb, var(--accent) 100%, transparent);
 }
 .steps .done { background: var(--ok-soft); color: var(--ok); border-color: color-mix(in srgb, var(--ok) 35%, transparent); }
-
-.client-details { direction: ltr; text-align: left; font-family: var(--font-mono); font-size: var(--fs-sm); }
 
 /* pagination (Laravel's default markup) */
 .pager { margin-top: 18px; }
@@ -1043,6 +1480,15 @@ nav[role="navigation"] li a, nav[role="navigation"] li span {
     box-shadow: none;
 }
 .icon-btn:hover { color: var(--accent-text); border-color: var(--accent); background: var(--accent-soft); transform: none; }
+/* پیوندِ بازگشت توپار، .icon-btn را می‌پوشد ولی <button> نیست تا قاعده‌ی
+   سراسریِ inline-flex وسط‌چین را بگیرد؛ اینجا باید گفته شود. */
+a.icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+    text-decoration: none;
+}
 
 .swatches { display: flex; align-items: center; gap: 6px; }
 .swatch {
@@ -1105,6 +1551,50 @@ nav[role="navigation"] li a, nav[role="navigation"] li span {
 
 @keyframes modal-fade { from { opacity: 0; } }
 @keyframes modal-pop  { from { opacity: 0; transform: translateY(16px) scale(.985); } }
+
+/* A dialog that asks one yes/no question has no body to be wide for, so it is
+   sized to its question instead of to the 820px of a detail sheet. */
+.modal-card.sm {
+    width: min(460px, 100%);
+    max-height: none;
+}
+
+.modal-card.sm .modal-head { border-bottom: 0; }
+.modal-card.sm .modal-foot { justify-content: flex-end; }
+.modal-card.sm .modal-foot .btn { min-width: 108px; }
+
+/* The glyph in a confirm dialog carries the tone: a danger action is red, a
+   soft one takes the accent. A glyph rather than an icon font, so there is no
+   extra request to make the dialog look finished. */
+.confirm-glyph {
+    display: grid;
+    place-items: center;
+    width: 38px;
+    height: 38px;
+    flex: none;
+    border-radius: var(--radius-full);
+    background: var(--accent-soft);
+    color: var(--accent-text);
+    font-size: 19px;
+    font-weight: 800;
+    line-height: 1;
+}
+
+.confirm-glyph.danger {
+    background: var(--danger-soft);
+    color: var(--danger);
+}
+
+/* The body text of a confirm dialog is the question itself, not a caption,
+   so it is allowed to wrap - the shared `.sub` is a single ellipsised line,
+   which would cut a long question ("... از دیتابیس و از پنل Connectix حذف
+   می‌شود") off mid-sentence. */
+.modal-card.sm .modal-head .sub {
+    white-space: normal;
+    overflow: visible;
+    max-width: 42ch;
+    line-height: 1.65;
+}
 
 .modal-head {
     display: flex;
@@ -1199,6 +1689,97 @@ nav[role="navigation"] li a, nav[role="navigation"] li span {
     word-break: break-all;
 }
 
+/* The bank-SMS deposit sheet: three cards side by side with the purchase card
+   spanning beneath them - the shape the legacy panel used. Each card is a
+   modal-section (so the heading keeps its accent tick) on the same raised
+   surface .kv cells use, with label/value rows instead of nested cells. */
+.sms-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+    min-width: 0;
+}
+
+.sms-grid > .wide { grid-column: 1 / -1; }
+
+@media (max-width: 860px) {
+    .sms-grid { grid-template-columns: 1fr; }
+}
+
+.sms-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px;
+    min-width: 0;
+}
+
+.sms-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 8px 0;
+    border-bottom: 1px dashed var(--border);
+    font-size: var(--fs-md);
+}
+
+.sms-row:last-child { border-bottom: 0; padding-bottom: 0; }
+
+.sms-row .k {
+    color: var(--text-dim);
+    font-weight: 600;
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.sms-row .v {
+    font-weight: 600;
+    min-width: 0;
+    text-align: end;
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 6px;
+    word-break: break-word;
+}
+
+.sms-row .v.empty { color: var(--text-faint); font-weight: 500; }
+
+.sms-row .v.ltr {
+    direction: ltr;
+    text-align: end;
+    font-family: var(--font-mono);
+    font-size: var(--fs-sm);
+    font-weight: 500;
+    word-break: break-all;
+}
+
+.sms-message {
+    white-space: pre-line;
+    line-height: 1.9;
+    font-size: var(--fs-sm);
+    color: var(--text);
+    word-break: break-word;
+    overflow-wrap: anywhere;
+}
+
+.sms-pair {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+    gap: 18px;
+}
+
+.sms-pair h5 {
+    margin: 0 0 4px;
+    font-size: var(--fs-sm);
+    color: var(--text-dim);
+    font-weight: 700;
+}
+
 .mini-btn {
     border: 1px solid var(--border);
     background: transparent;
@@ -1214,6 +1795,57 @@ nav[role="navigation"] li a, nav[role="navigation"] li span {
 
 .mini-btn:hover { color: var(--accent-text); border-color: var(--accent); background: var(--accent-soft); }
 .mini-btn.done { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 45%, transparent); }
+
+/* A read-only list of things inside a modal (the accounts of a user). The
+   shared `.chip` is styled for the landing page's centred marketing row, so
+   the modal gets its own list: left aligned, tinted by the same status tones
+   the badges use, and a real bullet so an empty label still reads as a row. */
+.chip-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: flex-start;
+}
+
+.chip-list .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    font-size: var(--fs-sm);
+    padding: 6px 12px;
+    border-radius: var(--radius-full);
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    font-weight: 600;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.chip-list .chip.ok   { background: var(--ok-soft);     color: var(--ok);     border-color: color-mix(in srgb, var(--ok) 35%, transparent); }
+.chip-list .chip.wait { background: var(--warn-soft);   color: var(--warn);   border-color: color-mix(in srgb, var(--warn) 35%, transparent); }
+.chip-list .chip.no   { background: var(--danger-soft); color: var(--danger); border-color: color-mix(in srgb, var(--danger) 35%, transparent); }
+
+/* The last-orders block inside the user modal. It is a table like any other
+   but it lives in a scrolling modal, so it drops the 560px floor the page
+   tables use: that floor is what makes a wide table scroll the page on a
+   phone, and here there is nothing to reveal by scrolling sideways. */
+.mini-table {
+    min-width: 0;
+    font-size: var(--fs-sm);
+}
+
+.mini-table th, .mini-table td { padding: 9px 10px; }
+
+.mini-table th {
+    font-size: 10px;
+    letter-spacing: .05em;
+}
+
+.mini-table td { color: var(--text-dim); }
+.mini-table td:first-child { color: var(--text); font-weight: 600; }
 
 .link-line {
     display: flex;
@@ -1265,7 +1897,11 @@ nav[role="navigation"] li a, nav[role="navigation"] li span {
 /* rows that open something on click */
 tr[data-client-details] { cursor: pointer; transition: background var(--dur) var(--ease); }
 tr[data-client-details]:hover { background: var(--accent-soft); }
-tr[data-client-details]:hover .client-details { border-color: var(--accent); color: var(--accent-text); }
+/* سطرِ جدول اکانت‌ها هم مثل سطر کاربران خودش هدف کلیک است؛ حاشیه و
+   رنگ دکمه‌ی «جزئیات» همان چیزی است که قبلاً با کلاس .client-details
+   روی خودِ دکمه بود — حالا که آن کلاس (که فونت مونو می‌داد) از دکمه
+   برداشته شده، هاور به سلول نتیجه می‌گیرد نه به کلاسی که دیگر نیست. */
+tr[data-client-details]:hover .cell-actions .btn.ghost { border-color: var(--accent); color: var(--accent-text); }
 
 /* ---------------------------------------------------------- responsive ---- */
 @media (max-width: 980px) {
@@ -1490,6 +2126,7 @@ body::before {
 }
 
 .content { padding: 24px 22px 72px; gap: 22px; }
+.form-stack { gap: 22px; }
 
 /* --- surfaces: frosted with a bright edge ------------------------------- */
 .card, .stat, .modal-card, .auth-card, .log {
@@ -1786,6 +2423,37 @@ select option:disabled {
     border-radius: inherit;
 }
 
+/* An avatar that opens something. It is a real <button> (Tab + Enter work,
+   and the aria-label names it), so the generic button styling has to be taken
+   back off: only the ring, the lift and the focus ring are kept. */
+.avatar-btn {
+    appearance: none;
+    -webkit-appearance: none;
+    padding: 0;
+    border: 1px solid var(--border);
+    cursor: pointer;
+    box-shadow: none;
+    background: var(--grad-accent);
+    transform: none;
+    filter: none;
+    transition: transform var(--dur) var(--ease), border-color var(--dur) var(--ease),
+                box-shadow var(--dur) var(--ease);
+}
+
+.avatar-btn:hover {
+    transform: translateY(-2px) scale(1.06);
+    filter: none;
+    box-shadow: 0 8px 20px -8px color-mix(in srgb, var(--accent) 85%, transparent);
+    border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+}
+
+.avatar-btn:active { transform: translateY(0) scale(1); }
+
+.avatar-btn:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
 .avatar.lg {
     width: 56px;
     height: 56px;
@@ -1805,5 +2473,8 @@ select option:disabled {
 /* The row actions keep two buttons on one line inside the table cell without
    turning the <td> itself into a flex container (which would break the table
    layout). */
+/* سطرِ جدول کاربران خودش یک هدف کلیک‌پذیر است (پنجره‌ی خلاصه‌ی کاربر)،
+   پس نشانگر باید بگوید زدنِ سطر معنا دارد. */
+tbody tr[data-user-details] { cursor: pointer; }
 .cell-actions { white-space: nowrap; }
 .cell-actions .inline-form + .inline-form { margin-inline-start: 6px; }

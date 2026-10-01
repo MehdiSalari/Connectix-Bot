@@ -312,6 +312,42 @@ class PanelSettingsService
         return is_bool($configured) ? $configured : $default;
     }
 
+    /**
+     * The seller plan groups, keyed by their English group name, with the
+     * labels the admin can rename at runtime.
+     *
+     * Legacy wrote these to setup/bot_config.json and the settings page could
+     * edit them there, so the labels are overrides on top of the config map
+     * rather than config alone. Per group: an override wins when it is not
+     * blank, and the config value is the fallback, so removing an override
+     * restores the shipped spelling instead of emptying the label.
+     *
+     * @return array<string, string>
+     */
+    public function planGroupNames(): array
+    {
+        $groups = (array) config('connectix_bot.plan_groups', []);
+        $out = [];
+
+        foreach ($groups as $group => $label) {
+            $key = 'plan_group_'.$this->groupKey($group);
+            $override = trim($this->string($this->overrides()[$key] ?? null));
+
+            $out[(string) $group] = $override !== '' ? $override : (string) $label;
+        }
+
+        return $out;
+    }
+
+    /**
+     * A group name turned into a settings key: lower case, spaces to
+     * underscores, so 'Business Class' becomes 'plan_group_business_class'.
+     */
+    private function groupKey(string $group): string
+    {
+        return str_replace(' ', '_', strtolower($group));
+    }
+
     // -----------------------------------------------------------------
     // Internals
     // -----------------------------------------------------------------

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Admin;
 
-use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
 use App\Http\Controllers\Controller;
 use App\Models\Payment;
@@ -22,6 +21,13 @@ use Illuminate\View\View;
  * `payments` table and whose search uses the same columns. Accepting or
  * rejecting an order writes the same `is_paid` value the Telegram approval
  * flow writes, so the panel and the callback stay consistent.
+ *
+ * The list is a real paginator. It used to fetch a page of twenty rows and
+ * then drop the ones that did not match the status or method filter in PHP,
+ * so a filtered page could show three rows of twenty and the hand-written
+ * pager it printed counted the unfiltered rows - offering pages that were
+ * empty once a filter was applied. Both filters are SQL now, and the list
+ * uses the same pager view as the users and ledger lists.
  */
 class AdminOrderController extends Controller
 {
@@ -34,36 +40,13 @@ class AdminOrderController extends Controller
         $query = trim((string) $request->query('search', ''));
         $status = (string) $request->query('status', '');
         $method = (string) $request->query('method', '');
-        $page = max(1, (int) $request->query('page', 1));
 
-        $items = $this->payments->search($query, $page, 20);
-
-        if ($status !== '' || $method !== '') {
-            $items = $items->filter(function (Payment $payment) use ($status, $method): bool {
-                $matchesStatus = match ($status) {
-                    'pending' => $payment->is_paid->isPending(),
-                    '0' => $payment->is_paid->value === '0',
-                    '1' => $payment->is_paid->value === '1',
-                    default => true,
-                };
-
-                $matchesMethod = $method === ''
-                    || ($payment->method instanceof PaymentMethod && $payment->method->value === $method);
-
-                return $matchesStatus && $matchesMethod;
-            });
-        }
-
-        $total = $this->payments->countSearchResults($query);
-
-        $pages = (int) ceil($total / 20);
+        $orders = $this->payments->paginate($query, $status, $method, 20);
 
         return view('admin.orders.index', [
             'appName' => app(PanelSettingsService::class)->appName(),
-            'payments' => $items,
-            'page' => $page,
-            'pages' => max(1, $pages),
-            'total' => $total,
+            'payments' => $orders,
+            'total' => $orders->total(),
             'search' => $query,
             'status' => $status,
             'method' => $method,

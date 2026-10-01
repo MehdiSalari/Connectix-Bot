@@ -75,6 +75,10 @@ class AdminClientController extends Controller
 
         $payload = [
             'client' => $client,
+            // A deep link into the seller panel, so an admin can act on the
+            // account where the panel shows the full record: the modal is a
+            // read-only summary of what the API chose to return.
+            'panel_url' => $this->connectix->clientPanelUrl($clientId),
             'local' => $local === null ? null : [
                 'username' => $local->username,
                 'count_of_devices' => $local->count_of_devices,

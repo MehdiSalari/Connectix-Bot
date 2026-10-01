@@ -29,6 +29,23 @@ class AdminGuideController extends Controller
     /** Standard platforms, in the order legacy saved them. */
     private const PLATFORMS = ['use', 'android', 'ios', 'windows', 'mac', 'linux'];
 
+    /**
+     * Persian names shown in the panel.
+     *
+     * The keys stay the legacy English ones because they are file names
+     * (use.mp4, ios.txt) and the bot addresses them by key; only the label the
+     * administrator reads is translated. `use` is not a platform at all - it is
+     * the general how-to-use guide - which is why the page shows it apart.
+     */
+    private const LABELS = [
+        'use' => 'نحوه استفاده کلی',
+        'android' => 'اندروید',
+        'ios' => 'آی‌اواس',
+        'windows' => 'ویندوز',
+        'mac' => 'مک',
+        'linux' => 'لینوکس',
+    ];
+
     /** Legacy refused anything over 10 MB with a Persian error message. */
     private const MAX_VIDEO_BYTES = 10 * 1024 * 1024;
 
@@ -56,6 +73,7 @@ class AdminGuideController extends Controller
         return view('admin.guides.index', [
             'appName' => app(PanelSettingsService::class)->appName(),
             'platforms' => self::PLATFORMS,
+            'labels' => self::LABELS,
             'existing' => $existing,
             'customItems' => app(GuideService::class)->customItems(),
         ]);
@@ -64,6 +82,7 @@ class AdminGuideController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $errors = [];
+        $touched = false;
         $guidePath = $this->guidePath();
         $customPath = $this->customPath();
 
@@ -84,19 +103,30 @@ class AdminGuideController extends Controller
                 File::delete($guidePath.'/'.$platform.'.txt');
                 $video->move($guidePath, $platform.'.mp4');
 
+                $touched = true;
+
                 continue;
             }
 
             if ($link !== '') {
                 if (! app(GuideService::class)->isValidUrl($link)) {
-                    $errors[] = "[$platform] لینک معتبر نیست.";
+                    $errors[] = "[$platform] لینک معتبر نیست. لینک باید با http:// یا https:// شروع شود.";
 
                     continue;
                 }
 
                 File::delete($guidePath.'/'.$platform.'.mp4');
                 File::put($guidePath.'/'.$platform.'.txt', $link);
+
+                $touched = true;
             }
+
+            // A row that submits neither is left alone rather than refused.
+            // The six platforms share one table, and that table is also the
+            // edit form: setting one platform means the other five sit there
+            // empty, so treating "untouched" as "invalid" would make every
+            // save fail until all six were filled in. The rule that matters is
+            // on the entries that are being created, below.
         }
 
         $title = trim((string) $request->input('custom_title', ''));
@@ -116,16 +146,29 @@ class AdminGuideController extends Controller
                     } else {
                         File::delete($customPath.'/'.$slug.'.txt');
                         $video->move($customPath, $slug.'.mp4');
+                        $touched = true;
                     }
                 } elseif ($link !== '') {
                     if (! app(GuideService::class)->isValidUrl($link)) {
-                        $errors[] = "[$title] لینک معتبر نیست.";
+                        $errors[] = "[$title] لینک معتبر نیست. لینک باید با http:// یا https:// شروع شود.";
                     } else {
                         File::delete($customPath.'/'.$slug.'.mp4');
                         File::put($customPath.'/'.$slug.'.txt', $link);
+                        $touched = true;
                     }
+                } else {
+                    // A titled custom guide with neither a video nor a link is
+                    // an entry the bot would offer and then be unable to
+                    // deliver, so it is refused instead of stored as a title
+                    // with no content behind it. This is the rule "a guide
+                    // takes a link or a video" actually has to enforce.
+                    $errors[] = "[$title] آموزشی ثبت نشد: یا ویدیو بگذارید یا لینک بدهید.";
                 }
             }
+        }
+
+        if (! $touched && $errors === []) {
+            $errors[] = 'هیچ آموزشی برای ذخیره نبود: در هر ردیف یا ویدیو بگذارید یا لینک بدهید.';
         }
 
         if ($errors !== []) {

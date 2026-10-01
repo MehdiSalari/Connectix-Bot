@@ -8,6 +8,7 @@ use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
 use App\Models\Payment;
 use App\Models\User;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\QueryException;
@@ -159,6 +160,41 @@ class PaymentService
             ->orderByDesc('created_at')
             ->forPage($page, $perPage)
             ->get();
+    }
+
+    /**
+     * The admin order list as a real paginator.
+     *
+     * The controller used to call {@see self::search()} and then filter the
+     * 20 returned rows in PHP, which meant a page could show three rows out
+     * of a page of twenty and the pager it printed counted the *unfiltered*
+     * rows - so filtering for a decided order still offered pages that were
+     * empty. The filters are part of the query here, so the pager the users
+     * and ledger lists already use describes the same set of rows.
+     *
+     * `id` is the second sort key: `created_at` is second-resolution, so
+     * orders placed in the same second used to swap places between pages and
+     * a row could be shown twice and skipped once.
+     */
+    public function paginate(
+        ?string $query = null,
+        string $status = '',
+        string $method = '',
+        int $perPage = 20,
+    ): LengthAwarePaginator {
+        $builder = $this->searchQuery($query);
+
+        // A pending order is the row with a NULL is_paid, not a value: the
+        // tri-state is why the enum has a Pending case that writes null.
+        $builder->when($status === 'pending', fn (Builder $nested) => $nested->whereNull('payments.is_paid'))
+            ->when(in_array($status, ['0', '1'], true), fn (Builder $nested) => $nested->where('payments.is_paid', $status))
+            ->when($method !== '', fn (Builder $nested) => $nested->where('payments.method', $method));
+
+        return $builder
+            ->orderByDesc('payments.created_at')
+            ->orderByDesc('payments.id')
+            ->paginate($perPage)
+            ->withQueryString();
     }
 
     /**

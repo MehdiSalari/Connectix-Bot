@@ -9,10 +9,13 @@ use App\Services\Guide\GuideService;
 use App\Services\Panel\PanelSettingsService;
 use App\Services\Setup\ApplicationKey;
 use App\Services\Telegram\AdminGuard;
+use App\Services\Telegram\TelegramProfileService;
 use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Contracts\View\View as ViewContract;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\URL;
+use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
 
@@ -52,6 +55,7 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->configureLoginThrottle();
+        $this->shareBotProfile();
 
         if (! config('app.debug')) {
             // Exception traces keep the first fifteen characters of every
@@ -106,6 +110,21 @@ class AppServiceProvider extends ServiceProvider
             $email = Str::lower((string) $request->input('email', ''));
 
             return Limit::perMinute(5)->by($email.'|'.$request->ip());
+        });
+    }
+
+    /**
+     * The bot's own photo, available to every view.
+     *
+     * The sidebar brand is on every panel page, so the profile cannot be
+     * passed down by each controller that happens to render one. The service
+     * caches the answer for hours and returns an empty profile in tests, so
+     * sharing it costs nothing: one cache read per request, no network.
+     */
+    private function shareBotProfile(): void
+    {
+        View::composer('*', static function (ViewContract $view): void {
+            $view->with('botProfile', app(TelegramProfileService::class)->botProfile());
         });
     }
 

@@ -6,6 +6,14 @@
     <meta name="color-scheme" content="dark light">
     <title>{{ $appName ?? 'پنل مدیریت' }}{{ isset($title) && $title !== '' ? ' | '.$title : '' }}</title>
 
+    {{-- The icon is declared explicitly rather than left to the /favicon.ico
+         probe: the .ico in public/ was a zero byte file, so the tab showed
+         whatever the browser fell back to. The SVG scales to the tab strip,
+         the PNG covers browsers that ignore it. --}}
+    <link rel="icon" href="{{ asset('favicon.svg') }}" type="image/svg+xml">
+    <link rel="icon" href="{{ asset('favicon-32.png') }}" sizes="32x32" type="image/png">
+    <link rel="apple-touch-icon" href="{{ asset('favicon-32.png') }}">
+
     {{-- Theme is resolved before the first paint so the panel never flashes. --}}
     <script>
         (function () {
@@ -32,10 +40,14 @@
     <div class="shell">
         <aside class="sidebar" id="sidebar">
             <div class="brand">
-                <span class="mark">C</span>
+                {{-- برند: عکس خودِ ربات تلگرام. همان اسکریپ t.me که عکس کاربران را
+                     می‌آورد، اینجا هم کش می‌شود (TelegramProfileService::botProfile)،
+                     پس تایم‌اوت تلگرام صفحه را معطل نمی‌کند و اگر لینک عکس مرده باشد
+                     onerror حرف اول نام را نمایان می‌کند. --}}
+                <span class="mark{{ ! empty($botProfile['avatar']) ? ' has-photo' : '' }}" aria-hidden="true">{{ mb_strtoupper(mb_substr(trim((string) ($appName ?? '')) !== '' ? (string) $appName : 'C', 0, 1)) }}@if (! empty($botProfile['avatar']))<img src="{{ $botProfile['avatar'] }}" alt="" loading="lazy" onerror="this.remove()">@endif</span>
                 <span class="name">
                     {{ $appName ?? 'پنل مدیریت' }}
-                    <small>Connectix Bot</small>
+                    <small class="{{ ! empty($botProfile['username']) ? 'handle' : '' }}">@if (! empty($botProfile['username']))<span dir="ltr">&#64;{{ $botProfile['username'] }}</span>@else Connectix Bot @endif</small>
                 </span>
                 <button type="button" class="nav-close" data-nav-close
                         aria-label="بستن منو">✕</button>
@@ -86,6 +98,19 @@
             <div class="topbar">
                 <div class="flex items-center gap-3">
                     <button type="button" class="burger" data-nav-toggle aria-label="باز و بسته کردن منو">☰</button>
+                    {{-- صفحات جزئی (مثل پروفایل کاربر) در منوی کناری ردیفی
+                         ندارند، پس بدون این دکمه راه برگشتی جز نوار آدرس
+                         ندارند. layout با $back فعال می‌شود؛ هر صفحه آدرسِ
+                         مادرش را می‌دهد تا لینک بدون تاریخچه هم کار کند
+                         (باز کردن مستقیم URL). فلش در RTL به راست می‌چپد چون
+                         «قبلی» در این چیدمان سمت راست است. --}}
+                    @isset($back)
+                        <a href="{{ $back }}" class="icon-btn" title="بازگشت" aria-label="بازگشت به صفحه قبل">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                 stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"
+                                 aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+                        </a>
+                    @endisset
                     <h1>{{ $title ?? '' }}</h1>
                 </div>
 
@@ -138,9 +163,78 @@
         </div>
     </div>
 
+    {{-- تایید عملیات به‌جای confirm() مرورگر: هر فرمی با data-confirm="متن"
+         اول همین دیالوگ را نشان می‌دهد. حذف اکانت، حذف آموزش و هر عملیات
+         برگشت‌ناپذیر دیگری از همین مسیر می‌رود. --}}
+    @include('partials.confirm')
+
     {{-- جزئیات اکانت روی همه‌ی صفحات در دسترس است: هر المنتی با
          data-client-details="<client id>" همین مودال را باز می‌کند. --}}
     @include('partials.client-details')
+
+    {{-- جزئیات کاربر (#3): آواتار هر ردیف لیست کاربران این مودال را باز می‌کند.
+         و جزئیات سفارش (#5.2): دکمه‌ی «جزئیات» در لیست سفارش‌ها. هر دو با
+         data-user-details / data-order-details صدا زده می‌شوند و هر دو
+         فقط-خواندنی هستند، پس ادمین و ادیتور هر دو می‌توانند بازشان کنند. --}}
+    @include('partials.user-details')
+    @include('partials.order-details')
+
+    {{-- جزئیات واریز بانکی (#): data-sms-details روی هر سطرِ لیست پیامک‌های
+         بانکی این مودال را باز می‌کند. فقط‌خواندنی است، پس ادمین و ادیتور
+         هر دو می‌توانند بازش کنند. --}}
+    @include('partials.sms-details')
+
+    {{-- تاریخچه‌ی کیف پول و بزرگ‌نمایی عکس. هر دو روی همه‌ی صفحات‌اند: هر
+         دکمه‌ای با data-wallet-history یا data-photo همین‌ها را باز می‌کند. --}}
+    @include('partials.wallet-history')
+    @include('partials.photo-lightbox')
+
+    <script>
+        (function () {
+            /* The overlay stack.
+             *
+             * Sheets can be nested (user details from inside an order, the photo
+             * lightbox from a header avatar, the confirm dialog over the client
+             * sheet), which broke three things that used to be independent
+             * per-sheet concerns:
+             *
+             *  - scroll lock: closing the inner sheet used to unlock the page
+             *    while the outer one was still open, so the page scrolled behind
+             *    a visible modal;
+             *  - Escape: every sheet listens on the document, so one press
+             *    closed all of them at once;
+             *  - stacking: the sheets carry no z-index of their own, so they
+             *    painted in include order - the user sheet is included before
+             *    the order sheet and used to open *behind* it.
+             *
+             * The stack answers all three. It is explicit rather than read back
+             * from the DOM because the includes are not in visual order.
+             */
+            var layerStack = [];
+            var LAYER_BASE = 200;   // above the drawer and header (z-index 90)
+
+            window.cxLayerOpen = function (element) {
+                if (layerStack.indexOf(element) === -1) {
+                    element.style.zIndex = String(LAYER_BASE + layerStack.length * 10);
+                    layerStack.push(element);
+                }
+                document.body.style.overflow = 'hidden';
+            };
+
+            window.cxLayerClose = function (element) {
+                var at = layerStack.indexOf(element);
+                if (at !== -1) {
+                    layerStack.splice(at, 1);
+                    element.style.removeProperty('z-index');
+                }
+                if (layerStack.length === 0) document.body.style.overflow = '';
+            };
+
+            window.cxIsTopLayer = function (element) {
+                return layerStack[layerStack.length - 1] === element;
+            };
+        })();
+    </script>
 
     <script>
         (function () {
@@ -204,6 +298,41 @@
                     root.dataset.accent = s.dataset.accent;
                     try { localStorage.setItem('cx-accent', s.dataset.accent); } catch (e) {}
                     paintSwatches();
+                });
+            });
+
+            // Dismissible flash messages. The button is added here rather than
+            // in the markup so the first paint is plain server HTML, and the
+            // reserved grid column collapses to nothing once it is gone.
+            document.querySelectorAll('.flash, .alert').forEach(function (flash) {
+                var close = document.createElement('button');
+                close.type = 'button';
+                close.className = 'flash-x';
+                close.setAttribute('aria-label', 'بستن پیام');
+                close.textContent = '✕';
+                close.addEventListener('click', function () {
+                    flash.classList.add('leaving');
+                    setTimeout(function () { flash.remove(); }, 220);
+                });
+                flash.appendChild(close);
+            });
+
+            /* File inputs double as drop targets (the browser fills them from
+             * a drop natively) so they light up while files are over them.
+             * A depth counter, not a bare toggle: the control's internal
+             * button fires its own enter/leave pair and a single leave would
+             * kill the highlight mid-drag. preventDefault on dragover is what
+             * actually allows the drop in every browser. */
+            document.querySelectorAll('input[type="file"]').forEach(function (input) {
+                var depth = 0;
+                var paint = function (on) { input.classList.toggle('is-dragover', on); };
+                input.addEventListener('dragover', function (event) { event.preventDefault(); });
+                input.addEventListener('dragenter', function () { depth++; paint(true); });
+                input.addEventListener('dragleave', function () {
+                    if (--depth <= 0) { depth = 0; paint(false); }
+                });
+                ['drop', 'dragend'].forEach(function (name) {
+                    input.addEventListener(name, function () { depth = 0; paint(false); });
                 });
             });
         })();

@@ -54,6 +54,8 @@ class AdminSettingsController extends Controller
             'test' => $this->settings->flag('connectix_bot.test_enabled', 'test', true),
             'bot_active' => $this->settings->flag('connectix_bot.active', 'bot_active', true),
             'force_channel_join' => $this->settings->flag('connectix_bot.force_channel_join', 'force_channel_join', false),
+            // نام گروه سرویس‌ها: قابل‌ویرایش، پس از استور نخوانده می‌شود نه از config.
+            'plan_groups' => $this->settings->planGroupNames(),
         ];
 
         return view('admin.settings.index', [
@@ -85,7 +87,7 @@ class AdminSettingsController extends Controller
             'test' => ['sometimes', Rule::in(['0', '1'])],
             'bot_active' => ['sometimes', Rule::in(['0', '1'])],
             'force_channel_join' => ['sometimes', Rule::in(['0', '1'])],
-        ]);
+        ] + $this->planGroupRules($request));
 
         $values = [
             'app_name' => $data['app_name'],
@@ -106,7 +108,7 @@ class AdminSettingsController extends Controller
             'test' => $request->boolean('test') ? '1' : '0',
             'bot_active' => $request->boolean('bot_active') ? '1' : '0',
             'force_channel_join' => $request->boolean('force_channel_join') ? '1' : '0',
-        ];
+        ] + $this->planGroupValues($request);
 
         $this->settings->saveOverrides($values);
 
@@ -127,6 +129,50 @@ class AdminSettingsController extends Controller
         return $webhookStatus === 'error' || $panelStatus === 'error'
             ? back()->with('warning', $notice)
             : back()->with('success', $notice);
+    }
+
+    /**
+     * Validation rules for the posted plan group labels, one per configured
+     * group, so an unknown field name is rejected instead of silently stored.
+     *
+     * @return array<string, array<int, string>>
+     */
+    private function planGroupRules(Request $request): array
+    {
+        $rules = [];
+
+        foreach (array_keys((array) config('connectix_bot.plan_groups', [])) as $group) {
+            $field = 'plan_group_'.str_replace(' ', '_', strtolower((string) $group));
+
+            // Blank is allowed and means "use the shipped label": the field is
+            // a rename, not a required field.
+            $rules[$field] = ['sometimes', 'nullable', 'string', 'max:60'];
+        }
+
+        return $rules;
+    }
+
+    /**
+     * The posted labels as override rows.
+     *
+     * A blank field is written as an empty row rather than skipped: the stored
+     * value is the rename, so leaving a previous name in place would make it
+     * impossible to go back to the shipped label. An empty override reads as
+     * "not renamed" in {@see PanelSettingsService::planGroupNames()}.
+     *
+     * @return array<string, string>
+     */
+    private function planGroupValues(Request $request): array
+    {
+        $values = [];
+
+        foreach (array_keys((array) config('connectix_bot.plan_groups', [])) as $group) {
+            $field = 'plan_group_'.str_replace(' ', '_', strtolower((string) $group));
+
+            $values[$field] = trim((string) $request->input($field, ''));
+        }
+
+        return $values;
     }
 
     /**

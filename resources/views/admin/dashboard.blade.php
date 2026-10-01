@@ -51,9 +51,9 @@
             <tbody>
                 @forelse ($recent_users as $user)
                     <tr>
-                        <td dir="ltr">{{ $user->chat_id }}</td>
+                        <td class="ltr">{{ $user->chat_id }}</td>
                         <td>{{ $user->name ?? '-' }}</td>
-                        <td dir="ltr">{{ $user->telegram_id ?? '-' }}</td>
+                        <td class="ltr">{{ $user->telegram_id ?? '-' }}</td>
                         <td>{{ $user->created_at?->format('Y-m-d H:i') }}</td>
                         <td><a class="btn ghost" href="{{ route('admin.users.show', $user) }}">مشاهده</a></td>
                     </tr>
@@ -80,7 +80,7 @@
             <tbody>
                 @forelse ($recent_payments as $payment)
                     <tr>
-                        <td dir="ltr">{{ $payment->order_number }}</td>
+                        <td class="ltr">{{ $payment->order_number }}</td>
                         <td>@if ($payment->user?->name) {{ $payment->user->name }} @else <span class="muted">-</span> @endif</td>
                         <td>{{ number_format($payment->priceAmount()) }}</td>
                         <td>{{ $payment->method->label() }}</td>

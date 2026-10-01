@@ -26,8 +26,15 @@
             <tbody>
                 @forelse ($transactions as $tx)
                     <tr>
-                        <td dir="ltr">{{ $tx->chat_id }}</td>
-                        <td>{{ number_format((int) $tx->amount) }}</td>
+                        <td class="ltr">{{ $tx->chat_id }}</td>
+                        <td>
+                            {{-- جهت پول با رنگ و فلش گفته می‌شود، نه فقط با کلمه‌ی
+                                 «افزایش»/«کاهش». --}}
+                            <span class="{{ $tx->operation === \App\Enums\WalletOperation::Increase ? 'money-up' : 'money-down' }}">
+                                {{ number_format((int) $tx->amount) }}
+                            </span>
+                            <span class="muted">تومان</span>
+                        </td>
                         <td>{{ $tx->operation->label() }}</td>
                         <td>{{ $tx->type->label() }}</td>
                         <td><span class="badge {{ $tx->status->isPending() ? 'wait' : ($tx->status->value === 'SUCCESS' ? 'ok' : 'no') }}">{{ $tx->status->labelForAdmin() }}</span></td>
