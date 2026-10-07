@@ -12,17 +12,20 @@ use App\Services\Connectix\ConnectixService;
 use App\Services\Migration\LegacyImportService;
 use App\Services\Panel\PanelSettingsService;
 use App\Services\Setup\DatabaseTester;
+use App\Services\Setup\ImportSpawner;
+use App\Services\Setup\ImportProgress;
 use App\Services\Setup\InstallationService;
 use App\Services\Setup\SetupStateStore;
+use App\Services\Setup\SetupImporter;
 use App\Services\Setup\SetupWizard;
-use App\Services\Sync\ClientSyncService;
-use App\Services\Sync\WalletSyncService;
 use App\Services\Telegram\TelegramService;
 use App\Support\EnvWriter;
 use App\Support\LogRedaction;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
@@ -54,6 +57,8 @@ class SetupWizardController extends Controller
         private readonly TelegramService $telegram,
         private readonly ConnectixService $connectix,
         private readonly PanelSettingsService $settings,
+        private readonly SetupImporter $importer,
+        private readonly ImportSpawner $spawner,
     ) {}
 
     // -----------------------------------------------------------------
@@ -381,8 +386,16 @@ class SetupWizardController extends Controller
         if ($admin instanceof Admin) {
             $admin->fill($values)->save();
         } else {
-            Admin::query()->create($values + ['email' => (string) $data['email']]);
+            $admin = Admin::query()->create($values + ['email' => (string) $data['email']]);
         }
+
+        // Creating this row is what makes the application count as installed,
+        // and ProtectSetup answers 404 to an installed wizard unless the caller
+        // is a signed in admin. The person who just wrote the credentials is
+        // that admin, so they are signed in here - otherwise the redirect that
+        // follows lands on /setup/bot-config as a 404 for the installer
+        // themselves.
+        Auth::guard('admin')->login($admin);
 
         // Legacy kept the admin chat id in the panel bot config too, and the
         // rewrite reads it from the environment when the panel has nothing.
@@ -539,63 +552,128 @@ class SetupWizardController extends Controller
             $this->env->set($values)->apply();
         }
 
-        $dryRun = ! $request->boolean('confirm');
-        $lines = [];
+        // The credentials are in `.env` by now — exactly where a spawned
+        // child re-reads them from. The payload carries only what to run, so
+        // no secret ever sits in a file or on a command line.
+        $inputs = [
+            'dryRun' => ! $request->boolean('confirm'),
+            'tables' => $request->input('tables') ?: null,
+        ];
 
-        try {
-            $report = app(LegacyImportService::class)->import(
-                only: $request->input('tables') ?: null,
-                dryRun: $dryRun,
-                chunk: 200,
-                onLine: function (string $line) use (&$lines): void {
-                    if (count($lines) < 200) {
-                        $lines[] = $line;
-                    }
-                },
-            );
-        } catch (Throwable $e) {
-            Log::error('The installer could not read the legacy database.', ['detail' => $this->redact($e->getMessage())]);
-            $this->store->markFailed(SetupStep::Import->value, $this->safeMessage($e));
-
-            return redirect()->route('setup.show', ['step' => SetupStep::Import->value])
-                ->withErrors(['import' => 'خواندن دیتابیس قبلی ناموفق بود. اتصال را بررسی کنید.']);
+        if ($this->outOfProcess()) {
+            return $this->dispatchImport('legacy', $inputs);
         }
 
-        return redirect()->route('setup.show', ['step' => SetupStep::Import->value])
-            ->with('status', $dryRun
-                ? 'حالت آزمایشی اجرا شد؛ چیزی نوشته نشد.'
-                : 'انتقال اطلاعات انجام شد.')
-            ->with('report', $report)
-            ->with('log', implode(PHP_EOL, $lines));
+        return $this->finishImport($this->importer->legacy($inputs));
     }
 
     private function importFromPanel(): RedirectResponse
     {
-        $lines = [];
-        $writer = function (string $line) use (&$lines): void {
-            if (count($lines) < 200) {
-                $lines[] = $line;
-            }
-        };
-
-        try {
-            // A page cap, not the whole panel: the wizard is an HTTP request on a
-            // shared host. Running it again continues where this stopped, which
-            // is what the daily sync job does afterwards anyway.
-            $clients = app(ClientSyncService::class)->sync($writer, 5);
-            $wallets = app(WalletSyncService::class)->sync($writer);
-        } catch (Throwable $e) {
-            Log::error('The installer could not sync from the seller panel.', ['detail' => $this->redact($e->getMessage())]);
-            $this->store->markFailed(SetupStep::Import->value, $this->safeMessage($e));
-
-            return redirect()->route('setup.show', ['step' => SetupStep::Import->value])
-                ->withErrors(['import' => 'خواندن اطلاعات از پنل ناموفق بود.']);
+        if ($this->outOfProcess()) {
+            return $this->dispatchImport('panel', []);
         }
 
-        return redirect()->route('setup.show', ['step' => SetupStep::Import->value])
-            ->with('status', 'اطلاعات پنل خوانده شد.')
-            ->with('report', ['clients' => $clients, 'wallets' => $wallets])
-            ->with('log', implode(PHP_EOL, $lines));
+        return $this->finishImport($this->importer->panel());
+    }
+
+    /**
+     * Run the import in its own process instead of inside this request.
+     *
+     * Auto mode: the built-in dev server (`artisan serve` on Windows) answers
+     * one request at a time, so a multi-minute import POST would starve the
+     * progress endpoint — and the whole application — until it finished. On a
+     * server that answers requests in parallel (Apache, FPM) and in the test
+     * suite, the original inline flow runs unchanged. The value in
+     * config/setup.php (`CONNECTIX_IMPORT_DRIVER`) overrides the detection.
+     */
+    private function outOfProcess(): bool
+    {
+        $driver = (string) config('setup.import_driver', 'auto');
+
+        if ($driver === 'auto') {
+            return PHP_SAPI === 'cli-server';
+        }
+
+        return $driver === 'process';
+    }
+
+    /**
+     * Mark the run active, hand it to a child process, redirect: the tab
+     * polls the progress file the child keeps writing, and the server stays
+     * free for every other request while the import runs.
+     */
+    private function dispatchImport(string $action, array $inputs): RedirectResponse
+    {
+        $step = route('setup.show', ['step' => SetupStep::Import->value]);
+        $state = ImportProgress::read();
+
+        // A killed child can leave `active` behind forever, so only a file
+        // that is still being written counts as a running import: a stale
+        // state heals by starting a new run instead of blocking the button.
+        $running = $state['active']
+            && $state['updated_at'] !== null
+            && (microtime(true) - (float) $state['updated_at']) < 60;
+
+        if ($running) {
+            return redirect($step)
+                ->with('status', 'یک ایمپورت از قبل در جریان است؛ تا پایان آن صبر کنید.');
+        }
+
+        // Written before the spawn, so the redirecting page load already sees
+        // an active run and starts polling from its very first request.
+        ImportProgress::start($action, $action === 'legacy' ? 'انتقال اطلاعات نصب قبلی' : 'خواندن مشتریان از پنل');
+
+        if (! $this->spawner->dispatch($action, ['inputs' => $inputs])) {
+            $message = 'راه‌اندازی پروسهٔ ایمپورت ممکن نشد؛ storage/logs/setup-import.log را بررسی کنید.';
+            $this->store->markFailed(SetupStep::Import->value, $message);
+            ImportProgress::fail($message);
+
+            return redirect($step)->withErrors(['import' => $message]);
+        }
+
+        return redirect($step);
+    }
+
+    /**
+     * An inline run reports through this request's flash messages, which the
+     * redirecting page then renders.
+     *
+     * @param  array<string, mixed>  $result
+     */
+    private function finishImport(array $result): RedirectResponse
+    {
+        $redirect = redirect()->route('setup.show', ['step' => SetupStep::Import->value]);
+
+        if (! ($result['ok'] ?? false)) {
+            return $redirect->withErrors(['import' => (string) ($result['error'] ?? 'انتقال انجام نشد.')]);
+        }
+
+        return $redirect
+            ->with('status', $result['status'])
+            ->with('report', $result['report'])
+            ->with('log', $result['log']);
+    }
+
+    /**
+     * The live import counters, read by the import step while its POST runs.
+     *
+     * Mirrors legacy setup/setup_progress.php: a short, unthrottled GET that
+     * reports percent/phase/log lines to whichever tab is watching.
+     */
+    public function importProgress(Request $request): JsonResponse
+    {
+        // These polls run every 700ms while the import POST is still running,
+        // and every session request ages the flash. ONE intervening poll is
+        // enough to delete the `report`/`status`/`log`/errors the POST wrote
+        // just before its redirect, so the page would render without them.
+        // Renewing the flash on every read keeps the notices alive exactly as
+        // long as a tab is watching; once polling stops, the next request
+        // consumes them the normal way.
+        if ($request->hasSession()) {
+            $request->session()->reflash();
+        }
+
+        return response()->json(ImportProgress::read());
     }
 
     // -----------------------------------------------------------------

@@ -7,8 +7,11 @@ namespace Tests\Feature;
 use App\Enums\AdminRole;
 use App\Enums\SetupState;
 use App\Models\Admin;
+use App\Models\Client;
 use App\Services\Setup\ApplicationKey;
 use App\Services\Setup\InstallationService;
+use App\Services\Setup\ImportProgress;
+use App\Services\Setup\ImportSpawner;
 use App\Services\Setup\SetupStateStore;
 use App\Support\EnvWriter;
 use Illuminate\Foundation\Testing\DatabaseMigrations;
@@ -500,6 +503,34 @@ class SetupTest extends TestCase
     }
 
     #[Test]
+    public function the_admin_step_signs_the_operator_in_so_the_rest_of_the_wizard_stays_open(): void
+    {
+        // The very request that creates the first admin is what makes the
+        // application count as installed, and an installed installer answers
+        // 404 to anyone who is not signed in as an admin. Without this, the
+        // step immediately after the admin form - /setup/bot-config - was a
+        // 404 for the person who had just installed the product.
+        $this->configureApplication(withoutAdmin: true);
+        Http::fake();
+
+        $this->post('/setup/admin', [
+            'email' => 'owner@example.com',
+            'password' => 'a-strong-password',
+            'password_confirmation' => 'a-strong-password',
+            'chat_id' => '123456789',
+            'role' => 'admin',
+        ])->assertRedirect('/setup/bot-config');
+
+        $this->assertTrue(app(InstallationService::class)->isInstalled());
+
+        $admin = Admin::query()->where('email', 'owner@example.com')->firstOrFail();
+        $this->assertAuthenticatedAs($admin, 'admin');
+
+        $this->get('/setup/bot-config')->assertOk();
+        $this->get('/setup/import')->assertOk();
+    }
+
+    #[Test]
     public function re_running_the_admin_step_updates_only_the_typed_account(): void
     {
         $this->configureApplication();
@@ -743,6 +774,317 @@ class SetupTest extends TestCase
         $this->expectException(\RuntimeException::class);
 
         (new EnvWriter)->set(['BAD KEY' => 'value']);
+    }
+
+    #[Test]
+    public function panel_import_reads_every_page_and_reports_live_percent(): void
+    {
+        $this->configureApplication();
+        $this->actingAsOwner();
+
+        // 12 pages of 20 = 240 clients: far beyond the 5-page cap the wizard
+        // used to stop at, which silently left most of the panel unimported.
+        Http::fake(function ($request) {
+            $url = $request->url();
+            $qs = [];
+            parse_str((string) parse_url($url, PHP_URL_QUERY), $qs);
+
+            if (str_contains($url, '/v1/seller/clients/show')) {
+                $id = (int) ($qs['id'] ?? 0);
+
+                return Http::response([
+                    'client' => [
+                        'id' => $id,
+                        'chat_id' => $id + 40000,
+                        'username' => 'user'.($id - 1000),
+                        'password' => 'secret',
+                        'user_id' => $id,
+                        'count_of_devices' => 0,
+                        'created_at' => '2026-01-01 00:00:00',
+                    ],
+                ], 200);
+            }
+
+            if (str_contains($url, '/v1/seller/clients')) {
+                $page = max(1, (int) ($qs['page'] ?? 1));
+                $rows = [];
+
+                if ($page <= 12) {
+                    for ($i = 0; $i < 20; $i++) {
+                        $id = 1000 + ($page - 1) * 20 + $i;
+                        $rows[] = [
+                            'id' => $id,
+                            'chat_id' => $id + 40000,
+                            'username' => 'user'.($id - 1000),
+                            'password' => 'secret',
+                            'user_id' => $id,
+                            'count_of_devices' => 0,
+                            'created_at' => '2026-01-01 00:00:00',
+                        ];
+                    }
+                }
+
+                return Http::response([
+                    'clients' => [
+                        'data' => $rows,
+                        'current_page' => $page,
+                        'last_page' => 12,
+                        'total' => 240,
+                        'next_page_url' => $page < 12
+                            ? 'https://api.connectix.vip/v1/seller/clients?page='.($page + 1)
+                            : null,
+                    ],
+                ], 200);
+            }
+
+            // The wallet list: an empty "data" list ends its pagination loop.
+            return Http::response(['data' => []], 200);
+        });
+
+        $this->post('/setup/import', ['action' => 'panel'])
+            ->assertRedirect('/setup/import');
+
+        $this->assertSame(240, Client::count(), 'every page of the panel must be imported, not just the first 5');
+
+        $progress = ImportProgress::read();
+        $this->assertSame('panel', $progress['action']);
+        $this->assertFalse($progress['failed']);
+        $this->assertTrue($progress['done']);
+        $this->assertSame(100, $progress['percent']);
+        $this->assertSame(240, $progress['processed']);
+        $this->assertSame(240, $progress['total']);
+
+        // The endpoint the import step polls while that POST is still running.
+        $this->get('/setup/import/progress')
+            ->assertOk()
+            ->assertJsonPath('action', 'panel')
+            ->assertJsonPath('done', true)
+            ->assertJsonPath('percent', 100);
+    }
+
+    #[Test]
+    public function panel_import_report_survives_the_progress_polls(): void
+    {
+        $this->configureApplication();
+        $this->actingAsOwner();
+
+        // One page is enough: this test is about the flash, not pagination.
+        Http::fake(function ($request) {
+            $url = $request->url();
+            $qs = [];
+            parse_str((string) parse_url($url, PHP_URL_QUERY), $qs);
+
+            if (str_contains($url, '/v1/seller/clients/show')) {
+                $id = (int) ($qs['id'] ?? 0);
+
+                return Http::response([
+                    'client' => [
+                        'id' => $id,
+                        'chat_id' => $id + 40000,
+                        'username' => 'user'.$id,
+                        'password' => 'secret',
+                        'user_id' => $id,
+                        'count_of_devices' => 0,
+                        'created_at' => '2026-01-01 00:00:00',
+                    ],
+                ], 200);
+            }
+
+            if (str_contains($url, '/v1/seller/clients')) {
+                return Http::response([
+                    'clients' => [
+                        'data' => [
+                            [
+                                'id' => 1001,
+                                'chat_id' => 41001,
+                                'username' => 'user1001',
+                                'password' => 'secret',
+                                'user_id' => 1001,
+                                'count_of_devices' => 0,
+                                'created_at' => '2026-01-01 00:00:00',
+                            ],
+                        ],
+                        'current_page' => 1,
+                        'last_page' => 1,
+                        'total' => 1,
+                        'next_page_url' => null,
+                    ],
+                ], 200);
+            }
+
+            return Http::response(['data' => []], 200);
+        });
+
+        $this->post('/setup/import', ['action' => 'panel'])
+            ->assertRedirect('/setup/import');
+
+        // The page polls this every 700ms. The polls run while the POST's
+        // flash (`report`) is still fresh: if the endpoint shared the session
+        // it would age the flash away and the redirecting GET would render
+        // the page WITHOUT the import report. Regression: report lost to a poll.
+        $this->get('/setup/import/progress')
+            ->assertOk()
+            ->assertJsonPath('done', true);
+
+        $this->get('/setup/import')
+            ->assertOk()
+            ->assertSee('گزارش انتقال');
+    }
+
+    #[Test]
+    public function background_import_dispatches_a_child_process_instead_of_blocking_the_server(): void
+    {
+        $this->configureApplication();
+        $this->actingAsOwner();
+        config(['setup.import_driver' => 'process']);
+
+        $spawner = new class extends ImportSpawner
+        {
+            /** @var array<int, array{action: string, payload: array<string, mixed>}> */
+            public array $dispatched = [];
+
+            public function dispatch(string $action, array $payload): bool
+            {
+                $this->dispatched[] = ['action' => $action, 'payload' => $payload];
+
+                return true;
+            }
+        };
+        $this->app->instance(ImportSpawner::class, $spawner);
+
+        // No Http::fake and no import work in this process: a dispatched run
+        // does all its HTTP in the child, which is the point of the driver.
+        $this->post('/setup/import', ['action' => 'panel'])
+            ->assertRedirect('/setup/import');
+
+        $this->assertCount(1, $spawner->dispatched, 'the wizard must spawn exactly one child');
+        $this->assertSame('panel', $spawner->dispatched[0]['action']);
+        $this->assertArrayHasKey('inputs', $spawner->dispatched[0]['payload']);
+
+        // The redirecting page load must see an active run at once, or the
+        // tab would paint nothing until the child's first write landed.
+        $progress = ImportProgress::read();
+        $this->assertTrue($progress['active'], 'dispatch must mark the run active before spawning');
+
+        $this->getJson('/setup/import/progress')
+            ->assertOk()
+            ->assertJsonPath('active', true)
+            ->assertJsonPath('action', 'panel');
+
+        // Leave no active state behind for whatever runs next.
+        ImportProgress::finish('test cleanup');
+    }
+
+    #[Test]
+    public function a_spawn_failure_fails_the_run_visibly_instead_of_hanging_the_button(): void
+    {
+        $this->configureApplication();
+        $this->actingAsOwner();
+        config(['setup.import_driver' => 'process']);
+
+        $spawner = new class extends ImportSpawner
+        {
+            public function dispatch(string $action, array $payload): bool
+            {
+                return false;
+            }
+        };
+        $this->app->instance(ImportSpawner::class, $spawner);
+
+        $this->post('/setup/import', ['action' => 'panel'])
+            ->assertRedirect('/setup/import')
+            ->assertSessionHasErrors('import');
+
+        $progress = ImportProgress::read();
+        $this->assertTrue($progress['failed'], 'a failed spawn must fail the visible run');
+        $this->assertFalse($progress['active']);
+    }
+
+    #[Test]
+    public function setup_import_command_consumes_the_payload_and_files_the_report(): void
+    {
+        $this->configureApplication();
+
+        Http::fake(function ($request) {
+            $url = $request->url();
+
+            if (str_contains($url, '/v1/seller/clients/show')) {
+                $qs = [];
+                parse_str((string) parse_url($url, PHP_URL_QUERY), $qs);
+                $id = (int) ($qs['id'] ?? 0);
+
+                return Http::response([
+                    'client' => [
+                        'id' => $id,
+                        'chat_id' => $id + 40000,
+                        'username' => 'user'.$id,
+                        'password' => 'secret',
+                        'user_id' => $id,
+                        'count_of_devices' => 0,
+                        'created_at' => '2026-01-01 00:00:00',
+                    ],
+                ], 200);
+            }
+
+            if (str_contains($url, '/v1/seller/clients')) {
+                return Http::response([
+                    'clients' => [
+                        'data' => [
+                            [
+                                'id' => 1001,
+                                'chat_id' => 41001,
+                                'username' => 'user1001',
+                                'password' => 'secret',
+                                'user_id' => 1001,
+                                'count_of_devices' => 0,
+                                'created_at' => '2026-01-01 00:00:00',
+                            ],
+                        ],
+                        'current_page' => 1,
+                        'last_page' => 1,
+                        'total' => 1,
+                        'next_page_url' => null,
+                    ],
+                ], 200);
+            }
+
+            return Http::response(['data' => []], 200);
+        });
+
+        // This is what ImportSpawner writes before spawning the command.
+        file_put_contents(
+            ImportSpawner::payloadPath(),
+            json_encode(['action' => 'panel', 'inputs' => []], JSON_UNESCAPED_UNICODE),
+        );
+
+        $this->artisan('setup:import')->assertExitCode(0);
+
+        $progress = ImportProgress::read();
+        $this->assertTrue($progress['done']);
+        $this->assertSame(100, $progress['percent']);
+        $this->assertSame('panel', $progress['action']);
+        $this->assertSame(1, $progress['report']['clients']['processed'] ?? null, 'the report must travel in the progress file');
+        $this->assertFileDoesNotExist(ImportSpawner::payloadPath(), 'the payload must be consumed on the first run');
+    }
+
+    #[Test]
+    public function import_report_renders_from_the_progress_file_when_the_flash_is_gone(): void
+    {
+        $this->configureApplication();
+        $this->actingAsOwner();
+
+        // An out-of-process run has no request left to carry a flash by the
+        // time it finishes: the closing report lives in the progress file and
+        // the import step must find it there after the final navigation.
+        ImportProgress::start('panel', 'خواندن مشتریان از پنل');
+        ImportProgress::finish('خواندن اطلاعات از پنل تمام شد.', [
+            'clients' => ['processed' => 7, 'total' => 7],
+            'wallets' => ['processed' => 3, 'total' => 3],
+        ]);
+
+        $this->get('/setup/import')
+            ->assertOk()
+            ->assertSee('گزارش انتقال');
     }
 
     // -----------------------------------------------------------------

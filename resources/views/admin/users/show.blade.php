@@ -28,7 +28,7 @@
             >{{ mb_substr(trim((string) ($user->name ?? '')) !== '' ? (string) $user->name : (string) $user->chat_id, 0, 1) }}@if ($user->avatar)<img class="avatar-photo" src="{{ $user->avatar }}" alt="" loading="lazy" onerror="this.remove()">@endif</span>
             <div>
                 <h2>{{ $user->name ?? 'بدون نام' }} <span class="muted">· شناسه گفتگو {{ $user->chat_id }}</span></h2>
-                <p class="muted">تلگرام: @if (filled($user->telegram_id))<a href="https://t.me/{{ ltrim($user->telegram_id, '@') }}" target="_blank" rel="noopener" dir="ltr">{{ $user->telegram_id }}</a>@else-@endif · عضویت: {{ $user->created_at?->format('Y-m-d H:i') }} · اکانت تست: {{ $user->hasUsedTest() ? 'استفاده شده' : 'استفاده نشده' }}</p>
+                <p class="muted">تلگرام: @if (filled($user->telegram_id))<a href="https://t.me/{{ ltrim($user->telegram_id, '@') }}" target="_blank" rel="noopener" dir="ltr">{{ '@' }}{{ $user->telegram_id }}</a>@else-@endif · عضویت: {{ $user->created_at?->format('Y-m-d H:i') }} · اکانت تست: {{ $user->hasUsedTest() ? 'استفاده شده' : 'استفاده نشده' }}</p>
             </div>
         </div>
     </div>

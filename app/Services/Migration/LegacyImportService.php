@@ -67,12 +67,16 @@ class LegacyImportService
      * Import every table, or only the ones named.
      *
      * @param  array<int, string>|null  $only
+     * @param  (callable(string, int, int): void)|null  $onTable  called after each table: (table, tables done, tables total)
      * @return array<string, array{read: int, written: int, skipped: int, failed: int}>
      */
-    public function import(?array $only = null, bool $dryRun = false, int $chunk = 500, ?callable $onLine = null): array
+    public function import(?array $only = null, bool $dryRun = false, int $chunk = 500, ?callable $onLine = null, ?callable $onTable = null): array
     {
         $report = [];
         $tables = $only === null ? array_keys(self::TABLES) : array_values($only);
+        $known = array_values(array_filter($tables, static fn (string $table): bool => isset(self::TABLES[$table])));
+        $total = count($known);
+        $done = 0;
 
         foreach ($tables as $table) {
             if (! isset(self::TABLES[$table])) {
@@ -86,6 +90,11 @@ class LegacyImportService
             }
 
             $report[$table] = $this->importTable($table, $dryRun, $chunk, $onLine);
+            $done++;
+
+            if ($onTable !== null) {
+                $onTable($table, $done, $total);
+            }
         }
 
         return $report;

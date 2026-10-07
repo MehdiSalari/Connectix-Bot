@@ -38,11 +38,12 @@ class ClientSyncService
 
     /**
      * @param  callable(string $line): void  $onLine  Progress reporter, one line per client.
-     * @return array{processed: int, users: int, clients: int, skipped: int, pages: int}
+     * @param  (callable(array{processed: int, users: int, clients: int, skipped: int, pages: int, total: int}): void)|null  $onPage  called after each page with the running stats
+     * @return array{processed: int, users: int, clients: int, skipped: int, pages: int, total: int}
      */
-    public function sync(callable $onLine, int $maxPages = 0): array
+    public function sync(callable $onLine, int $maxPages = 0, ?callable $onPage = null): array
     {
-        $stats = ['processed' => 0, 'users' => 0, 'clients' => 0, 'skipped' => 0, 'pages' => 0];
+        $stats = ['processed' => 0, 'users' => 0, 'clients' => 0, 'skipped' => 0, 'pages' => 0, 'total' => 0];
         $previousIds = null;
 
         for ($page = 1; $maxPages < 1 || $page <= $maxPages; $page++) {
@@ -58,6 +59,10 @@ class ClientSyncService
             }
 
             $stats['pages'] = $page;
+
+            if ($stats['total'] === 0) {
+                $stats['total'] = (int) ($payload['clients']['total'] ?? $payload['total_clients'] ?? 0);
+            }
 
             if ($rows === []) {
                 break;
@@ -111,6 +116,10 @@ class ClientSyncService
                 $stats['clients'],
                 $stats['skipped'],
             ));
+
+            if ($onPage !== null) {
+                $onPage($stats);
+            }
         }
 
         return $stats;

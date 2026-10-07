@@ -236,7 +236,7 @@
             grid.appendChild(cell('ایمیل', c.email));
             grid.appendChild(cell('تلفن', c.phone, { mono: true }));
             grid.appendChild(cell('شناسه گفتگو', c.chat_id, { mono: true, copy: true }));
-            grid.appendChild(cell('تلگرام', c.telegram_id, { mono: true, link: t(c.telegram_id) }));
+            grid.appendChild(cell('تلگرام', '@' + c.telegram_id, { mono: true, link: t(c.telegram_id) }));
             grid.appendChild(cell('تاریخ انقضا', c.expire_date));
             grid.appendChild(cell('تعداد دستگاه', c.count_of_devices));
             grid.appendChild(cell('افزوده توسط', c.added_by));

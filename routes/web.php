@@ -74,6 +74,12 @@ Route::post('/bank/sms', BankSmsController::class)
 |
 */
 
+// The import step polls this while its own long POST is still running, so it
+// sits outside the throttled group below: throttle:30,1 would 429 the reader.
+Route::prefix('setup')->name('setup.')->middleware(['setup.protect'])->group(function (): void {
+    Route::get('/import/progress', [SetupWizardController::class, 'importProgress'])->name('import.progress');
+});
+
 Route::prefix('setup')->name('setup.')->middleware(['setup.protect', 'throttle:30,1'])->group(function (): void {
     Route::get('/', [SetupWizardController::class, 'index'])->name('index');
     Route::get('/done', [SetupWizardController::class, 'done'])->name('done');

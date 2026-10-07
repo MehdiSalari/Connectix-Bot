@@ -52,6 +52,27 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Import driver
+    |--------------------------------------------------------------------------
+    |
+    | Where the wizard's data import actually runs.
+    |
+    |  auto     - out-of-process on the built-in dev server (it answers one
+    |             request at a time, so an inline import would starve the
+    |             progress polls for the whole run), inline everywhere else.
+    |  process  - always spawn `php artisan setup:import`.
+    |  inline   - always run inside the POST request (needs a server that
+    |             answers requests in parallel: Apache, FPM).
+    |
+    | The test suite runs on the CLI SAPI and never sets this, so `auto`
+    | always resolves to inline there.
+    |
+    */
+
+    'import_driver' => env('CONNECTIX_IMPORT_DRIVER', 'auto'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Environment requirements
     |--------------------------------------------------------------------------
     */

@@ -3,114 +3,304 @@
     نصب نیمه‌کاره بود، اجرای دوباره‌ی همین دکمه‌ها امن است و از همان‌جا ادامه می‌دهد.
 </div>
 
-<h3>انتقال از دیتابیس نصب قبلی</h3>
-<p class="muted">
-    اگر این سرور قبلاً نسخه قدیمی روی همین دیتابیس اجرا می‌شده، ردیف‌های آن را می‌آوریم.
-    بدون تیک «تأیید»، فقط آزمایش اجرا می‌شود و چیزی نوشته نمی‌شود.
-</p>
+{{-- Live counters: the import runs as one long POST while this box polls
+     GET setup.import.progress (legacy did the same via setup_progress.php). --}}
+<div class="card" id="ip-box" hidden>
+    <div id="ip-head">
+        <span id="ip-phase" class="muted">—</span>
+        <strong id="ip-percent">۰٪</strong>
+    </div>
+    <div class="bar"><div id="ip-bar" style="width: 0%"></div></div>
+    <div id="ip-count" class="muted"></div>
+    <pre class="log" id="ip-log" hidden></pre>
+</div>
 
-<form method="post" action="{{ route('setup.import') }}">
+<h3>انتقال از دیتابیس نصب قبلی</h3>
+<form method="POST" action="{{ route('setup.import') }}" class="stack">
     @csrf
     <input type="hidden" name="action" value="legacy">
 
-    <div class="grid">
-        <div class="field">
-            <label for="legacy_host">آدرس دیتابیس قبلی</label>
-            <input type="text" id="legacy_host" name="legacy_host" value="{{ config('database.connections.legacy.host') }}"
-                   placeholder="localhost">
-        </div>
-        <div class="field">
-            <label for="legacy_port">پورت</label>
-            <input type="text" id="legacy_port" name="legacy_port"
-                   value="{{ config('database.connections.legacy.port') ?: '3306' }}" placeholder="3306">
-        </div>
-        <div class="field">
-            <label for="legacy_database">نام دیتابیس قبلی</label>
-            <input type="text" id="legacy_database" name="legacy_database"
-                   value="{{ config('database.connections.legacy.database') }}">
-        </div>
-        <div class="field">
-            <label for="legacy_username">نام کاربری</label>
-            <input type="text" id="legacy_username" name="legacy_username"
-                   value="{{ config('database.connections.legacy.username') }}" autocomplete="off">
-        </div>
-        <div class="field">
-            <label for="legacy_password">رمز عبور</label>
-            <input type="password" id="legacy_password" name="legacy_password" autocomplete="new-password">
+    <div class="form-grid two">
+        <label>
+            <span>هاست دیتابیس</span>
+            <input type="text" name="db_host" value="{{ old('db_host', $env['DB_HOST'] ?? '') }}">
+        </label>
+        <label>
+            <span>پورت</span>
+            <input type="text" name="db_port" value="{{ old('db_port', $env['DB_PORT'] ?? '3306') }}">
+        </label>
+        <label>
+            <span>نام دیتابیس</span>
+            <input type="text" name="db_database" value="{{ old('db_database', $env['DB_DATABASE'] ?? '') }}">
+        </label>
+        <label>
+            <span>کاربر</span>
+            <input type="text" name="db_username" value="{{ old('db_username', $env['DB_USERNAME'] ?? '') }}">
+        </label>
+        <label>
+            <span>رمز عبور</span>
+            <input type="password" name="db_password" value="{{ old('db_password', $env['DB_PASSWORD'] ?? '') }}">
+        </label>
+        <div class="field-note">
+            <span>توضیحات</span>
+            <p>اگر دیتابیس قبلی روی همین سرور است، همین مقادیر را نگه دارید.</p>
         </div>
     </div>
 
-    <div class="field">
-        <label class="check">
-            <input type="checkbox" name="confirm" value="1">
-            <span>تأیید می‌کنم که این انتقال روی دیتابیس درست انجام شود (بدون این تیک، فقط آزمایش است)</span>
-        </label>
-    </div>
+    <label class="checkbox">
+        <input type="checkbox" name="confirm" value="1" checked>
+        <span>واقعاً بنویس (بدون تیک فقط «حالت آزمایشی» و شمارش رکوردها اجرا می‌شود)</span>
+    </label>
 
     <div class="actions">
-        <button type="submit">انتقال اطلاعات نصب قبلی</button>
+        <button type="submit" class="btn primary">شروع انتقال</button>
+        <a href="{{ route('setup.show', ['step' => 'database']) }}" class="btn ghost">مرحله قبل</a>
+        <a href="{{ route('setup.show', ['step' => 'bot-config']) }}" class="btn">مرحله بعد →</a>
     </div>
 </form>
 
 <h3>خواندن مشتریان از پنل</h3>
 <p class="muted">
     معادل گام آخر نسخه legacy: مشتریان و کیف پول‌ها از پنل فروشنده خوانده می‌شوند.
-    هر بار پنج صفحه خوانده می‌شود تا درخواست طولانی نشود؛ با زمان‌بندی روزانه، بقیه هم خودکار کامل می‌شود.
+    <strong>همه صفحات پنل</strong> خوانده می‌شود (مثلاً ۳۴ صفحه برای ۶۶۶ مشتری) و درصد پیشرفت همین‌جا نمایش داده می‌شود؛
+    تا پایان انتقال نباید آن را کنسل کنید.
 </p>
 
-<form method="post" action="{{ route('setup.import') }}">
+<form method="POST" action="{{ route('setup.import') }}" class="stack">
     @csrf
+    <input type="hidden" name="action" value="panel">
     <div class="actions">
-        <button type="submit" name="action" value="panel">خواندن از پنل</button>
-        <a href="{{ route('setup.show', ['step' => $step->next()->value]) }}">
-            <button type="button" class="secondary">رفتن به {{ $step->next()->label() }}</button>
-        </a>
+        <button type="submit" class="btn primary">خواندن از پنل فروشنده</button>
+        <a href="{{ route('setup.show', ['step' => 'bot-config']) }}" class="btn">مرحله بعد →</a>
     </div>
 </form>
 
-@if (session('report'))
-    <h3>نتیجه</h3>
-    <table>
-        <tr>
-            <th>جدول</th>
-            <th>خوانده</th>
-            <th>نوشته</th>
-            <th>رد شده</th>
-            <th>ناموفق</th>
-        </tr>
-        @foreach (session('report') as $table => $counts)
-            @if (is_array($counts) && isset($counts['read']))
+@php
+    // Flash first — an inline run still sets it. An out-of-process run has no
+    // request left by the time it finishes, so its report travels in the
+    // progress file and is picked up here after the final navigation.
+    $report = session('report');
+    if (! is_array($report) || $report === []) {
+        $report = \App\Services\Setup\ImportProgress::read()['report'] ?? null;
+    }
+@endphp
+@if(is_array($report) && $report !== [])
+    <h3>گزارش انتقال</h3>
+    <div class="table-wrap">
+        <table class="table">
+            <thead>
                 <tr>
-                    <td><code>{{ $table }}</code></td>
-                    <td>{{ $counts['read'] }}</td>
-                    <td>{{ $counts['written'] }}</td>
-                    <td>{{ $counts['skipped'] }}</td>
-                    <td>{{ $counts['failed'] }}</td>
+                    <th>بخش</th>
+                    <th>خوانده</th>
+                    <th>نوشته</th>
+                    <th>رد شده</th>
+                    <th>خطا</th>
                 </tr>
-            @else
-                <tr>
-                    <td><code>{{ $table }}</code></td>
-                    <td colspan="4" class="muted">
-                        @foreach ($counts as $key => $value)
-                            {{ $key }}: {{ is_scalar($value) ? $value : json_encode($value) }}@if (! $loop->last)، @endif
-                        @endforeach
-                    </td>
-                </tr>
-            @endif
-        @endforeach
-    </table>
+            </thead>
+            <tbody>
+                @foreach($report as $name => $counts)
+                    <tr>
+                        <td><strong>{{ $name }}</strong></td>
+                        @if(is_array($counts) && isset($counts['read']))
+                            <td>{{ number_format((int) $counts['read']) }}</td>
+                            <td>{{ number_format((int) ($counts['written'] ?? 0)) }}</td>
+                            <td>{{ number_format((int) ($counts['skipped'] ?? 0)) }}</td>
+                            <td>{{ number_format((int) ($counts['failed'] ?? 0)) }}</td>
+                        @else
+                            <td colspan="4">
+                                @if(is_array($counts))
+                                    @foreach($counts as $k => $v)
+                                        {{ $k }}: {{ is_scalar($v) ? (string) $v : json_encode($v, JSON_UNESCAPED_UNICODE) }}@if(!$loop->last) · @endif
+                                    @endforeach
+                                @else
+                                    {{ $counts }}
+                                @endif
+                            </td>
+                        @endif
+                    </tr>
+                @endforeach
+            </tbody>
+        </table>
+    </div>
 @endif
 
 <h3>وضعیت فعلی جدول‌ها</h3>
-<table>
-    <tr>
-        <th style="width: 40%">جدول</th>
-        <th>تعداد رکورد</th>
-    </tr>
-    @foreach ($stepData['counts'] as $table => $count)
-        <tr>
-            <td><code>{{ $table }}</code></td>
-            <td>{{ number_format($count) }}</td>
-        </tr>
-    @endforeach
-</table>
+<div class="table-wrap">
+    <table class="table">
+        <thead>
+            <tr>
+                <th>جدول</th>
+                <th>تعداد رکورد</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach(($counts ?? []) as $table => $count)
+                <tr>
+                    <td>{{ $table }}</td>
+                    <td>{{ number_format((int) $count) }}</td>
+                </tr>
+            @endforeach
+        </tbody>
+    </table>
+</div>
+
+<style>
+    #ip-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 8px; }
+    #ip-head strong { color: var(--accent); font-variant-numeric: tabular-nums; }
+    #ip-count { font-size: var(--fs-xs); }
+    #ip-log { margin-top: 12px; }
+    form.is-importing button,
+    form.is-importing a { opacity: .55; pointer-events: none; }
+</style>
+
+<script>
+(function () {
+    'use strict';
+
+    const importUrl = @json(route('setup.import'));
+    const progressUrl = @json(route('setup.import.progress'));
+    const forms = Array.from(document.querySelectorAll('form[action="' + importUrl + '"]'));
+    if (!forms.length) return;
+
+    const box = document.getElementById('ip-box');
+    const phaseEl = document.getElementById('ip-phase');
+    const percentEl = document.getElementById('ip-percent');
+    const barEl = document.getElementById('ip-bar');
+    const countEl = document.getElementById('ip-count');
+    const logEl = document.getElementById('ip-log');
+    const fa = (n) => Number(n).toLocaleString('fa-IR');
+
+    let timer = null;
+    let navigated = false;
+    let awaiting = false;
+    let prevUpdated = null;
+    let lastChange = Date.now();
+
+    const lock = () => forms.forEach((f) => f.classList.add('is-importing'));
+    const unlock = () => forms.forEach((f) => f.classList.remove('is-importing'));
+
+    function navigate(url) {
+        if (navigated) return;
+        navigated = true;
+        setTimeout(() => { window.location.href = url; }, 350);
+    }
+
+    function paint(state) {
+        box.hidden = false;
+        const pct = Math.max(0, Math.min(100, Number(state.percent || 0)));
+        percentEl.textContent = fa(pct) + '٪';
+        barEl.style.width = pct + '%';
+        phaseEl.textContent = state.phase || '—';
+        if (state.total) {
+            countEl.textContent = fa(state.processed || 0) + ' از ' + fa(state.total) + ' رکورد';
+        } else {
+            countEl.textContent = state.processed ? fa(state.processed) + ' رکورد' : '';
+        }
+        const lines = (state.lines || []).slice(-8);
+        logEl.hidden = lines.length === 0;
+        logEl.textContent = lines.join('\n');
+        logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    function stop() { awaiting = false; if (timer) { clearInterval(timer); timer = null; } }
+    function start() { awaiting = true; lock(); if (!timer) timer = setInterval(poll, 700); }
+
+    async function poll() {
+        try {
+            const res = await fetch(progressUrl, { headers: { Accept: 'application/json' }, cache: 'no-store' });
+            if (!res.ok) return null;
+            const state = await res.json();
+
+            if (state.updated_at !== prevUpdated) {
+                prevUpdated = state.updated_at;
+                lastChange = Date.now();
+            }
+
+            // Merely opening the page while a finished/stale run sits in the
+            // file: observe silently — painting or navigating here would make
+            // the page reload itself forever.
+            if (!awaiting && !state.active) return state;
+
+            paint(state);
+
+            if (state.failed) {
+                stop();
+                unlock();
+                phaseEl.textContent = state.message || 'ناموفق بود؛ خطا را بررسی کنید.';
+            } else if (state.done) {
+                // The response (with flash messages) is already written: follow it.
+                stop();
+                navigate(importUrl);
+            } else if (Date.now() - lastChange > 60000) {
+                // The import is quiet — a slow panel call, one big legacy table —
+                // or its process died. Unlock so a retry is possible, but KEEP
+                // polling: if writes resume the message is painted over by the
+                // next response, and a run that finishes while this message is up
+                // still navigates to its report. Stopping here would strand the
+                // page on a frozen box forever (the wallets phase alone is silent
+                // for ~20s while one API call runs).
+                unlock();
+                phaseEl.textContent = 'گزارش پیشرفت قطع شد؛ اگر ایمپورت ادامه دارد دکمه را دوباره بزنید.';
+            }
+            return state;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    forms.forEach((form) => {
+        form.addEventListener('submit', (event) => {
+            event.preventDefault();
+
+            paint({ percent: 0, phase: 'در حال شروع انتقال…', lines: [] });
+            lastChange = Date.now();
+            start();
+
+            // NOT form.action: this form contains <input name="action">, and
+            // HTMLFormElement's named-property override makes form.action the
+            // INPUT element itself — the URL would stringify to
+            // "/setup/[object HTMLInputElement]" and answer 405.
+            fetch(importUrl, {
+                method: 'POST',
+                body: new FormData(form),
+                headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'text/html, application/xhtml+xml' },
+                // manual: let the browser hold the 302 instead of following it
+                // invisibly — a hidden follow-up GET would consume the flash
+                // report before the visible reload could show it.
+                redirect: 'manual',
+                credentials: 'same-origin',
+            }).then((response) => {
+                if (response.type === 'opaqueredirect' || response.redirected) {
+                    stop();
+                    navigate(importUrl);
+                    return;
+                }
+                if (response.status === 419) {
+                    stop();
+                    unlock();
+                    phaseEl.textContent = 'نشان CSRF منقضی شده است؛ صفحه تازه‌سازی می‌شود.';
+                    setTimeout(() => window.location.reload(), 900);
+                    return;
+                }
+                stop();
+                unlock();
+                phaseEl.textContent = 'پاسخ ناموفق بود (' + response.status + ')؛ دوباره تلاش کنید.';
+            }).catch(() => {
+                // The connection died, not necessarily the import: the server keeps
+                // running it (ignore_user_abort), so keep watching the endpoint.
+            });
+        });
+    });
+
+    // Re-open an import that is still running (e.g. this tab was reopened).
+    poll().then((state) => { if (state && state.active) start(); });
+
+    // A backgrounded tab gets its timers throttled (or suspended outright):
+    // the moment it becomes visible again, poll immediately instead of
+    // waiting for the next timer tick, so a finished import navigates to its
+    // report as soon as the operator looks back.
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) { poll(); }
+    });
+})();
+</script>

@@ -293,7 +293,11 @@ img, svg { vertical-align: middle; }
 
 /* With a real photo the letter is only a fallback underneath it, so the tile
    is rounded-square rather than a circle and the photo covers it edge to edge. */
-.brand .mark.has-photo { border-radius: 11px; }
+.brand .mark.has-photo {
+    border-radius: 11px;
+    background: none;
+    box-shadow: none;
+}
 .brand .mark img {
     position: absolute;
     inset: 0;
@@ -969,7 +973,7 @@ a.badge:hover {
 
 .flash, .alert {
     position: relative;
-    display: grid;
+    /* display: grid; */
     grid-template-columns: auto 1fr auto;
     align-items: start;
     gap: 12px;
