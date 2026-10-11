@@ -232,7 +232,7 @@ class SetupTest extends TestCase
     {
         $this->configureApplication();
 
-        $this->get('/')->assertOk();
+        $this->get('/')->assertRedirect(route('admin.dashboard'));
         $this->assertTrue(app(InstallationService::class)->isInstalled());
     }
 

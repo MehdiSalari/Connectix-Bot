@@ -17,7 +17,8 @@ use App\Http\Controllers\Telegram\TelegramWebhookController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
-    return view('welcome');
+    // If you whant to have a welcome page, add it here
+    return redirect()->route('admin.dashboard');
 });
 
 /*
