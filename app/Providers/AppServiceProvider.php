@@ -10,6 +10,7 @@ use App\Services\Panel\PanelSettingsService;
 use App\Services\Setup\ApplicationKey;
 use App\Services\Telegram\AdminGuard;
 use App\Services\Telegram\TelegramProfileService;
+use App\Support\JalaliDate;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Contracts\View\View as ViewContract;
 use Illuminate\Http\Request;
@@ -56,6 +57,7 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->configureLoginThrottle();
         $this->shareBotProfile();
+        $this->sharePanelChrome();
 
         if (! config('app.debug')) {
             // Exception traces keep the first fifteen characters of every
@@ -125,6 +127,30 @@ class AppServiceProvider extends ServiceProvider
     {
         View::composer('*', static function (ViewContract $view): void {
             $view->with('botProfile', app(TelegramProfileService::class)->botProfile());
+        });
+    }
+
+    /**
+     * The chrome's own data: app version, today in the Iranian calendar, and
+     * whether the bot is currently switched on.
+     *
+     * The sidebar reads the version off version.txt, the topbar shows the
+     * Jalali date next to a live Tehran clock, and the status pill follows
+     * the bot's runtime toggle. All three are chrome-wide, so like the bot
+     * profile they cannot be handed down by whichever controller renders a
+     * page; and like the bot profile the reads are cheap and safe without
+     * a database: the version file simply may not exist, and the flag falls
+     * back to its config default when the settings table is absent (tests).
+     */
+    private function sharePanelChrome(): void
+    {
+        View::composer('*', static function (ViewContract $view): void {
+            $version = trim((string) @file_get_contents(base_path('version.txt')));
+
+            $view->with('panelVersion', $version !== '' ? $version : '4.0.0');
+            $view->with('jalaliToday', JalaliDate::today());
+            $view->with('systemActive', app(PanelSettingsService::class)
+                ->flag('connectix_bot.active', 'bot_active', true));
         });
     }
 

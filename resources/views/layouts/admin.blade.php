@@ -36,6 +36,41 @@
 <body>
     @php
         $admin = auth('admin')->user();
+
+        // Icon + label per destination. `$active` is supplied by each view and
+        // still names the same keys as before; rendering walks a grouped
+        // structure over this flat map instead, Airoxnet style.
+        $nav = [
+            'dashboard' => ['route' => 'admin.dashboard', 'label' => 'داشبورد', 'icon' => '<path d="M4 13h6V4H4v9Zm0 7h6v-5H4v5Zm10 0h6v-9h-6v9Zm0-16v5h6V4h-6Z"/>'],
+            'users'     => ['route' => 'admin.users.index', 'label' => 'کاربران', 'icon' => '<path d="M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm0 2c-3.3 0-6 1.8-6 4v2h12v-2c0-2.2-2.7-4-6-4Zm8-1a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm.5 3c-.6 0-1.2.1-1.7.3 1.1 1 1.7 2.2 1.7 3.7v2h4v-2c0-2.2-2.2-4-4-4Z"/>'],
+            'orders'    => ['route' => 'admin.orders.index', 'label' => 'سفارش‌ها', 'icon' => '<path d="M6 2h12a1 1 0 0 1 1 1v18l-3-2-2 2-2-2-2 2-2-2-3 2V3a1 1 0 0 1 1-1Zm2 5v2h8V7H8Zm0 4v2h8v-2H8Zm0 4v2h5v-2H8Z"/>'],
+            'wallet'    => ['route' => 'admin.wallet-transactions.index', 'label' => 'تراکنش‌های کیف پول', 'icon' => '<path d="M3 6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v1h1a1 1 0 0 1 1 1v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6Zm2 0v12h14V9h-4a2 2 0 0 0-2 2v2a2 2 0 0 0 2 2h4V7H5Zm11 6.5a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3Z"/>'],
+            'sms'       => ['route' => 'admin.sms-payments.index', 'label' => 'پیامک‌های بانکی', 'icon' => '<path d="M4 4h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H8l-4 4V6a2 2 0 0 1 2-2Zm3 4v2h10V8H7Zm0 4v2h7v-2H7Z"/>'],
+            'settings'  => ['route' => 'admin.settings.show', 'label' => 'تنظیمات ربات', 'icon' => '<path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Zm9 4a7.5 7.5 0 0 0-.1-1.2l2-1.6-2-3.4-2.4 1a7.6 7.6 0 0 0-2-1.2L16.1 3H11.9l-.4 2.6c-.7.3-1.4.7-2 1.2l-2.4-1-2 3.4 2 1.6a7.7 7.7 0 0 0 0 2.4l-2 1.6 2 3.4 2.4-1c.6.5 1.3.9 2 1.2l.4 2.6h4.2l.4-2.6c.7-.3 1.4-.7 2-1.2l2.4 1 2-3.4-2-1.6c.1-.4.1-.8.1-1.2Z"/>'],
+            'guides'    => ['route' => 'admin.guides.index', 'label' => 'آموزش‌ها', 'icon' => '<path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm-2 14.5v-9l7 4.5-7 4.5Z"/>'],
+            'broadcast' => ['route' => 'admin.broadcast.show', 'label' => 'پیام همگانی', 'icon' => '<path d="M18 8a3 3 0 0 1 0 6v3a1 1 0 0 1-1.5.9L11 15H7a3 3 0 0 1 0-6h4l5.5-3.9A1 1 0 0 1 18 6v2Zm-9 4a1 1 0 1 0 0 2 1 1 0 0 0 0-2ZM5 9a1 1 0 0 1 1 1v4a1 1 0 1 1-2 0v-4a1 1 0 0 1 1-1Z"/>'],
+        ];
+        $active = $active ?? '';
+
+        // چهار گروه Airoxnet: مرور، مدیریت، مالی، سیستم. سرگروه فقط وقتی
+        // رندر می‌شود که لااقل یکی از لینک‌هایش موجود باشد.
+        $navGroups = [
+            'مرور'   => ['dashboard'],
+            'مدیریت' => ['users', 'orders'],
+            'مالی'   => ['wallet', 'sms'],
+            'سیستم'  => ['settings', 'guides', 'broadcast'],
+        ];
+
+        // A Tehran timestamp for the clock to start from: the JS ticks the
+        // seconds forward from this epoch instead of reading the visitor's
+        // own clock, whose offset the panel cannot trust. Greeting and date
+        // are server rendered, so the header reads correctly even with JS off.
+        $tehranNow = now('Asia/Tehran');
+        $tehranHour = (int) $tehranNow->format('G');
+        $jalali = $jalaliToday ?? \App\Support\JalaliDate::today();
+        $jalaliDate = \App\Support\JalaliDate::toPersianDigits(
+            sprintf('%04d/%02d/%02d', $jalali['year'], $jalali['month'], $jalali['day'])
+        );
     @endphp
     <div class="shell">
         <aside class="sidebar" id="sidebar">
@@ -48,38 +83,51 @@
                 <span class="name">
                     {{ $appName ?? 'پنل مدیریت' }}
                     <small class="{{ ! empty($botProfile['username']) ? 'handle' : '' }}">@if (! empty($botProfile['username']))<span dir="ltr">&#64;{{ $botProfile['username'] }}</span>@else Connectix Bot @endif</small>
+                    <small class="brand-tag" dir="ltr">VPN RESELLER PANEL</small>
                 </span>
                 <button type="button" class="nav-close" data-nav-close
                         aria-label="بستن منو">✕</button>
             </div>
 
-            <nav>
-                @php
-                    // Icon + label per destination. `$active` is supplied by each view.
-                    $nav = [
-                        'dashboard' => ['route' => 'admin.dashboard', 'label' => 'داشبورد', 'icon' => '<path d="M4 13h6V4H4v9Zm0 7h6v-5H4v5Zm10 0h6v-9h-6v9Zm0-16v5h6V4h-6Z"/>'],
-                        'users'     => ['route' => 'admin.users.index', 'label' => 'کاربران', 'icon' => '<path d="M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm0 2c-3.3 0-6 1.8-6 4v2h12v-2c0-2.2-2.7-4-6-4Zm8-1a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm.5 3c-.6 0-1.2.1-1.7.3 1.1 1 1.7 2.2 1.7 3.7v2h4v-2c0-2.2-2.2-4-4-4Z"/>'],
-                        'orders'    => ['route' => 'admin.orders.index', 'label' => 'سفارش‌ها', 'icon' => '<path d="M6 2h12a1 1 0 0 1 1 1v18l-3-2-2 2-2-2-2 2-2-2-3 2V3a1 1 0 0 1 1-1Zm2 5v2h8V7H8Zm0 4v2h8v-2H8Zm0 4v2h5v-2H8Z"/>'],
-                        'wallet'    => ['route' => 'admin.wallet-transactions.index', 'label' => 'تراکنش‌های کیف پول', 'icon' => '<path d="M3 6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v1h1a1 1 0 0 1 1 1v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6Zm2 0v12h14V9h-4a2 2 0 0 0-2 2v2a2 2 0 0 0 2 2h4V7H5Zm11 6.5a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3Z"/>'],
-                        'sms'       => ['route' => 'admin.sms-payments.index', 'label' => 'پیامک‌های بانکی', 'icon' => '<path d="M4 4h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H8l-4 4V6a2 2 0 0 1 2-2Zm3 4v2h10V8H7Zm0 4v2h7v-2H7Z"/>'],
-                        'settings'  => ['route' => 'admin.settings.show', 'label' => 'تنظیمات ربات', 'icon' => '<path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Zm9 4a7.5 7.5 0 0 0-.1-1.2l2-1.6-2-3.4-2.4 1a7.6 7.6 0 0 0-2-1.2L16.1 3H11.9l-.4 2.6c-.7.3-1.4.7-2 1.2l-2.4-1-2 3.4 2 1.6a7.7 7.7 0 0 0 0 2.4l-2 1.6 2 3.4 2.4-1c.6.5 1.3.9 2 1.2l.4 2.6h4.2l.4-2.6c.7-.3 1.4-.7 2-1.2l2.4 1 2-3.4-2-1.6c.1-.4.1-.8.1-1.2Z"/>'],
-                        'guides'    => ['route' => 'admin.guides.index', 'label' => 'آموزش‌ها', 'icon' => '<path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm-2 14.5v-9l7 4.5-7 4.5Z"/>'],
-                        'broadcast' => ['route' => 'admin.broadcast.show', 'label' => 'پیام همگانی', 'icon' => '<path d="M18 8a3 3 0 0 1 0 6v3a1 1 0 0 1-1.5.9L11 15H7a3 3 0 0 1 0-6h4l5.5-3.9A1 1 0 0 1 18 6v2Zm-9 4a1 1 0 1 0 0 2 1 1 0 0 0 0-2ZM5 9a1 1 0 0 1 1 1v4a1 1 0 1 1-2 0v-4a1 1 0 0 1 1-1Z"/>'],
-                    ];
-                    $active = $active ?? '';
-                @endphp
+            <nav class="pl-nav">
+                @foreach ($navGroups as $groupLabel => $keys)
+                    @php
+                        $groupItems = array_values(array_filter(
+                            $keys,
+                            fn (string $key): bool => isset($nav[$key]),
+                        ));
+                    @endphp
 
-                @foreach ($nav as $key => $item)
-                    <a href="{{ route($item['route']) }}" class="{{ $active === $key ? 'active' : '' }}">
-                        <span class="ico">
-                            <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">{!! $item['icon'] !!}</svg>
-                        </span>
-                        <span>{{ $item['label'] }}</span>
-                    </a>
+                    @if ($groupItems !== [])
+                        <div class="pl-nav-head">{{ $groupLabel }}</div>
+                    @endif
+
+                    @foreach ($groupItems as $key)
+                        @php $item = $nav[$key]; @endphp
+                        <a href="{{ route($item['route']) }}" class="{{ $active === $key ? 'active' : '' }}">
+                            <span class="ico">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">{!! $item['icon'] !!}</svg>
+                            </span>
+                            <span>{{ $item['label'] }}</span>
+                        </a>
+                    @endforeach
                 @endforeach
             </nav>
 
             <div class="foot">
+                {{-- کارت نسخه به سبک Airoxnet: نسخه از version.txt می‌آید
+                     (کامپوزر آن را به‌صورت $panelVersion روی همهٔ ویوها
+                     می‌گذارد، با fallback داخل خودش). --}}
+                <div class="pl-vercard">
+                    <span class="pl-vercard-ico" aria-hidden="true">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13 2 3 14h7l-1 8 11-13h-7l1-7Z"/></svg>
+                    </span>
+                    <span class="pl-vercard-text">
+                        <b>{{ $appName ?? 'پنل مدیریت' }}</b>
+                        <small>نسخهٔ {{ $panelVersion ?? '4.0.0' }}</small>
+                    </span>
+                </div>
+
                 <div class="who">
                     <span class="avatar">{{ mb_strtoupper(mb_substr((string) ($admin?->email ?? 'G'), 0, 1)) }}</span>
                     <span>
@@ -91,6 +139,7 @@
                     @csrf
                     <button type="submit" class="ghost" style="width:100%">خروج از حساب</button>
                 </form>
+                <p class="pl-credit">توسعه‌دهنده: Connectix</p>
             </div>
         </aside>
 
@@ -114,14 +163,37 @@
                     <h1>{{ $title ?? '' }}</h1>
                 </div>
 
-                <div class="tools">
-                    <div class="swatches" role="group" aria-label="رنگ پوسته">
-                        @foreach (['violet', 'cyan', 'emerald', 'rose', 'amber', 'blue'] as $tone)
-                            <button type="button" class="swatch {{ $tone }}" data-accent="{{ $tone }}"
-                                    aria-pressed="false" title="پوسته {{ $tone }}"></button>
-                        @endforeach
+                {{-- سمت دیگرِ topbar: وضعیت ربات (همان flag که خود ربات
+                     می‌خواند)، سلام روز/شب، تاریخ شمسی و ساعت زندهٔ تهران.
+                     pill نقطهٔ سبز/قرمز دارد و تاریخ سمت سرور ساخته شده تا با
+                     خاموشیِ JS هم خوانده شود. --}}
+                <div class="pl-top-tools">
+                    <div class="pl-status{{ ($systemActive ?? true) ? '' : ' bad' }}" title="وضعیت ربات">
+                        <span class="dot" aria-hidden="true"></span>
+                        <span class="pl-status-label">{{ ($systemActive ?? true) ? 'سیستم فعال' : 'سیستم غیرفعال' }}</span>
                     </div>
-                    <button type="button" class="icon-btn" data-theme-toggle aria-label="تغییر روشنایی">◐</button>
+
+                    <div class="pl-hello">
+                        <span class="pl-hello-ico" id="pl-hello-icon" aria-hidden="true">☀</span>
+                        <span class="pl-hello-text">
+                            <b id="pl-hello-greeting">{{ \App\Support\JalaliDate::greeting($tehranHour) }}</b>
+                            <small dir="ltr" id="pl-clock"
+                                   data-epoch="{{ $tehranNow->getTimestamp() }}"
+                                   data-offset="{{ $tehranNow->getOffset() }}">{{ $tehranNow->format('H:i:s') }}</small>
+                        </span>
+                    </div>
+
+                    <span class="pl-date">{{ $jalaliDate }}</span>
+
+                    <div class="tools">
+                        <div class="swatches" role="group" aria-label="رنگ پوسته">
+                            @foreach (['violet', 'cyan', 'emerald', 'rose', 'amber', 'blue'] as $tone)
+                                <button type="button" class="swatch {{ $tone }}" data-accent="{{ $tone }}"
+                                        aria-pressed="false" title="پوسته {{ $tone }}"></button>
+                            @endforeach
+                        </div>
+                        <button type="button" class="icon-btn" data-theme-toggle aria-label="تغییر روشنایی">◐</button>
+                    </div>
                 </div>
             </div>
 
@@ -335,6 +407,40 @@
                     input.addEventListener(name, function () { depth = 0; paint(false); });
                 });
             });
+
+            /* Live Tehran clock. The server rendered the real Tehran time as a
+             * unix epoch plus its UTC offset; every tick advances the epoch by
+             * the seconds elapsed since the script booted and formats it in
+             * that fixed offset. The visitor's clock and timezone never enter
+             * the math, so the seconds stay on Tehran time. The greeting and
+             * the sun/moon glyph flip on the same boundary Airoxnet used
+             * (۵ تا ۱۸ روز، بقیه شب). */
+            (function () {
+                var clock = document.getElementById('pl-clock');
+                if (!clock) return;
+
+                var epoch = parseInt(clock.dataset.epoch, 10);
+                var offset = parseInt(clock.dataset.offset, 10);
+                if (isNaN(epoch) || isNaN(offset)) return;
+
+                var bootMs = Date.now();
+                var pad = function (n) { return n < 10 ? '0' + n : '' + n; };
+                var paint = function () {
+                    // UTC methods + the fixed offset = wall time in Tehran.
+                    var now = new Date((epoch + Math.floor((Date.now() - bootMs) / 1000)) * 1000 + offset * 1000);
+                    clock.textContent = pad(now.getUTCHours()) + ':' + pad(now.getUTCMinutes()) + ':' + pad(now.getUTCSeconds());
+
+                    var hour = now.getUTCHours();
+                    var day = hour >= 5 && hour < 18;
+                    var greeting = document.getElementById('pl-hello-greeting');
+                    var icon = document.getElementById('pl-hello-icon');
+                    if (greeting) greeting.textContent = day ? 'روز بخیر' : 'شب بخیر';
+                    if (icon) icon.textContent = day ? '☀' : '☾';
+                };
+
+                paint();
+                setInterval(paint, 1000);
+            })();
         })();
     </script>
 </body>
