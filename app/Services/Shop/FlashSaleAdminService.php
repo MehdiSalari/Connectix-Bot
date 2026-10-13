@@ -118,7 +118,7 @@ class FlashSaleAdminService
         try {
             $end = Carbon::parse($endsAt, 'Asia/Tehran');
             $now = now('Asia/Tehran');
-            $diffInSeconds = $end->diffInSeconds($now);
+            $diffInSeconds = $now->diffInSeconds($end);
 
             if ($diffInSeconds <= 0) {
                 return 'به پایان رسیده';

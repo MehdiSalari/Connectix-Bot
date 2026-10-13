@@ -13,6 +13,7 @@ enum WalletTransactionType: string
     case Buy = 'BUY';
     case CardToCard = 'CARD_TO_CARD';
     case DoneByAdmin = 'DONE_BY_ADMIN';
+    case WelcomeCredit = 'WELCOME_CREDIT';
 
     public function label(): string
     {
@@ -20,6 +21,7 @@ enum WalletTransactionType: string
             self::Buy => 'خرید',
             self::CardToCard => 'کارت به کارت',
             self::DoneByAdmin => 'توسط ادمین',
+            self::WelcomeCredit => 'هدیه خوش‌آمدگویی',
         };
     }
 }

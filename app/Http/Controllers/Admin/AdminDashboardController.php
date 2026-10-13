@@ -7,6 +7,8 @@ namespace App\Http\Controllers\Admin;
 use App\Enums\PaymentMethod;
 use App\Http\Controllers\Controller;
 use App\Models\Payment;
+use App\Models\Reseller;
+use App\Models\Ticket;
 use App\Models\User;
 use App\Services\Panel\PanelSettingsService;
 use App\Services\Telegram\TelegramProfileService;
@@ -43,6 +45,17 @@ class AdminDashboardController extends Controller
      */
     private static ?bool $hasApprovedAt = null;
 
+    /**
+     * The legacy markers of a settled payment, the same list the welcome
+     * credit guard treats as a real purchase (docs/legacy-audit.md §payment
+     * parity): '1' / '2' are the documented approvals, 'OK' / 'APPROVED'
+     * appear in older rows.
+     */
+    private const APPROVED = ['1', '2', 'OK', 'APPROVED'];
+
+    /** The documented refusals; anything else (NULL included) is pending. */
+    private const REJECTED = ['0', 'REJECTED'];
+
     public function __invoke(Request $request): View
     {
         $admin = $request->user('admin');
@@ -51,6 +64,16 @@ class AdminDashboardController extends Controller
         $today = $now->toDateString();
         $tomorrow = $now->copy()->addDay()->toDateString();
         $windowStart = $now->copy()->subDays(6)->toDateString();
+
+        // The chart window the page asked for (۷ / ۳۰ / ۹۰ روز اخیر). Anything
+        // else — absent, junk, out of the fork's own clamp — reads as seven,
+        // so the default page keeps the seven-slot series the panel always
+        // showed and the pinned chart tests pin down.
+        $range = (int) $request->input('range', 7);
+        if (! in_array($range, [7, 30, 90], true)) {
+            $range = 7;
+        }
+        $seriesWindowStart = $now->copy()->subDays($range - 1)->toDateString();
 
         // Jalali month arithmetic: the previous month and the current one,
         // both as [start, end) Tehran windows, plus how far into the current
@@ -93,10 +116,12 @@ class AdminDashboardController extends Controller
 
         $monthNames = ['فروردین', 'اردیبهشت', 'خرداد', 'تیر', 'مرداد', 'شهریور', 'مهر', 'آبان', 'آذر', 'دی', 'بهمن', 'اسفند'];
 
-        // One slot per Tehran calendar day of the last seven, oldest first.
+        // One slot per Tehran calendar day of the chosen window, oldest first.
         // The query GROUPs BY the Tehran date; the map only fills days that
-        // had rows, leaving the rest at a flat zero.
-        $series = static function (string $sql, array $bindings) use ($now, $monthNames): array {
+        // had rows, leaving the rest at a flat zero. The slot count follows
+        // the range selector (۷ / ۳۰ / ۹۰), so a wider window re-queries the
+        // same series over more days rather than slicing seven days thinner.
+        $series = static function (string $sql, array $bindings) use ($now, $monthNames, $range): array {
             $byDay = [];
 
             foreach (DB::select($sql, $bindings) as $row) {
@@ -105,7 +130,7 @@ class AdminDashboardController extends Controller
 
             $out = [];
 
-            for ($i = 6; $i >= 0; $i--) {
+            for ($i = $range - 1; $i >= 0; $i--) {
                 $day = $now->copy()->subDays($i);
                 $j = PersianCalendar::toJalali((int) $day->format('Y'), (int) $day->format('n'), (int) $day->format('j'));
 
@@ -119,16 +144,91 @@ class AdminDashboardController extends Controller
             return $out;
         };
 
-        $series7dRevenue = $series(
+        $seriesRevenue = $series(
             "SELECT DATE({$revDate}) d, SUM(REPLACE(price, ',', '')) v FROM payments "
                 ."WHERE DATE({$revDate}) >= ? AND DATE({$revDate}) < ? GROUP BY DATE({$revDate})",
-            [$windowStart, $tomorrow],
+            [$seriesWindowStart, $tomorrow],
         );
-        $series7dUsers = $series(
+        $seriesUsers = $series(
             'SELECT DATE(created_at) d, COUNT(*) v FROM users '
                 .'WHERE DATE(created_at) >= ? AND DATE(created_at) < ? GROUP BY DATE(created_at)',
-            [$windowStart, $tomorrow],
+            [$seriesWindowStart, $tomorrow],
         );
+
+        /*
+         * The KPI row the fork's dashboard prints: total users with the
+         * blocked count riding along, distinct paying customers (at least one
+         * successful purchase — loyalty redemptions are gifts, not purchases,
+         * so their rows are excluded the same way the welcome-credit guard
+         * excludes them), open tickets, active resellers and the parsed wallet
+         * pool. Every table is a feature-fork table that may not exist on an
+         * install that stopped at the legacy schema, so each count is a
+         * guarded read that answers zero rather than breaking the page.
+         */
+        $buyersTotal = Payment::query()
+            ->whereIn('is_paid', self::APPROVED)
+            ->where(fn ($q) => $q
+                ->whereNull('method')
+                ->orWhere('method', '')
+                ->orWhere('method', '!=', 'loyalty'))
+            ->distinct()
+            ->count('chat_id');
+
+        $blockedUsers = (int) User::query()->where('is_blocked', 1)->count();
+
+        $openTickets = 0;
+        if (class_exists(Ticket::class)) {
+            try {
+                $openTickets = Ticket::query()->where('status', 'OPEN')->count();
+            } catch (\Throwable) {
+                $openTickets = 0;
+            }
+        }
+
+        $activeResellers = 0;
+        if (class_exists(Reseller::class)) {
+            try {
+                $activeResellers = Reseller::query()->where('status', 'ACTIVE')->count();
+            } catch (\Throwable) {
+                $activeResellers = 0;
+            }
+        }
+
+        // The balance column is VARCHAR; a plain SUM reads "25,000" as 25, so
+        // the separators are stripped before adding, like the price column.
+        $walletBalanceTotal = (int) DB::table('wallets')
+            ->selectRaw("COALESCE(SUM(REPLACE(REPLACE(balance, ',', ''), ' ', '')), 0) as total")
+            ->value('total');
+
+        // Transaction status split for the doughnut: the documented approval
+        // and refusal markers, and everything else (NULL pending rows
+        // included) counted as awaiting a decision — the fork's own bucketing.
+        $successCount = Payment::query()->whereIn('is_paid', self::APPROVED)->count();
+        $rejectedCount = Payment::query()->whereIn('is_paid', self::REJECTED)->count();
+        $totalPayments = Payment::query()->count();
+
+        // The most used coupon codes inside the chosen window: empty strings
+        // and NULLs are "no coupon", not a coupon, so they never row up.
+        $topCoupons = Payment::query()
+            ->selectRaw("coupon, COUNT(*) as uses, SUM(REPLACE(REPLACE(REPLACE(price, ',', ''), ' ', ''), '٬', '')) as revenue")
+            ->whereNotNull('coupon')
+            ->where('coupon', '!=', '')
+            ->whereIn('is_paid', self::APPROVED)
+            ->where(fn ($q) => $q
+                ->whereNull('method')
+                ->orWhere('method', '')
+                ->orWhere('method', '!=', 'loyalty'))
+            ->whereRaw("DATE({$revDate}) >= ? AND DATE({$revDate}) < ?", [$seriesWindowStart, $tomorrow])
+            ->groupBy('coupon')
+            ->orderByDesc('uses')
+            ->limit(5)
+            ->get()
+            ->map(static fn ($row): array => [
+                'coupon' => (string) $row->coupon,
+                'uses' => (int) $row->uses,
+                'revenue' => (int) $row->revenue,
+            ])
+            ->all();
 
         // Recent orders flattened to plain rows: `method` is read raw, so a
         // legacy value outside the enum ("loyalty") cannot throw mid-render.
@@ -173,6 +273,8 @@ class AdminDashboardController extends Controller
             'admin' => $admin,
             'stats' => [
                 'users_total' => User::query()->count(),
+                'blocked_users' => $blockedUsers,
+                'buyers_total' => $buyersTotal,
                 'new_users_today' => $usersWindow($today, $tomorrow),
                 'new_users_7d' => $newUsers7d,
                 'new_users_prev_7d' => $newUsersPrev7d,
@@ -186,9 +288,19 @@ class AdminDashboardController extends Controller
                 'revenue_total' => $revenueTotal,
                 'orders_today' => Payment::query()->whereRaw('DATE(created_at) = ?', [$today])->count(),
                 'pending' => Payment::query()->whereNull('is_paid')->count(),
+                'open_tickets' => $openTickets,
+                'active_resellers' => $activeResellers,
                 'wallet_total' => (int) DB::table('wallets')->selectRaw('COALESCE(SUM(balance), 0) as total')->value('total'),
-                'series_7d_revenue' => $series7dRevenue,
-                'series_7d_users' => $series7dUsers,
+                'wallet_balance_total' => $walletBalanceTotal,
+                'status_counts' => [
+                    'success' => $successCount,
+                    'rejected' => $rejectedCount,
+                    'pending' => max(0, $totalPayments - $successCount - $rejectedCount),
+                ],
+                'top_coupons' => $topCoupons,
+                'series_revenue' => $seriesRevenue,
+                'series_users' => $seriesUsers,
+                'range' => $range,
                 'recent_orders' => $recentOrders,
             ],
             'recent_users' => User::query()

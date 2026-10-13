@@ -8,6 +8,9 @@ use App\Models\PanelSetting;
 use App\Models\Reseller;
 use App\Models\ResellerRequest;
 use App\Models\User;
+use App\Models\Wallet;
+use App\Services\Panel\PanelSettingsService;
+use App\Services\Telegram\AdminGuard;
 use App\Services\Telegram\TelegramService;
 use App\Support\JalaliDate;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -496,5 +499,281 @@ class ResellerService
                 'error' => $e->getMessage(),
             ]);
         }
+    }
+
+    // ==================================================================
+    // Bot side
+    //
+    // Port of the `reseller`, `reseller_apply` and repreqok/repreqno
+    // branches of bot.php plus representativeStatusView() in the fork's
+    // functions.php. The texts keep the fork's wording; the approval
+    // buttons ride on the notification the applicant's own tap produces.
+    // ==================================================================
+
+    /**
+     * The «نمایندگی» status screen, port of representativeStatusView():
+     * an approved representative sees their summary, a pending applicant
+     * sees the review notice, everyone else gets the requirement text with
+     * the single `reseller_apply` button.
+     *
+     * @return array{text: string, reply_markup: string}
+     */
+    public function menuText(User $user): array
+    {
+        $chatId = (string) $user->chat_id;
+        $back = [['text' => '🔙 بازگشت به منوی اصلی', 'callback_data' => 'main_menu']];
+
+        $reseller = $this->resellerFor($chatId);
+
+        if ($reseller !== null && $reseller->isActive()) {
+            $discount = $this->discountFor($reseller);
+            $suffix = $discount['type'] === 'percent' ? '٪' : ' تومان';
+
+            $text = "🎖 <b>شما نماینده تاییدشده هستید.</b>\n\n"
+                .'تخفیفهای شما بهصورت خودکار در خرید و تمدید اعمال میشوند';
+
+            if ($discount['value'] > 0) {
+                $text .= ":\n\n• تخفیف فعال: {$discount['value']}{$suffix}";
+            } else {
+                $text .= '.';
+            }
+
+            $text .= "\n\n💰 موجودی کیف پول: "
+                .number_format((float) $reseller->balance).' تومان'
+                ."\n🔖 کمیسیون: {$discount['value']}{$suffix}";
+
+            return [
+                'text' => $text,
+                'reply_markup' => $this->keyboard([$back]),
+            ];
+        }
+
+        $latest = $this->latestRequest($chatId);
+
+        if ($latest !== null && $latest->status === 'PENDING') {
+            return [
+                'text' => "🎖 <b>درخواست نمایندگی شما در حال بررسی است.</b>\n\n"
+                    .'پس از تایید توسط مدیریت، تخفیفهای نمایندگان بهصورت خودکار برای شما فعال خواهد شد.',
+                'reply_markup' => $this->keyboard([$back]),
+            ];
+        }
+
+        $minBalance = (float) $this->settings()['reseller_min_wallet_balance'];
+        $currentBalance = $this->walletBalance($chatId);
+
+        $text = "🎖 <b>درخواست نمایندگی</b>\n\n"
+            .'برای ثبت درخواست نمایندگی، کیف پول شما باید حداقل <b>'
+            .number_format($minBalance).' تومان</b> موجودی داشته باشد.\n'
+            .'* این مبلغ فقط بررسی میشود و از کیف پول شما کسر نخواهد شد.\n\n'
+            .'موجودی فعلی کیف پول شما: <b>'.number_format($currentBalance).' تومان</b>\n\n'
+            .($latest !== null && $latest->status === 'REJECTED'
+                ? 'درخواست قبلی شما رد شده بود؛ میتوانید دوباره درخواست دهید.\n\n'
+                : '')
+            .'برای ثبت درخواست، دکمه زیر را بزنید.';
+
+        return [
+            'text' => $text,
+            'reply_markup' => $this->keyboard([
+                [['text' => '📨 ارسال درخواست نمایندگی', 'callback_data' => 'reseller_apply']],
+                $back,
+            ]),
+        ];
+    }
+
+    /**
+     * Send a representative request, port of the `reseller_apply` branch.
+     *
+     * On success the message is replaced with the confirmation and every
+     * administrator chat id receives the fork's notification carrying the
+     * inline `repreqok_{id}` / `repreqno_{id}` decision buttons. A refused
+     * request comes back as `answer` — the handler shows it as a callback
+     * alert instead of editing, exactly as the fork did.
+     *
+     * @return array{text: string, reply_markup: string|null, answer: string|null}
+     */
+    public function apply(User $user): array
+    {
+        $chatId = (string) $user->chat_id;
+        $balance = $this->walletBalance($chatId);
+
+        if ($this->resellerFor($chatId)?->isActive()) {
+            return $this->refused('شما هماکنون نماینده هستید.');
+        }
+
+        $existing = $this->latestRequest($chatId);
+
+        if ($existing !== null && $existing->status === 'PENDING') {
+            return $this->refused('درخواست قبلی شما هنوز در حال بررسی است.');
+        }
+
+        $minBalance = (float) $this->settings()['reseller_min_wallet_balance'];
+
+        if ($balance < $minBalance) {
+            return $this->refused(
+                'حداقل موجودی کیف پول برای ارسال درخواست نمایندگی '.number_format($minBalance)
+                .' تومان است.'.PHP_EOL
+                .'موجودی فعلی شما: '.number_format($balance).' تومان.'.PHP_EOL.PHP_EOL
+                .'(این مبلغ فقط بررسی میشود و از کیف پول شما کسر نخواهد شد.)'
+            );
+        }
+
+        $request = ResellerRequest::query()->create([
+            'chat_id' => $chatId,
+            'user_id' => $user->id,
+            'wallet_balance_at_request' => $balance,
+            'status' => 'PENDING',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $name = (string) ($user->name ?? '');
+
+        $adminText = "🔔 <b>درخواست نمایندگی جدید</b>\n\n"
+            .'👤 آیدی کاربر: <code>'.self::e($chatId)."</code>\n"
+            .($name !== '' ? 'نام: '.self::e($name)."\n" : '')
+            .'💰 موجودی کیف پول: '.number_format($balance).' تومان';
+
+        foreach ($this->adminIds() as $adminId) {
+            $this->quietSend($adminId, $adminText, [
+                'reply_markup' => $this->keyboard([
+                    [
+                        ['text' => '✅ تایید نمایندگی', 'callback_data' => 'repreqok_'.$request->id],
+                        ['text' => '❌ رد درخواست', 'callback_data' => 'repreqno_'.$request->id],
+                    ],
+                ]),
+            ]);
+        }
+
+        return [
+            'text' => '📨 درخواست نمایندگی شما ثبت شد و برای بررسی به مدیریت ارسال گردید.',
+            'reply_markup' => $this->keyboard([
+                [['text' => '🔙 بازگشت به منوی اصلی', 'callback_data' => 'main_menu']],
+            ]),
+            'answer' => null,
+        ];
+    }
+
+    /**
+     * Approve from the bot's inline button (`repreqok_{id}`): administrators
+     * only, then the panel's approveRequest() does the transactional work —
+     * which already tells the applicant — and the answer text matches the
+     * fork's callback wording.
+     *
+     * @return array{text: string, reply_markup: string|null}
+     */
+    public function approveRequestBot(int|string $requestId, string $adminChatId): array
+    {
+        if (! $this->guard()->isAdmin($adminChatId)) {
+            return ['text' => '⛔ دسترسی غیرمجاز.', 'reply_markup' => null];
+        }
+
+        $request = ResellerRequest::query()->find((int) $requestId);
+
+        $ok = $request !== null && $this->approveRequest($request, $adminChatId);
+
+        return ['text' => $ok
+            ? '✅ نمایندگی با موفقیت تایید شد.'
+            : '❌ این درخواست یافت نشد یا قبلاً بررسی شده است.', 'reply_markup' => null];
+    }
+
+    /**
+     * Reject from the bot's inline button (`repreqno_{id}`), the mirror of
+     * {@see self::approveRequestBot()}.
+     *
+     * @return array{text: string, reply_markup: string|null}
+     */
+    public function rejectRequestBot(int|string $requestId, string $adminChatId): array
+    {
+        if (! $this->guard()->isAdmin($adminChatId)) {
+            return ['text' => '⛔ دسترسی غیرمجاز.', 'reply_markup' => null];
+        }
+
+        $request = ResellerRequest::query()->find((int) $requestId);
+
+        $ok = $request !== null && $this->rejectRequest($request, null, $adminChatId);
+
+        return ['text' => $ok
+            ? '❌ درخواست رد شد.'
+            : '❌ این درخواست یافت نشد یا قبلاً بررسی شده است.', 'reply_markup' => null];
+    }
+
+    // ------------------------------------------------------------------
+    // Bot-side internals
+    // ------------------------------------------------------------------
+
+    /** The representative row for a chat id, or null. */
+    private function resellerFor(string $chatId): ?Reseller
+    {
+        return Reseller::query()->where('chat_id', $chatId)->first();
+    }
+
+    /** The latest request of any status for a chat id, or null. */
+    private function latestRequest(string $chatId): ?ResellerRequest
+    {
+        return ResellerRequest::query()
+            ->where('chat_id', $chatId)
+            ->orderByDesc('id')
+            ->first();
+    }
+
+    /** The wallet balance the fork read through wallet('get', ...). */
+    private function walletBalance(string $chatId): float
+    {
+        $wallet = Wallet::query()->where('chat_id', $chatId)->first();
+
+        return $wallet === null ? 0.0 : (float) $wallet->balance;
+    }
+
+    /** The administrator membership test, built from the resolved settings. */
+    private function guard(): AdminGuard
+    {
+        return AdminGuard::fromSettings(app(PanelSettingsService::class));
+    }
+
+    /** Every configured administrator chat id (local config first). */
+    private function adminIds(): array
+    {
+        $ids = array_values(array_filter(array_map(strval(...), (array) config('connectix_bot.admin_ids', []))));
+
+        if ($ids !== []) {
+            return $ids;
+        }
+
+        try {
+            return app(PanelSettingsService::class)->adminIds();
+        } catch (Throwable) {
+            return [];
+        }
+    }
+
+    /** The shape a refused apply() sends back (fork's answerCallbackQuery). */
+    private function refused(string $message): array
+    {
+        return ['text' => $message, 'reply_markup' => null, 'answer' => $message];
+    }
+
+    /** Send without letting a Telegram failure break the flow. */
+    private function quietSend(string $chatId, string $text, array $params = []): void
+    {
+        try {
+            $this->telegram->sendMessage($chatId, $text, array_merge(['parse_mode' => 'HTML'], $params));
+        } catch (Throwable $e) {
+            Log::warning('A reseller notification could not be delivered.', [
+                'chat_id' => $chatId,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /** The inline keyboard JSON the fork handed back to bot.php. */
+    private function keyboard(array $rows): string
+    {
+        return json_encode(['inline_keyboard' => $rows], JSON_UNESCAPED_UNICODE);
+    }
+
+    /** Telegram-HTML escaping, the fork's EmojiService::escape(). */
+    private static function e(mixed $value): string
+    {
+        return htmlspecialchars((string) $value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
     }
 }

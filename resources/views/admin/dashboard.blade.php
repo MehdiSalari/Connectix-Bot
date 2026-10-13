@@ -17,6 +17,14 @@
     };
 
     $persian = static fn (string|int $value): string => \App\Support\PersianCalendar::toPersianDigits((string) $value);
+
+    // شمارندههای KPI با ارقام فارسی و جداکنندهٔ هزارگان چاپ میشوند —
+    // همان قاعدهای که رشتههای تاریخ و نشان تیکتها دارند.
+    $faNum = static fn (int $value): string => $persian(number_format($value));
+
+    // بازهٔ نمودارها: فقط همین سه گزینه از سرور پذیرفته میشود (کنترلر
+    // هم همینها را میپذیرد؛ هر مقدار دیگری به ۷ برمیگردد).
+    $range = (int) ($stats['range'] ?? 7);
 @endphp
 <style>
     /* فقط همین صفحه: به connectix.css دست نمی‌زنیم، از همان متغیرها و
@@ -31,6 +39,10 @@
     .cx-delta-muted { color: var(--text-faint); }
     .cx-delta-vs { color: var(--text-faint); font-weight: 500; }
     .dash-unit { font-size: 12px; color: var(--text-faint); font-weight: 500; }
+    .dash-blocked { font-size: 12px; color: var(--danger); font-weight: 700; margin-top: 6px; display: block; }
+    .dash-range { display: flex; align-items: center; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+    .dash-range label { color: var(--text-faint); font-size: 12.5px; font-weight: 600; }
+    .dash-range select { min-width: 10rem; }
     @media (max-width: 900px) { .dash-charts { grid-template-columns: 1fr; } }
 </style>
 
@@ -46,12 +58,23 @@
         </div>
     </div>
 
+    {{-- ردیف KPI به ترتیب و برچسب فورک: کل کاربران (با شمار مسدودها)،
+         مشتریانِ دستکم یک خرید موفق، سه کارت درآمد، تیکتهای باز و
+         نمایندگان فعال. دلتا و واحدِ کارتهای قبلی سر جای خود مانده است. --}}
     <div class="dash-kpis">
         <div class="stat">
-            <div class="k">کاربران</div>
-            <div class="v">{{ number_format($stats['users_total']) }}</div>
+            <div class="k">کل کاربران</div>
+            <div class="v">{{ $faNum($stats['users_total']) }}</div>
             <span class="dash-delta">{!! $deltaHtml($stats['new_users_delta'], 'نسبت به هفتهٔ قبل') !!}</span>
             <span class="dash-unit">{{ $persian($stats['new_users_today']) }} کاربر جدید امروز</span>
+            @if ($stats['blocked_users'] > 0)
+                <span class="dash-blocked">{{ $faNum($stats['blocked_users']) }} مسدود</span>
+            @endif
+        </div>
+        <div class="stat">
+            <div class="k">مشتریان (حداقل ۱ خرید موفق)</div>
+            <div class="v">{{ $faNum($stats['buyers_total']) }}</div>
+            <span class="dash-unit">از {{ $faNum($stats['users_total']) }} کاربر</span>
         </div>
         <div class="stat">
             <div class="k">درآمد امروز (تومان)</div>
@@ -64,30 +87,96 @@
             <span class="dash-delta">{!! $deltaHtml($stats['revenue_month_delta'], 'نسبت به همین بازهٔ ماه قبل') !!}</span>
         </div>
         <div class="stat">
-            <div class="k">سفارش‌های در انتظار بررسی</div>
-            <div class="v">{{ number_format($stats['pending']) }}</div>
+            <div class="k">درآمد کل (تومان)</div>
+            <div class="v">{{ number_format($stats['revenue_total']) }}</div>
+            <span class="dash-unit">همهٔ سفارشهای ثبتشده</span>
+        </div>
+        <div class="stat">
+            <div class="k">تیکتهای باز</div>
+            <div class="v">{{ $faNum($stats['open_tickets']) }}</div>
+            <span class="dash-unit">در انتظار پاسخ پشتیبانی</span>
+        </div>
+        <div class="stat">
+            <div class="k">نمایندگان فعال</div>
+            <div class="v">{{ $faNum($stats['active_resellers']) }}</div>
+            <span class="dash-unit">موجودی کیف پول کل: {{ $faNum($stats['wallet_balance_total']) }}</span>
+        </div>
+        <div class="stat">
+            <div class="k">سفارشهای در انتظار بررسی</div>
+            <div class="v">{{ $faNum($stats['pending']) }}</div>
             <span class="dash-unit">سفارش‌های امروز: {{ $persian($stats['orders_today']) }}</span>
         </div>
     </div>
 
+    {{-- بازهٔ نمودارها: همان select فورک (۷/۳۰/۹۰ روز) که با انتخاب، فرم را
+         میفرستد؛ سرور فقط همین سه مقدار را میپذیرد و سریها را دوباره میخواند. --}}
+    <div class="dash-range">
+        <form method="get" action="{{ route('admin.dashboard') }}">
+            <label for="dash-range">بازهٔ نمودارها</label>
+            <select name="range" id="dash-range" onchange="this.form.submit()">
+                <option value="7" @selected($range === 7)>۷ روز اخیر</option>
+                <option value="30" @selected($range === 30)>۳۰ روز اخیر</option>
+                <option value="90" @selected($range === 90)>۹۰ روز اخیر</option>
+            </select>
+            <noscript><button class="btn" type="submit">اعمال</button></noscript>
+        </form>
+    </div>
+
     <div class="dash-charts">
         <div class="card">
-            <h2>درآمد ۷ روز اخیر <span class="dash-unit">(تومان)</span></h2>
+            <h2>درآمد {{ $persian($range) }} روز اخیر <span class="dash-unit">(تومان)</span></h2>
             <div class="dash-chart-box">
                 <canvas id="dashRevenueChart"
                         data-chart="revenue"
-                        data-labels="{{ json_encode(array_column($stats['series_7d_revenue'], 'label'), JSON_UNESCAPED_UNICODE) }}"
-                        data-values="{{ json_encode(array_column($stats['series_7d_revenue'], 'value')) }}"></canvas>
+                        data-labels="{{ json_encode(array_column($stats['series_revenue'], 'label'), JSON_UNESCAPED_UNICODE) }}"
+                        data-values="{{ json_encode(array_column($stats['series_revenue'], 'value')) }}"></canvas>
             </div>
         </div>
         <div class="card">
-            <h2>کاربران جدید ۷ روز اخیر</h2>
+            <h2>کاربران جدید {{ $persian($range) }} روز اخیر</h2>
             <div class="dash-chart-box">
                 <canvas id="dashUsersChart"
                         data-chart="users"
-                        data-labels="{{ json_encode(array_column($stats['series_7d_users'], 'label'), JSON_UNESCAPED_UNICODE) }}"
-                        data-values="{{ json_encode(array_column($stats['series_7d_users'], 'value')) }}"></canvas>
+                        data-labels="{{ json_encode(array_column($stats['series_users'], 'label'), JSON_UNESCAPED_UNICODE) }}"
+                        data-values="{{ json_encode(array_column($stats['series_users'], 'value')) }}"></canvas>
             </div>
+        </div>
+    </div>
+
+    {{-- خمیرهٔ وضعیت تراکنشها و جدول پراستفادهترین کدهای تخفیف: همان
+         چیدمان دو ستونی فورک، زیر نمودارهای روند. --}}
+    <div class="dash-charts">
+        <div class="card">
+            <h2>وضعیت تراکنشها</h2>
+            <div class="dash-chart-box">
+                <canvas id="dashStatusChart"
+                        data-chart="status"
+                        data-labels="{{ json_encode(['پرداخت شده', 'رد شده', 'در انتظار'], JSON_UNESCAPED_UNICODE) }}"
+                        data-values="{{ json_encode([$stats['status_counts']['success'], $stats['status_counts']['rejected'], $stats['status_counts']['pending']]) }}"></canvas>
+            </div>
+        </div>
+        <div class="card">
+            <h2>پراستفادهترین کدهای تخفیف</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>کد</th>
+                        <th>تعداد استفاده</th>
+                        <th>درآمد (تومان)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @forelse ($stats['top_coupons'] as $coupon)
+                        <tr>
+                            <td class="ltr">{{ $coupon['coupon'] }}</td>
+                            <td>{{ $faNum($coupon['uses']) }}</td>
+                            <td>{{ number_format($coupon['revenue']) }}</td>
+                        </tr>
+                    @empty
+                        <tr><td colspan="3" class="muted">در بازهٔ انتخابی هیچ کد تخفیفی استفاده نشده است.</td></tr>
+                    @endforelse
+                </tbody>
+            </table>
         </div>
     </div>
 
@@ -162,6 +251,9 @@
                 var accent = (cs.getPropertyValue('--accent') || '').trim() || '#8b5cf6';
                 var border = (cs.getPropertyValue('--border') || '').trim() || '#2a2d48';
                 var muted = (cs.getPropertyValue('--text-faint') || '').trim() || '#888';
+                var ok = (cs.getPropertyValue('--ok') || '').trim() || '#34d399';
+                var warn = (cs.getPropertyValue('--warn') || '').trim() || '#fbbf24';
+                var danger = (cs.getPropertyValue('--danger') || '').trim() || '#fb7185';
 
                 function rgba(hex, a) {
                     hex = hex.replace('#', '');
@@ -215,8 +307,40 @@
                     });
                 }
 
+                // خمیرهٔ وضعیت تراکنشها: سه برش با رنگهای سیستم (تاییدشده،
+                // رد شده، در انتظار) — برچسبها و مقادیر از همان data-* میآیند.
+                function doughnut(id) {
+                    var el = document.getElementById(id);
+                    if (!el) return;
+
+                    var labels = JSON.parse(el.dataset.labels || '[]');
+                    var values = JSON.parse(el.dataset.values || '[]');
+
+                    new Chart(el, {
+                        type: 'doughnut',
+                        data: {
+                            labels: labels,
+                            datasets: [{
+                                data: values,
+                                backgroundColor: [ok, danger, warn],
+                                borderColor: 'transparent',
+                                hoverOffset: 6
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            cutout: '62%',
+                            plugins: {
+                                legend: { position: 'bottom', labels: { boxWidth: 12, padding: 14 } }
+                            }
+                        }
+                    });
+                }
+
                 build('dashRevenueChart', 'bar', false);
                 build('dashUsersChart', 'line', true);
+                doughnut('dashStatusChart');
             };
 
             if (document.readyState === 'loading') {

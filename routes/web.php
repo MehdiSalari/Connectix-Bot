@@ -1,14 +1,14 @@
 <?php
 
+use App\Http\Controllers\Admin\AdminAccountController;
+use App\Http\Controllers\Admin\AdminActivityController;
 use App\Http\Controllers\Admin\AdminAdminsController;
-use App\Http\Controllers\Admin\AdminBroadcastController;
-use App\Http\Controllers\Admin\AdminCardController;
-use App\Http\Controllers\Admin\AdminClientController;
 use App\Http\Controllers\Admin\AdminAppearanceController;
 use App\Http\Controllers\Admin\AdminBotButtonController;
 use App\Http\Controllers\Admin\AdminBotEmojiController;
-use App\Http\Controllers\Admin\AdminLocalServiceController;
-use App\Http\Controllers\Admin\AdminPanelNodeController;
+use App\Http\Controllers\Admin\AdminBroadcastController;
+use App\Http\Controllers\Admin\AdminCardController;
+use App\Http\Controllers\Admin\AdminClientController;
 use App\Http\Controllers\Admin\AdminCouponController;
 use App\Http\Controllers\Admin\AdminCryptoController;
 use App\Http\Controllers\Admin\AdminCustomPlanController;
@@ -17,11 +17,13 @@ use App\Http\Controllers\Admin\AdminFeaturesController;
 use App\Http\Controllers\Admin\AdminFlashSaleController;
 use App\Http\Controllers\Admin\AdminGatewayController;
 use App\Http\Controllers\Admin\AdminGuideController;
+use App\Http\Controllers\Admin\AdminLocalServiceController;
 use App\Http\Controllers\Admin\AdminLoginController;
 use App\Http\Controllers\Admin\AdminLoyaltyController;
 use App\Http\Controllers\Admin\AdminNotificationController;
 use App\Http\Controllers\Admin\AdminOrderController;
 use App\Http\Controllers\Admin\AdminOrderDetailsController;
+use App\Http\Controllers\Admin\AdminPanelNodeController;
 use App\Http\Controllers\Admin\AdminResellerController;
 use App\Http\Controllers\Admin\AdminSettingsController;
 use App\Http\Controllers\Admin\AdminSmsPaymentController;
@@ -29,7 +31,6 @@ use App\Http\Controllers\Admin\AdminTicketController;
 use App\Http\Controllers\Admin\AdminUserController;
 use App\Http\Controllers\Admin\AdminWalletTransactionController;
 use App\Http\Controllers\Admin\AdminWinbackController;
-use App\Http\Controllers\Admin\PlaceholderController;
 use App\Http\Controllers\Bank\BankSmsController;
 use App\Http\Controllers\Setup\SetupWizardController;
 use App\Http\Controllers\Telegram\TelegramWebhookController;
@@ -381,22 +382,20 @@ Route::prefix('admin')->name('admin.')->group(function (): void {
             ->name('features.store');
 
         /*
-         * Placeholders for the admin sections the fork has and this rewrite
-         * grows into, one wave at a time. The layout renders a sidebar row for
-         * each of these only when the route exists (Route::has), so the menu
-         * fills in as the waves land; until then every one answers 404 through
-         * PlaceholderController instead of dying on an undefined route name.
+         * The two leftover fork sections, now real: the account page (own
+         * email/password — GET renders the form, POST applies the change
+         * under the same name, since the sidebar and the flash redirect both
+         * address `account.show`) and the activity trail. Each admin sees
+         * only their own rows — the fork's rule: «هر ادمین فقط فعالیتهای
+         * خودش را میبیند».
          */
-        $placeholders = [
-            'account.show' => 'account',
-            'activity.index' => 'activity',
-        ];
+        Route::match(['get', 'post'], 'account', [AdminAccountController::class, '__invoke'])
+            ->middleware('admin.role:admin,editor')
+            ->name('account.show');
 
-        foreach ($placeholders as $name => $uri) {
-            Route::get($uri, PlaceholderController::class)
-                ->middleware('admin.role:admin,editor')
-                ->name($name);
-        }
+        Route::get('activity', [AdminActivityController::class, 'index'])
+            ->middleware('admin.role:admin,editor')
+            ->name('activity.index');
 
         /*
          * دکمه‌های صفحه اصلی: three screen tabs (main menu board with the

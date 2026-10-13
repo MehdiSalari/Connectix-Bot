@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Services\Telegram;
 
+use App\Models\BotButton;
+use App\Services\Bot\BotButtonService;
+use App\Services\Bot\ButtonColorService;
 use App\Services\Panel\PanelSettingsService;
 use App\Services\Plan\PlanService;
 use App\Services\User\UserService;
@@ -25,19 +28,28 @@ class KeyboardFactory
         private readonly PlanService $plans,
         private readonly UserService $users,
         private readonly AdminGuard $admins,
+        private readonly BotButtonService $botButtons,
     ) {}
 
     /**
      * The home screen.
      *
-     * Legacy put a conditional first row on top: the free trial offer while
-     * the user has not taken one, or a "keep the same one" shortcut once they
-     * have.
+     * If bot_buttons table has active rows for screen='main_menu', build the
+     * keyboard from them (row_num/col_num grouping, sort_order; text =
+     * emoji + ' | ' + current_label per fork formatting).
+     * Otherwise fall through to the hardcoded legacy rows exactly as before.
      *
      * @return array<int, array<int, array<string, mixed>>>
      */
     public function mainMenu(string|int $chatId): array
     {
+        $activeButtons = $this->botButtons->getActiveButtons('main_menu');
+
+        if (! empty($activeButtons)) {
+            return $this->buildDynamicMainMenu($activeButtons, $chatId);
+        }
+
+        // Legacy hardcoded fallback — must match exactly what tests pin
         $rows = $this->firstRow($chatId);
 
         $rows[] = [
@@ -74,6 +86,96 @@ class KeyboardFactory
         }
 
         return $rows;
+    }
+
+    /**
+     * Build main menu from dynamic bot_buttons rows.
+     */
+    private function buildDynamicMainMenu(array $buttons, string|int $chatId): array
+    {
+        $rows = [];
+
+        foreach ($buttons as $button) {
+            $emoji = $button->emoji !== '' ? trim($button->emoji) . ' | ' : '';
+            $text = $emoji . $button->current_label;
+
+            $style = ButtonColorService::colorFor($text, $button->button_color);
+
+            $entry = ['text' => $text];
+
+            if ($button->action_type === 'open_url' && $button->link_url) {
+                $entry['url'] = $button->link_url;
+            } elseif (! empty($button->custom_emoji_id)) {
+                $entry['icon_custom_emoji_id'] = $button->custom_emoji_id;
+            }
+
+            // Internal action_type maps button_key to legacy callback_data via BotButtonService
+            if (! isset($entry['url'])) {
+                $callback = $this->resolveCallback($button);
+                $entry['callback_data'] = $callback;
+            }
+
+            if ($style !== null) {
+                $entry['style'] = $style;
+            }
+
+            $rowNum = $button->row_num ?? 1;
+            $rows[$rowNum][] = $entry;
+        }
+
+        // Return array indexed from 0
+        return array_values($rows);
+    }
+
+    /**
+     * Map a button's action_type + button_key to the legacy callback_data.
+     * Mirrors BotButtonService::screenButtons() fallback logic.
+     */
+    private function resolveCallback(BotButton $button): string
+    {
+        $buyFallbacks = [
+            'renew_flow' => 'renew',
+            'buy_new_flow' => 'group',
+        ];
+
+        $osKeys = [
+            'app_windows' => 'app_windows',
+            'app_android' => 'app_android',
+            'app_ios' => 'app_ios',
+            'app_linux' => 'app_linux',
+            'app_mac' => 'app_mac',
+        ];
+
+        // button_key map first
+        if ($button->button_key !== '' && isset($buyFallbacks[$button->button_key])) {
+            return $buyFallbacks[$button->button_key];
+        }
+        if ($button->button_key !== '' && isset($osKeys[$button->button_key])) {
+            return $osKeys[$button->button_key];
+        }
+
+        // action_type map
+        $actionMap = [
+            'buy' => 'action:buy_or_renew_service',
+            'profile' => 'accounts',
+            'accounts' => 'accounts',
+            'wallet' => 'wallet',
+            'reseller' => 'reseller',
+            'support' => 'tickets',
+            'test' => 'get_test',
+            'always_select' => 'always_select:0',
+            'guides' => 'guide',
+            'guide' => 'guide',
+            'apps' => 'apps',
+            'webapp' => 'webapp',
+        ];
+
+        if ($button->action_type !== '' && isset($actionMap[$button->action_type])) {
+            return $actionMap[$button->action_type];
+        }
+
+        // Fallback: button_key or 'main_menu'
+        return $button->button_key !== '' ? $button->button_key : 'main_menu';
     }
 
     /**

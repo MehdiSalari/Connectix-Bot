@@ -87,10 +87,9 @@ class ChromeSkinsTest extends TestCase
 
     public function test_a_placeholder_route_answers_404_through_the_placeholder_controller(): void
     {
-        // Still a placeholder: the tickets page landed its real controller in
-        // wave 3, so the 404 probe moved to a section that has not yet.
+        // All fork sections now have real controllers. An unknown route still 404s.
         $this->actingAsAdmin()
-            ->get(route('admin.activity.index'))
+            ->get(route('admin.dashboard').'/does-not-exist')
             ->assertNotFound();
     }
 

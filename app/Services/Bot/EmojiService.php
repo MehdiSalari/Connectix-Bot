@@ -219,4 +219,13 @@ class EmojiService
     {
         return EmojiPackImported::query()->where('set_name', $setName)->delete() > 0;
     }
+
+    /**
+     * Simple pass-through for rendering text with emoji keys.
+     * Fork's EmojiService had more; we just return text unchanged for now.
+     */
+    public static function renderText(string $text): string
+    {
+        return $text;
+    }
 }

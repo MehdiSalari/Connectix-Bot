@@ -6,13 +6,17 @@ namespace App\Services\Purchase;
 
 use App\Enums\PaymentMethod;
 use App\Models\Client;
+use App\Models\LoyaltyRedemption;
 use App\Models\Payment;
 use App\Models\User;
 use App\Services\Connectix\ConnectixService;
+use App\Services\Loyalty\LoyaltyAdminService;
 use App\Services\Plan\PlanService;
+use App\Services\Shop\FlashSaleAdminService;
 use App\Services\User\UserStateService;
 use App\Services\Wallet\WalletService;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -224,11 +228,25 @@ class PurchaseService
      *
      * Legacy stored the discounted value formatted with separators when a
      * coupon had been applied, and the raw panel price otherwise.
+     * Flash sale price is applied at the calculation point (all payment
+     * methods use it) via FlashSaleAdminService::activeMap.
      *
      * @param  array<string, mixed>  $state
      */
     public function priceFor(array $state): string
     {
+        // Apply flash sale price at the calculation point
+        if (isset($state['plan'])) {
+            $planId = (string) $state['plan'];
+            $activeMap = FlashSaleAdminService::activeMap([$planId]);
+            if (isset($activeMap[$planId])) {
+                $original = (int) str_replace(',', '', (string) ($state['price'] ?? ''));
+                [$final, $strike] = FlashSaleAdminService::priceWithSale($original, $activeMap[$planId]);
+                // Update state with sale price
+                $state['price'] = (string) $final;
+            }
+        }
+
         if (isset($state['final_price'])) {
             return number_format($this->amountDue($state));
         }
@@ -250,6 +268,34 @@ class PurchaseService
         }
 
         return (int) str_replace(',', '', (string) $value);
+    }
+
+    /**
+     * Flash sale confirmation line: original + sale + remaining time.
+     * For handlers to use in confirmation messages.
+     *
+     * @param  string  $planId
+     * @return string|null
+     */
+    public function flashLine(string $planId): ?string
+    {
+        $activeMap = FlashSaleAdminService::activeMap([$planId]);
+        if (! isset($activeMap[$planId])) {
+            return null;
+        }
+
+        $sale = $activeMap[$planId];
+        $originalPrice = (int) str_replace(',', '', (string) ($sale['plan_price'] ?? 0));
+
+        // We need the original price - try to get from plan
+        $plan = $this->plans->findSellableById($planId);
+        if ($plan === null) {
+            return null;
+        }
+        $original = (int) str_replace(',', '', (string) ($plan['sell_price'] ?? 0));
+        [$final, $strike] = FlashSaleAdminService::priceWithSale($original, $sale);
+
+        return FlashSaleAdminService::remainingText($sale['ends_at']);
     }
 
     // -----------------------------------------------------------------
