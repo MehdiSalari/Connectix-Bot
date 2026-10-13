@@ -1,17 +1,34 @@
 <?php
 
+use App\Http\Controllers\Admin\AdminAdminsController;
 use App\Http\Controllers\Admin\AdminBroadcastController;
+use App\Http\Controllers\Admin\AdminCardController;
 use App\Http\Controllers\Admin\AdminClientController;
 use App\Http\Controllers\Admin\AdminAppearanceController;
+use App\Http\Controllers\Admin\AdminBotButtonController;
+use App\Http\Controllers\Admin\AdminBotEmojiController;
+use App\Http\Controllers\Admin\AdminLocalServiceController;
+use App\Http\Controllers\Admin\AdminPanelNodeController;
+use App\Http\Controllers\Admin\AdminCouponController;
+use App\Http\Controllers\Admin\AdminCryptoController;
+use App\Http\Controllers\Admin\AdminCustomPlanController;
 use App\Http\Controllers\Admin\AdminDashboardController;
+use App\Http\Controllers\Admin\AdminFeaturesController;
+use App\Http\Controllers\Admin\AdminFlashSaleController;
+use App\Http\Controllers\Admin\AdminGatewayController;
 use App\Http\Controllers\Admin\AdminGuideController;
 use App\Http\Controllers\Admin\AdminLoginController;
+use App\Http\Controllers\Admin\AdminLoyaltyController;
+use App\Http\Controllers\Admin\AdminNotificationController;
 use App\Http\Controllers\Admin\AdminOrderController;
 use App\Http\Controllers\Admin\AdminOrderDetailsController;
+use App\Http\Controllers\Admin\AdminResellerController;
 use App\Http\Controllers\Admin\AdminSettingsController;
 use App\Http\Controllers\Admin\AdminSmsPaymentController;
+use App\Http\Controllers\Admin\AdminTicketController;
 use App\Http\Controllers\Admin\AdminUserController;
 use App\Http\Controllers\Admin\AdminWalletTransactionController;
+use App\Http\Controllers\Admin\AdminWinbackController;
 use App\Http\Controllers\Admin\PlaceholderController;
 use App\Http\Controllers\Bank\BankSmsController;
 use App\Http\Controllers\Setup\SetupWizardController;
@@ -240,6 +257,130 @@ Route::prefix('admin')->name('admin.')->group(function (): void {
             ->name('appearance.store');
 
         /*
+         * درگاه‌های پرداخت، پرداخت کریپتو، پلن سفارشی و کد تخفیف: همان مرزی
+         * که بقیهٔ صفحات تنظیمات دارند — خواندن برای هر دو نقش، نوشتن فقط با
+         * ادمین.
+         */
+
+        // درگاه‌های پرداخت آنلاین
+        Route::get('gateways', [AdminGatewayController::class, 'index'])
+            ->middleware('admin.role:admin,editor')
+            ->name('gateways.index');
+        Route::post('gateways', [AdminGatewayController::class, 'update'])
+            ->middleware('admin.role:admin')
+            ->name('gateways.update');
+        Route::post('gateways/toggle', [AdminGatewayController::class, 'toggle'])
+            ->middleware('admin.role:admin')
+            ->name('gateways.toggle');
+
+        // پرداخت کریپتو (TRX/TON)
+        Route::get('crypto', [AdminCryptoController::class, 'index'])
+            ->middleware('admin.role:admin,editor')
+            ->name('crypto.index');
+        Route::post('crypto', [AdminCryptoController::class, 'update'])
+            ->middleware('admin.role:admin')
+            ->name('crypto.update');
+
+        // پلن سفارشی (حجم و زمان دلخواه)
+        Route::get('custom-plan', [AdminCustomPlanController::class, 'index'])
+            ->middleware('admin.role:admin,editor')
+            ->name('custom-plan.index');
+        Route::post('custom-plan', [AdminCustomPlanController::class, 'update'])
+            ->middleware('admin.role:admin')
+            ->name('custom-plan.update');
+
+        // کد تخفیف محلی
+        Route::get('coupons', [AdminCouponController::class, 'index'])
+            ->middleware('admin.role:admin,editor')
+            ->name('coupons.index');
+        Route::post('coupons', [AdminCouponController::class, 'store'])
+            ->middleware('admin.role:admin')
+            ->name('coupons.store');
+        Route::post('coupons/toggle', [AdminCouponController::class, 'toggle'])
+            ->middleware('admin.role:admin')
+            ->name('coupons.toggle');
+        Route::post('coupons/delete', [AdminCouponController::class, 'destroy'])
+            ->middleware('admin.role:admin')
+            ->name('coupons.destroy');
+
+        /*
+         * نمایندگی‌ها: the reseller management page. Reading is open to both
+         * roles; every mutating action (settings, quota, reset, discount,
+         * approve/reject) is admin-only, the same boundary the rest of the
+         * panel draws.
+         */
+        Route::get('resellers', [AdminResellerController::class, 'index'])
+            ->middleware('admin.role:admin,editor')
+            ->name('resellers.index');
+        Route::post('resellers/settings', [AdminResellerController::class, 'updateSettings'])
+            ->middleware('admin.role:admin')
+            ->name('resellers.settings');
+        Route::post('resellers/quota', [AdminResellerController::class, 'quota'])
+            ->middleware('admin.role:admin')
+            ->name('resellers.quota');
+        Route::post('resellers/reset-used', [AdminResellerController::class, 'resetUsed'])
+            ->middleware('admin.role:admin')
+            ->name('resellers.reset-used');
+        Route::post('resellers/discount', [AdminResellerController::class, 'discount'])
+            ->middleware('admin.role:admin')
+            ->name('resellers.discount');
+        Route::post('resellers/decide', [AdminResellerController::class, 'decide'])
+            ->middleware('admin.role:admin')
+            ->name('resellers.decide');
+
+        /*
+         * کارت‌های مشکوک: the suspicious-cards page. Reading is open to both
+         * roles; the alert threshold is admin-only.
+         */
+        Route::get('cards', [AdminCardController::class, 'index'])
+            ->middleware('admin.role:admin,editor')
+            ->name('cards.index');
+        Route::post('cards/threshold', [AdminCardController::class, 'threshold'])
+            ->middleware('admin.role:admin')
+            ->name('cards.threshold');
+
+        /*
+         * حراج زماندار، سیستم امتیازدهی، یادآور انقضا، بازگشت مشتری و
+         * ویژگیهای ویژه: the five fork feature pages. Reading is open to both
+         * roles; every mutation (save/toggle/delete/queue/backup) is admin-only
+         * — the same boundary the rest of the settings pages draw.
+         */
+        Route::get('flash-sales', [AdminFlashSaleController::class, 'index'])
+            ->middleware('admin.role:admin,editor')
+            ->name('flash-sales.index');
+        Route::post('flash-sales', [AdminFlashSaleController::class, 'index'])
+            ->middleware('admin.role:admin')
+            ->name('flash-sales.store');
+
+        Route::get('loyalty', [AdminLoyaltyController::class, 'index'])
+            ->middleware('admin.role:admin,editor')
+            ->name('loyalty.index');
+        Route::post('loyalty', [AdminLoyaltyController::class, 'index'])
+            ->middleware('admin.role:admin')
+            ->name('loyalty.store');
+
+        Route::get('notifications', [AdminNotificationController::class, 'index'])
+            ->middleware('admin.role:admin,editor')
+            ->name('notifications.index');
+        Route::post('notifications', [AdminNotificationController::class, 'index'])
+            ->middleware('admin.role:admin')
+            ->name('notifications.store');
+
+        Route::get('winback', [AdminWinbackController::class, 'index'])
+            ->middleware('admin.role:admin,editor')
+            ->name('winback.index');
+        Route::post('winback', [AdminWinbackController::class, 'index'])
+            ->middleware('admin.role:admin')
+            ->name('winback.store');
+
+        Route::get('features', [AdminFeaturesController::class, 'index'])
+            ->middleware('admin.role:admin,editor')
+            ->name('features.index');
+        Route::post('features', [AdminFeaturesController::class, 'index'])
+            ->middleware('admin.role:admin')
+            ->name('features.store');
+
+        /*
          * Placeholders for the admin sections the fork has and this rewrite
          * grows into, one wave at a time. The layout renders a sidebar row for
          * each of these only when the route exists (Route::has), so the menu
@@ -247,22 +388,6 @@ Route::prefix('admin')->name('admin.')->group(function (): void {
          * PlaceholderController instead of dying on an undefined route name.
          */
         $placeholders = [
-            'resellers.index' => 'resellers',
-            'tickets.index' => 'tickets',
-            'admins.index' => 'admins',
-            'gateways.index' => 'gateways',
-            'panels.index' => 'panels',
-            'crypto.index' => 'crypto',
-            'coupons.index' => 'coupons',
-            'custom-plan.index' => 'custom-plan',
-            'flash-sales.index' => 'flash-sales',
-            'loyalty.index' => 'loyalty',
-            'cards.index' => 'cards',
-            'buttons.index' => 'buttons',
-            'emojis.index' => 'emojis',
-            'notifications.index' => 'notifications',
-            'winback.index' => 'winback',
-            'features.index' => 'features',
             'account.show' => 'account',
             'activity.index' => 'activity',
         ];
@@ -272,5 +397,161 @@ Route::prefix('admin')->name('admin.')->group(function (): void {
                 ->middleware('admin.role:admin,editor')
                 ->name($name);
         }
+
+        /*
+         * دکمه‌های صفحه اصلی: three screen tabs (main menu board with the
+         * row/column layout, buy screen, OS picker), the per-row inline edit,
+         * the board's reorder save and the default-colour card. Listing is
+         * open to both roles; every mutation is admin-only — the same boundary
+         * the rest of the settings pages draw.
+         */
+        Route::get('buttons', [AdminBotButtonController::class, 'index'])
+            ->middleware('admin.role:admin,editor')
+            ->name('buttons.index');
+        Route::post('buttons/reorder', [AdminBotButtonController::class, 'reorder'])
+            ->middleware('admin.role:admin')
+            ->name('buttons.reorder');
+        Route::post('buttons/default-color', [AdminBotButtonController::class, 'defaultColor'])
+            ->middleware('admin.role:admin')
+            ->name('buttons.default-color');
+        Route::post('buttons/toggle', [AdminBotButtonController::class, 'toggle'])
+            ->middleware('admin.role:admin')
+            ->name('buttons.toggle');
+        Route::post('buttons', [AdminBotButtonController::class, 'update'])
+            ->middleware('admin.role:admin')
+            ->name('buttons.update');
+
+        /*
+         * ایموجی‌های پرمیوم: the emoji registry with its section tabs, the
+         * per-emoji edit rows (fallback char + premium custom_emoji_id), the
+         * import-pack form and the favourites star. Read for both roles;
+         * writes admin-only.
+         */
+        Route::get('emojis', [AdminBotEmojiController::class, 'index'])
+            ->middleware('admin.role:admin,editor')
+            ->name('emojis.index');
+        Route::post('emojis/import-pack', [AdminBotEmojiController::class, 'importPack'])
+            ->middleware('admin.role:admin')
+            ->name('emojis.import-pack');
+        Route::post('emojis/favorite', [AdminBotEmojiController::class, 'toggleFavorite'])
+            ->middleware('admin.role:admin')
+            ->name('emojis.favorite');
+        Route::post('emojis/delete-pack', [AdminBotEmojiController::class, 'destroyPack'])
+            ->middleware('admin.role:admin')
+            ->name('emojis.delete-pack');
+        Route::post('emojis/delete', [AdminBotEmojiController::class, 'destroy'])
+            ->middleware('admin.role:admin')
+            ->name('emojis.destroy');
+        Route::post('emojis', [AdminBotEmojiController::class, 'update'])
+            ->middleware('admin.role:admin')
+            ->name('emojis.update');
+
+        /*
+         * پنل‌های VPN و پلن‌ها: Marzban / 3x-ui / Remnawave / Hiddify nodes,
+         * their connection test (driver testConnection, Http::fake in tests)
+         * and the per-panel local plans. The encrypted secret never leaves the
+         * service: the edit form only ever sees a has_secret flag. Reading is
+         * open to both roles; panels, plans and the test button are admin-only.
+         */
+        Route::get('panels', [AdminPanelNodeController::class, 'index'])
+            ->middleware('admin.role:admin,editor')
+            ->name('panels.index');
+        Route::post('panels/save', [AdminPanelNodeController::class, 'savePanel'])
+            ->middleware('admin.role:admin')
+            ->name('panels.save');
+        Route::post('panels/delete', [AdminPanelNodeController::class, 'deletePanel'])
+            ->middleware('admin.role:admin')
+            ->name('panels.delete');
+        Route::post('panels/test', [AdminPanelNodeController::class, 'testPanel'])
+            ->middleware('admin.role:admin')
+            ->name('panels.test');
+        Route::post('panels/plan/save', [AdminPanelNodeController::class, 'savePlan'])
+            ->middleware('admin.role:admin')
+            ->name('panels.plan.save');
+        Route::post('panels/plan/delete', [AdminPanelNodeController::class, 'deletePlan'])
+            ->middleware('admin.role:admin')
+            ->name('panels.plan.delete');
+
+        /*
+         * کاربران و سرویس‌ها (مستقل از Connectix): hand-made users keyed by
+         * their Telegram chat id and the local services rows. Wave 3 scope:
+         * everything operates on local rows only; remote provisioning on the
+         * VPN panel arrives with wave 4. Search and listing are open to both
+         * roles; every mutation is admin-only.
+         */
+        Route::get('localservices', [AdminLocalServiceController::class, 'index'])
+            ->middleware('admin.role:admin,editor')
+            ->name('localservices.index');
+        Route::get('localservices/users/search', [AdminLocalServiceController::class, 'searchUsers'])
+            ->middleware('admin.role:admin,editor')
+            ->name('localservices.users.search');
+        Route::post('localservices/users', [AdminLocalServiceController::class, 'createUser'])
+            ->middleware('admin.role:admin')
+            ->name('localservices.users.store');
+        Route::post('localservices/users/block', [AdminLocalServiceController::class, 'setBlocked'])
+            ->middleware('admin.role:admin')
+            ->name('localservices.users.block');
+        Route::post('localservices/services', [AdminLocalServiceController::class, 'createService'])
+            ->middleware('admin.role:admin')
+            ->name('localservices.services.store');
+        Route::post('localservices/services/attach', [AdminLocalServiceController::class, 'attach'])
+            ->middleware('admin.role:admin')
+            ->name('localservices.services.attach');
+        Route::post('localservices/services/renew', [AdminLocalServiceController::class, 'renew'])
+            ->middleware('admin.role:admin')
+            ->name('localservices.services.renew');
+        Route::post('localservices/services/enabled', [AdminLocalServiceController::class, 'setEnabled'])
+            ->middleware('admin.role:admin')
+            ->name('localservices.services.enabled');
+        Route::post('localservices/services/reset-traffic', [AdminLocalServiceController::class, 'resetTraffic'])
+            ->middleware('admin.role:admin')
+            ->name('localservices.services.reset-traffic');
+        Route::post('localservices/services/delete', [AdminLocalServiceController::class, 'destroy'])
+            ->middleware('admin.role:admin')
+            ->name('localservices.services.destroy');
+
+        /*
+         * تیکت‌ها: لیست و صفحات خواندن برای هر دو نقش، نوشتن فقط با ادمین —
+         * همان مرزی که بقیهٔ صفحات دارند و همان نقش‌بندی فورک (پشتیبان فقط
+         * می‌خواند). reply/status/close هر سه POST هستند و هر سه در
+         * admin_activity ثبت می‌شوند.
+         */
+        Route::get('tickets', [AdminTicketController::class, 'index'])
+            ->middleware('admin.role:admin,editor')
+            ->name('tickets.index');
+        Route::get('tickets/{ticket}', [AdminTicketController::class, 'show'])
+            ->middleware('admin.role:admin,editor')
+            ->name('tickets.show');
+        Route::post('tickets/{ticket}/reply', [AdminTicketController::class, 'reply'])
+            ->middleware('admin.role:admin')
+            ->name('tickets.reply');
+        Route::post('tickets/{ticket}/status', [AdminTicketController::class, 'status'])
+            ->middleware('admin.role:admin')
+            ->name('tickets.status');
+        Route::post('tickets/{ticket}/close', [AdminTicketController::class, 'close'])
+            ->middleware('admin.role:admin')
+            ->name('tickets.close');
+
+        /*
+         * ادمین‌ها: مدیریت حساب‌های پنل. خواندن برای هر دو نقش؛ ساخت،
+         * فعال/غیرفعال، دسترسی‌ها و تغییر رمز فقط با ادمین. حساب ادمین اصلی
+         * (نصب) در هیچ مسیری قابل تغییر نیست و ادیتور اصلاً به این صفحات
+         * نوشتن راه ندارد.
+         */
+        Route::get('admins', [AdminAdminsController::class, 'index'])
+            ->middleware('admin.role:admin,editor')
+            ->name('admins.index');
+        Route::post('admins', [AdminAdminsController::class, 'store'])
+            ->middleware('admin.role:admin')
+            ->name('admins.store');
+        Route::post('admins/{admin}/toggle', [AdminAdminsController::class, 'toggle'])
+            ->middleware('admin.role:admin')
+            ->name('admins.toggle');
+        Route::post('admins/{admin}/permissions', [AdminAdminsController::class, 'updatePermissions'])
+            ->middleware('admin.role:admin')
+            ->name('admins.permissions');
+        Route::post('admins/{admin}/password', [AdminAdminsController::class, 'resetPassword'])
+            ->middleware('admin.role:admin')
+            ->name('admins.password');
     });
 });
