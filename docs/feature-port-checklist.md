@@ -21,8 +21,8 @@
 - [x] **W2.1** ۸ تم ThemeService (airox-gold، airox-violet، اقیانوس، جنگل، غروب، رز، نیمه‌شب، گرافیت) در `connectix.css` + صفحه «ظاهر و تم» (admin/appearance) با پیش‌نمایش زنده و ذخیره تم پیش‌فرض پنل
 - [x] **W2.2** منوی گروهی کامل Airoxnet در sidebar: گروه‌های عمومی/فروشگاه/ربات/حساب با badge تیکت باز، کارت نسخه، لینک کانال، فیلتر بر اساس نقش/دسترسی ادمین
 - [x] **W2.3** topbar کامل: pill وضعیت سیستم، سلام روز/شب + ساعت تهران زنده، تاریخ شمسی، zنگارش swatch پوسته، دکمه تم
-- [ ] **W2.4** رفرش داشبورد به سبک Airoxnet: KPI های کامل (کاربران، مشتریان، درآمد امروز/ماه/کل، تیکت باز، نمایندگان فعال) + sparkline + نمودار وضعیت تراکنش‌ها (doughnut) + پراستفاده‌ترین کدهای تخفیف + بازه نمودار (۷/۳۰/۹۰ روز) — بدون شکستن قواعد v22-v24 (تاریخ شمسی، حذف کارت سرویس‌های فعال، «—» برای دوره صفر)
-- [ ] **W2.5** صفحه «ایمیل و رمز عبور» (حساب) + «امنیت حساب» + «فعالیت‌ها» (admin_activity)
+- [x] **W2.4** رفرش داشبورد به سبک Airoxnet: KPI های کامل (کاربران، مشتریان، درآمد امروز/ماه/کل، تیکت باز، نمایندگان فعال) + sparkline + نمودار وضعیت تراکنش‌ها (doughnut) + پراستفاده‌ترین کدهای تخفیف + بازه نمودار (۷/۳۰/۹۰ روز) — بدون شکستن قواعد v22-v24 (تاریخ شمسی، حذف کارت سرویس‌های فعال، «—» برای دوره صفر)
+- [x] **W2.5** صفحه «ایمیل و رمز عبور» (حساب) + «امنیت حساب» + «فعالیت‌ها» (admin_activity)
 
 ## موج ۳ — صفحات پنل (هر صفحه: کنترلر + ویو + تست)
 
@@ -46,16 +46,16 @@
 
 ## موج ۴ — سمت ربات (هندلرها + سرویس‌های سخت‌افزاری)
 
-- [ ] **W4.1** `CryptoPayService` — سفارش TRX/TON، نرخ نوبیتکس، استخراج هش، تایید خودکار، دکمه‌های ادمین؛ callback data `crypto_*`
-- [ ] **W4.2** `OnlineGatewayService` — زرین‌پال/نکست‌پی/NOWPayments، callback `gw_*`، callback URL
+- [x] **W4.1** `CryptoPayService` — سفارش TRX/TON، نرخ نوبیتکس، استخراج هش، تایید خودکار، دکمه‌های ادمین؛ callback data `crypto_*`
+- [x] **W4.2** `OnlineGatewayService` — زرین‌پال/نکست‌پی/NOWPayments، callback `gw_*`، callback URL
 - [ ] **W4.3** `CustomPlanService` — فروش GB/روز دلخواه، callback `customplan_*`
-- [ ] **W4.4** `TicketService` — تیکت در ربات، callback های `tickets*`/`myticket`/`reply`/`close`/`user`/`uclose`/`tkhist` + rateTicket
-- [ ] **W4.5** `ResellerService` — درخواست/تایید نمایندگی، کمیسیون، callback های `repreqok/no` + سهمیه تست
+- [x] **W4.4** `TicketService` — تیکت در ربات، callback های `tickets*`/`myticket`/`reply`/`close`/`user`/`uclose`/`tkhist` + rateTicket
+- [x] **W4.5** `ResellerService` — درخواست/تایید نمایندگی، کمیسیون، callback های `repreqok/no` + سهمیه تست
 - [ ] **W4.6** `LoyaltyService` — امتیاز از پرداخت، تبدیل به کد، اعمال در پرداخت، پیام ربات
-- [ ] **W4.7** دکمه‌های داینامیک + رنگ خودکار (`autoButtonColor`) در `KeyboardFactory` — خواندن `bot_buttons` + `default_button_color`
-- [ ] **W4.8** حراج زمان‌دار در خرید — قیمت خط‌خورده، تایمر، اعمال در همه روش‌های پرداخت
+- [x] **W4.7** دکمه‌های داینامیک + رنگ خودکار (`autoButtonColor`) در `KeyboardFactory` — خواندن `bot_buttons` + `default_button_color`
+- [x] **W4.8** حراج زمان‌دار در خرید — قیمت خط‌خورده، تایمر، اعمال در همه روش‌های پرداخت
 - [ ] **W4.9** `FlashSaleService`/`CardTrackService`/`WelcomeCreditService`/`NotificationService`/`WinbackService` + کران‌ها
-- [ ] **W4.10** شماره کارت پرداخت‌کننده در رسیدها (`payments.src_card`) + نمایش در لیست‌ها
+- [x] **W4.10** شماره کارت پرداخت‌کننده در رسیدها (`payments.src_card`) + نمایش در لیست‌ها
 
 ## موج ۵ — همگرایی و تست نهایی
 
