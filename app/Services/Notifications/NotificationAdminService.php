@@ -103,7 +103,12 @@ class NotificationAdminService
                 continue;
             }
 
-            $expiresDay = Carbon::parse($expires)->startOfDay();
+            // The panel measures "days remaining" on Tehran days, and $now is
+            // a Tehran Carbon. Parsing the expiry as app-timezone (UTC)
+            // shifted every comparison by 3.5 hours, which made the largest
+            // day group unreachable: a client expiring on Tehran-day D+3
+            // landed past the window end and was dropped instead of grouped.
+            $expiresDay = Carbon::parse($expires, 'Asia/Tehran')->startOfDay();
 
             if ($expiresDay->lt($today) || $expiresDay->gt($windowEnd)) {
                 continue;

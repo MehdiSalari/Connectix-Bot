@@ -121,7 +121,7 @@ class AdminFeaturesController extends Controller
             'actionMsg' => $actionMsg,
             'brandName' => $brandName,
             'brandChannel' => $brandChannel,
-            'startEmoji' => $this->startEmojiService->get(),
+            'startEmoji' => StartEmojiAdminService::get(),
             'welcomeCredit' => WelcomeCreditAdminService::get(),
             'welcomeCreditStats' => WelcomeCreditAdminService::stats(),
             'backup' => DbBackupAdminService::get(),

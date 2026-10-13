@@ -325,7 +325,6 @@ class LoyaltyAdminService
                 'type'       => $type,
                 'ref'        => $ref,
                 'note'       => mb_substr($note, 0, 255),
-                'user_note'  => $userNote === null ? null : mb_substr($userNote, 0, 255),
                 'expires_at' => $expires,
                 'created_at' => self::now(),
             ]);
@@ -378,7 +377,6 @@ class LoyaltyAdminService
                     'type'       => $type,
                     'ref'        => $ref,
                     'note'       => mb_substr($note, 0, 255),
-                    'user_note'  => $userNote === null ? null : mb_substr($userNote, 0, 255),
                     'expires_at' => null,
                     'created_at' => self::now(),
                 ]);
@@ -426,7 +424,7 @@ class LoyaltyAdminService
             ->where('chat_id', $chatId)
             ->orderBy('id', 'desc')
             ->limit($limit)
-            ->get(['amount', 'type', 'note', 'user_note', 'created_at'])
+            ->get(['amount', 'type', 'note', 'created_at'])
             ->toArray();
     }
 
@@ -458,6 +456,10 @@ class LoyaltyAdminService
             ->orderBy('bal', 'desc')
             ->limit($limit)
             ->get()
+            // The query builder returns stdClass rows, but every other
+            // method here (and the blade that consumes this list) deals in
+            // arrays — so normalize instead of leaking objects upward.
+            ->map(static fn ($row): array => (array) $row)
             ->toArray();
     }
 
