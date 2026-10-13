@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Admin\AdminBroadcastController;
 use App\Http\Controllers\Admin\AdminClientController;
+use App\Http\Controllers\Admin\AdminAppearanceController;
 use App\Http\Controllers\Admin\AdminDashboardController;
 use App\Http\Controllers\Admin\AdminGuideController;
 use App\Http\Controllers\Admin\AdminLoginController;
@@ -11,6 +12,7 @@ use App\Http\Controllers\Admin\AdminSettingsController;
 use App\Http\Controllers\Admin\AdminSmsPaymentController;
 use App\Http\Controllers\Admin\AdminUserController;
 use App\Http\Controllers\Admin\AdminWalletTransactionController;
+use App\Http\Controllers\Admin\PlaceholderController;
 use App\Http\Controllers\Bank\BankSmsController;
 use App\Http\Controllers\Setup\SetupWizardController;
 use App\Http\Controllers\Telegram\TelegramWebhookController;
@@ -227,5 +229,48 @@ Route::prefix('admin')->name('admin.')->group(function (): void {
         Route::get('broadcast/progress', [AdminBroadcastController::class, 'progress'])
             ->middleware('admin.role:admin')
             ->name('broadcast.progress');
+
+        // ظاهر و تم: انتخاب تم پیش‌فرض پنل و وب‌اپ. خواندن برای هر دو نقش،
+        // نوشتن فقط با ادمین — همان مرزی که بقیهٔ صفحات تنظیمات دارند.
+        Route::get('appearance', [AdminAppearanceController::class, 'show'])
+            ->middleware('admin.role:admin,editor')
+            ->name('appearance');
+        Route::post('appearance', [AdminAppearanceController::class, 'store'])
+            ->middleware('admin.role:admin')
+            ->name('appearance.store');
+
+        /*
+         * Placeholders for the admin sections the fork has and this rewrite
+         * grows into, one wave at a time. The layout renders a sidebar row for
+         * each of these only when the route exists (Route::has), so the menu
+         * fills in as the waves land; until then every one answers 404 through
+         * PlaceholderController instead of dying on an undefined route name.
+         */
+        $placeholders = [
+            'resellers.index' => 'resellers',
+            'tickets.index' => 'tickets',
+            'admins.index' => 'admins',
+            'gateways.index' => 'gateways',
+            'panels.index' => 'panels',
+            'crypto.index' => 'crypto',
+            'coupons.index' => 'coupons',
+            'custom-plan.index' => 'custom-plan',
+            'flash-sales.index' => 'flash-sales',
+            'loyalty.index' => 'loyalty',
+            'cards.index' => 'cards',
+            'buttons.index' => 'buttons',
+            'emojis.index' => 'emojis',
+            'notifications.index' => 'notifications',
+            'winback.index' => 'winback',
+            'features.index' => 'features',
+            'account.show' => 'account',
+            'activity.index' => 'activity',
+        ];
+
+        foreach ($placeholders as $name => $uri) {
+            Route::get($uri, PlaceholderController::class)
+                ->middleware('admin.role:admin,editor')
+                ->name($name);
+        }
     });
 });

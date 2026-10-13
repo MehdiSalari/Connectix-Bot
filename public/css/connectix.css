@@ -2766,3 +2766,470 @@ tbody tr[data-user-details] { cursor: pointer; }
     .pl-vercard { padding: 10px 12px; }
     .pl-vercard-ico { width: 30px; height: 30px; flex-basis: 30px; }
 }
+
+/* =============================================================================
+   FORK THEME PACK — the ten Airoxnet themes as data-theme ids
+   -----------------------------------------------------------------------------
+   The reference fork defines every theme over one shared set of --pl-*
+   variable names (ThemeService::variablesCss). Each block below sets those
+   same --pl-* names AND maps them onto this stylesheet's tokens (--bg,
+   --surface, --accent, --text, --ok, --danger, ...), so every component
+   keeps painting from the tokens it already reads.
+
+   data-theme="light" and "dark" already exist above and stay the defaults;
+   the eight new ids are airox-gold, airox-violet, ocean, forest, sunset,
+   rose, midnight and graphite. The selector is :root[data-theme="..."]
+   (0,2,0): equal to the liquid-glass dark defaults but LATER in the file,
+   so a fork theme always wins whatever family it belongs to.
+   ========================================================================== */
+
+/* --- اقیانوس · ocean (light) ---------------------------------------------- */
+:root[data-theme="ocean"] {
+    --pl-bg: #eef6fb; --pl-card: #ffffff; --pl-line: #dbe9f3; --pl-text: #0f3049; --pl-muted: #6b8aa0;
+    --pl-primary: #0284c7; --pl-primary2: #06b6d4; --pl-primary-soft: #e0f2fe; --pl-hover: #f1f8fc;
+    --pl-link: #3f5f78; --pl-icon: #7d9bb1; --pl-circle: #eaf3f9; --pl-circle-text: #3f5f78;
+    --pl-shadow: 0 2px 14px rgba(2, 132, 199, .08);
+
+    --bg: var(--pl-bg);
+    --bg-glow-1: color-mix(in srgb, var(--pl-primary) 20%, transparent);
+    --bg-glow-2: color-mix(in srgb, var(--pl-primary2) 16%, transparent);
+    --bg-glow-3: color-mix(in srgb, var(--pl-primary) 9%, transparent);
+    --surface: color-mix(in srgb, var(--pl-card) 70%, transparent);
+    --surface-2: var(--pl-hover);
+    --surface-solid: var(--pl-card);
+    --sidebar-bg: color-mix(in srgb, var(--pl-card) 78%, transparent);
+    --border: color-mix(in srgb, var(--pl-line) 90%, transparent);
+    --border-strong: color-mix(in srgb, var(--pl-line) 60%, var(--pl-text) 9%);
+    --text: var(--pl-text);
+    --text-dim: var(--pl-link);
+    --text-faint: var(--pl-muted);
+    --accent: var(--pl-primary);
+    --accent-2: var(--pl-primary2);
+    --accent-soft: var(--pl-primary-soft);
+    --accent-text: color-mix(in srgb, var(--accent) 68%, var(--text));
+    --on-accent: #ffffff;
+    --ok: #0f9d6b;     --ok-soft: rgba(15, 157, 107, .14);
+    --warn: #b7791f;   --warn-soft: rgba(183, 121, 31, .14);
+    --danger: #e0455f; --danger-soft: rgba(224, 69, 95, .14);
+    --info: #0d84c4;   --info-soft: rgba(13, 132, 196, .14);
+    --shadow-sm: 0 1px 2px rgba(15, 23, 42, .06);
+    --shadow: var(--pl-shadow);
+    --shadow-lg: 0 30px 60px -30px rgba(15, 23, 42, .35);
+    --specular: inset 0 1px 0 rgba(255, 255, 255, .8);
+    --select-option-bg: var(--pl-card);
+    color-scheme: light;
+}
+
+/* --- جنگل · forest (light) ------------------------------------------------- */
+:root[data-theme="forest"] {
+    --pl-bg: #f0f7f3; --pl-card: #ffffff; --pl-line: #dcebe2; --pl-text: #12372a; --pl-muted: #6f8f7f;
+    --pl-primary: #059669; --pl-primary2: #10b981; --pl-primary-soft: #dcfce7; --pl-hover: #f3faf6;
+    --pl-link: #3c5f4e; --pl-icon: #80a08f; --pl-circle: #eaf4ee; --pl-circle-text: #3c5f4e;
+    --pl-shadow: 0 2px 14px rgba(5, 150, 105, .08);
+
+    --bg: var(--pl-bg);
+    --bg-glow-1: color-mix(in srgb, var(--pl-primary) 20%, transparent);
+    --bg-glow-2: color-mix(in srgb, var(--pl-primary2) 16%, transparent);
+    --bg-glow-3: color-mix(in srgb, var(--pl-primary) 9%, transparent);
+    --surface: color-mix(in srgb, var(--pl-card) 70%, transparent);
+    --surface-2: var(--pl-hover);
+    --surface-solid: var(--pl-card);
+    --sidebar-bg: color-mix(in srgb, var(--pl-card) 78%, transparent);
+    --border: color-mix(in srgb, var(--pl-line) 90%, transparent);
+    --border-strong: color-mix(in srgb, var(--pl-line) 60%, var(--pl-text) 9%);
+    --text: var(--pl-text);
+    --text-dim: var(--pl-link);
+    --text-faint: var(--pl-muted);
+    --accent: var(--pl-primary);
+    --accent-2: var(--pl-primary2);
+    --accent-soft: var(--pl-primary-soft);
+    --accent-text: color-mix(in srgb, var(--accent) 68%, var(--text));
+    --on-accent: #ffffff;
+    --ok: #0f9d6b;     --ok-soft: rgba(15, 157, 107, .14);
+    --warn: #b7791f;   --warn-soft: rgba(183, 121, 31, .14);
+    --danger: #e0455f; --danger-soft: rgba(224, 69, 95, .14);
+    --info: #0d84c4;   --info-soft: rgba(13, 132, 196, .14);
+    --shadow-sm: 0 1px 2px rgba(15, 23, 42, .06);
+    --shadow: var(--pl-shadow);
+    --shadow-lg: 0 30px 60px -30px rgba(15, 23, 42, .35);
+    --specular: inset 0 1px 0 rgba(255, 255, 255, .8);
+    --select-option-bg: var(--pl-card);
+    color-scheme: light;
+}
+
+/* --- غروب · sunset (light) -------------------------------------------------- */
+:root[data-theme="sunset"] {
+    --pl-bg: #fff6ef; --pl-card: #ffffff; --pl-line: #f6e3d3; --pl-text: #3d2412; --pl-muted: #a78469;
+    --pl-primary: #ea580c; --pl-primary2: #f59e0b; --pl-primary-soft: #ffedd5; --pl-hover: #fff9f4;
+    --pl-link: #6d4a33; --pl-icon: #c19a7c; --pl-circle: #fbeee2; --pl-circle-text: #6d4a33;
+    --pl-shadow: 0 2px 14px rgba(234, 88, 12, .09);
+
+    --bg: var(--pl-bg);
+    --bg-glow-1: color-mix(in srgb, var(--pl-primary) 20%, transparent);
+    --bg-glow-2: color-mix(in srgb, var(--pl-primary2) 16%, transparent);
+    --bg-glow-3: color-mix(in srgb, var(--pl-primary) 9%, transparent);
+    --surface: color-mix(in srgb, var(--pl-card) 70%, transparent);
+    --surface-2: var(--pl-hover);
+    --surface-solid: var(--pl-card);
+    --sidebar-bg: color-mix(in srgb, var(--pl-card) 78%, transparent);
+    --border: color-mix(in srgb, var(--pl-line) 90%, transparent);
+    --border-strong: color-mix(in srgb, var(--pl-line) 60%, var(--pl-text) 9%);
+    --text: var(--pl-text);
+    --text-dim: var(--pl-link);
+    --text-faint: var(--pl-muted);
+    --accent: var(--pl-primary);
+    --accent-2: var(--pl-primary2);
+    --accent-soft: var(--pl-primary-soft);
+    --accent-text: color-mix(in srgb, var(--accent) 68%, var(--text));
+    --on-accent: #ffffff;
+    --ok: #0f9d6b;     --ok-soft: rgba(15, 157, 107, .14);
+    --warn: #b7791f;   --warn-soft: rgba(183, 121, 31, .14);
+    --danger: #e0455f; --danger-soft: rgba(224, 69, 95, .14);
+    --info: #0d84c4;   --info-soft: rgba(13, 132, 196, .14);
+    --shadow-sm: 0 1px 2px rgba(15, 23, 42, .06);
+    --shadow: var(--pl-shadow);
+    --shadow-lg: 0 30px 60px -30px rgba(15, 23, 42, .35);
+    --specular: inset 0 1px 0 rgba(255, 255, 255, .8);
+    --select-option-bg: var(--pl-card);
+    color-scheme: light;
+}
+
+/* --- رز · rose (light) ------------------------------------------------------ */
+:root[data-theme="rose"] {
+    --pl-bg: #fdf2f6; --pl-card: #ffffff; --pl-line: #f7dde7; --pl-text: #3f1527; --pl-muted: #a77589;
+    --pl-primary: #db2777; --pl-primary2: #f43f5e; --pl-primary-soft: #fce7f3; --pl-hover: #fef7fa;
+    --pl-link: #6d3a50; --pl-icon: #c58ea3; --pl-circle: #fbe9f0; --pl-circle-text: #6d3a50;
+    --pl-shadow: 0 2px 14px rgba(219, 39, 119, .08);
+
+    --bg: var(--pl-bg);
+    --bg-glow-1: color-mix(in srgb, var(--pl-primary) 20%, transparent);
+    --bg-glow-2: color-mix(in srgb, var(--pl-primary2) 16%, transparent);
+    --bg-glow-3: color-mix(in srgb, var(--pl-primary) 9%, transparent);
+    --surface: color-mix(in srgb, var(--pl-card) 70%, transparent);
+    --surface-2: var(--pl-hover);
+    --surface-solid: var(--pl-card);
+    --sidebar-bg: color-mix(in srgb, var(--pl-card) 78%, transparent);
+    --border: color-mix(in srgb, var(--pl-line) 90%, transparent);
+    --border-strong: color-mix(in srgb, var(--pl-line) 60%, var(--pl-text) 9%);
+    --text: var(--pl-text);
+    --text-dim: var(--pl-link);
+    --text-faint: var(--pl-muted);
+    --accent: var(--pl-primary);
+    --accent-2: var(--pl-primary2);
+    --accent-soft: var(--pl-primary-soft);
+    --accent-text: color-mix(in srgb, var(--accent) 68%, var(--text));
+    --on-accent: #ffffff;
+    --ok: #0f9d6b;     --ok-soft: rgba(15, 157, 107, .14);
+    --warn: #b7791f;   --warn-soft: rgba(183, 121, 31, .14);
+    --danger: #e0455f; --danger-soft: rgba(224, 69, 95, .14);
+    --info: #0d84c4;   --info-soft: rgba(13, 132, 196, .14);
+    --shadow-sm: 0 1px 2px rgba(15, 23, 42, .06);
+    --shadow: var(--pl-shadow);
+    --shadow-lg: 0 30px 60px -30px rgba(15, 23, 42, .35);
+    --specular: inset 0 1px 0 rgba(255, 255, 255, .8);
+    --select-option-bg: var(--pl-card);
+    color-scheme: light;
+}
+
+/* --- نیمه‌شب · midnight (dark) ---------------------------------------------- */
+:root[data-theme="midnight"] {
+    --pl-bg: #070d1a; --pl-card: #0f1830; --pl-line: #1d2a4a; --pl-text: #e3ecff; --pl-muted: #7f93bd;
+    --pl-primary: #22d3ee; --pl-primary2: #3b82f6; --pl-primary-soft: #10325a; --pl-hover: #15213f;
+    --pl-link: #a9bbdf; --pl-icon: #6a7fab; --pl-circle: #15213f; --pl-circle-text: #bccbe9;
+    --pl-shadow: 0 2px 16px rgba(0, 0, 0, .45);
+
+    --bg: var(--pl-bg);
+    --bg-glow-1: color-mix(in srgb, var(--pl-primary) 24%, transparent);
+    --bg-glow-2: color-mix(in srgb, var(--pl-primary2) 18%, transparent);
+    --bg-glow-3: color-mix(in srgb, var(--pl-primary) 10%, transparent);
+    --surface: color-mix(in srgb, var(--pl-card) 78%, transparent);
+    --surface-2: var(--pl-hover);
+    --surface-solid: color-mix(in srgb, var(--pl-card) 94%, transparent);
+    --sidebar-bg: color-mix(in srgb, var(--pl-card) 86%, transparent);
+    --border: color-mix(in srgb, var(--pl-line) 82%, transparent);
+    --border-strong: var(--pl-line);
+    --text: var(--pl-text);
+    --text-dim: var(--pl-link);
+    --text-faint: var(--pl-muted);
+    --accent: var(--pl-primary);
+    --accent-2: var(--pl-primary2);
+    --accent-soft: var(--pl-primary-soft);
+    --accent-text: color-mix(in srgb, var(--accent) 62%, var(--text));
+    --on-accent: #ffffff;
+    --ok: #34d399;     --ok-soft: rgba(52, 211, 153, .14);
+    --warn: #fbbf24;   --warn-soft: rgba(251, 191, 36, .14);
+    --danger: #fb7185; --danger-soft: rgba(251, 113, 133, .14);
+    --info: #38bdf8;   --info-soft: rgba(56, 189, 248, .14);
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, .4);
+    --shadow: var(--pl-shadow);
+    --shadow-lg: 0 30px 60px -25px rgba(0, 0, 0, .65);
+    --specular: inset 0 1px 0 rgba(255, 255, 255, .12);
+    --select-option-bg: var(--pl-card);
+    color-scheme: dark;
+}
+
+/* --- گرافیت · graphite (dark) ------------------------------------------------ */
+:root[data-theme="graphite"] {
+    --pl-bg: #121212; --pl-card: #1c1c1e; --pl-line: #2e2e32; --pl-text: #ededed; --pl-muted: #9a9aa2;
+    --pl-primary: #fbbf24; --pl-primary2: #f59e0b; --pl-primary-soft: #3a2f12; --pl-hover: #252528;
+    --pl-link: #c4c4ca; --pl-icon: #85858d; --pl-circle: #252528; --pl-circle-text: #d0d0d6;
+    --pl-shadow: 0 2px 14px rgba(0, 0, 0, .5);
+
+    --bg: var(--pl-bg);
+    --bg-glow-1: color-mix(in srgb, var(--pl-primary) 16%, transparent);
+    --bg-glow-2: color-mix(in srgb, var(--pl-primary2) 12%, transparent);
+    --bg-glow-3: color-mix(in srgb, var(--pl-primary) 7%, transparent);
+    --surface: color-mix(in srgb, var(--pl-card) 78%, transparent);
+    --surface-2: var(--pl-hover);
+    --surface-solid: color-mix(in srgb, var(--pl-card) 94%, transparent);
+    --sidebar-bg: color-mix(in srgb, var(--pl-card) 86%, transparent);
+    --border: color-mix(in srgb, var(--pl-line) 82%, transparent);
+    --border-strong: var(--pl-line);
+    --text: var(--pl-text);
+    --text-dim: var(--pl-link);
+    --text-faint: var(--pl-muted);
+    --accent: var(--pl-primary);
+    --accent-2: var(--pl-primary2);
+    --accent-soft: var(--pl-primary-soft);
+    --accent-text: color-mix(in srgb, var(--accent) 62%, var(--text));
+    --on-accent: #1a1204;
+    --ok: #34d399;     --ok-soft: rgba(52, 211, 153, .14);
+    --warn: #fbbf24;   --warn-soft: rgba(251, 191, 36, .14);
+    --danger: #fb7185; --danger-soft: rgba(251, 113, 133, .14);
+    --info: #38bdf8;   --info-soft: rgba(56, 189, 248, .14);
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, .4);
+    --shadow: var(--pl-shadow);
+    --shadow-lg: 0 30px 60px -25px rgba(0, 0, 0, .65);
+    --specular: inset 0 1px 0 rgba(255, 255, 255, .1);
+    --select-option-bg: var(--pl-card);
+    color-scheme: dark;
+}
+
+/* --- تیره طلایی · airox-gold (dark) — the Airoxnet gold dashboard skin ------ */
+:root[data-theme="airox-gold"] {
+    --pl-bg: #0b0d14; --pl-card: #12151f; --pl-line: #252a3a; --pl-text: #f1f2f6; --pl-muted: #8a90a6;
+    --pl-primary: #f5b83d; --pl-primary2: #d99a1c; --pl-primary-soft: #2a2310; --pl-hover: #1a1e2b;
+    --pl-link: #c7cadb; --pl-icon: #8a90a6; --pl-circle: #1a1e2b; --pl-circle-text: #d6d9e8;
+    --pl-shadow: 0 4px 22px rgba(0, 0, 0, .45);
+
+    --bg: var(--pl-bg);
+    --bg-glow-1: rgba(245, 184, 61, .10);
+    --bg-glow-2: rgba(217, 154, 28, .07);
+    --bg-glow-3: rgba(245, 184, 61, .04);
+    --surface: color-mix(in srgb, var(--pl-card) 78%, transparent);
+    --surface-2: var(--pl-hover);
+    --surface-solid: color-mix(in srgb, var(--pl-card) 94%, transparent);
+    --sidebar-bg: color-mix(in srgb, var(--pl-card) 86%, transparent);
+    --border: color-mix(in srgb, var(--pl-line) 82%, transparent);
+    --border-strong: var(--pl-line);
+    --text: var(--pl-text);
+    --text-dim: var(--pl-link);
+    --text-faint: var(--pl-muted);
+    --accent: var(--pl-primary);
+    --accent-2: var(--pl-primary2);
+    --accent-soft: var(--pl-primary-soft);
+    --accent-text: color-mix(in srgb, var(--accent) 62%, var(--text));
+    --on-accent: #1a1204;
+    --ok: #34d399;     --ok-soft: rgba(52, 211, 153, .14);
+    --warn: #fbbf24;   --warn-soft: rgba(251, 191, 36, .14);
+    --danger: #fb7185; --danger-soft: rgba(251, 113, 133, .14);
+    --info: #38bdf8;   --info-soft: rgba(56, 189, 248, .14);
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, .4);
+    --shadow: var(--pl-shadow);
+    --shadow-lg: 0 30px 60px -25px rgba(0, 0, 0, .65);
+    --specular: inset 0 1px 0 rgba(255, 255, 255, .1);
+    --select-option-bg: var(--pl-card);
+    color-scheme: dark;
+}
+
+/* the gold skin's own background: the #171b29 → #0d1019 wash the fork paints,
+   with a faint gold bloom where the aurora would be */
+:root[data-theme="airox-gold"] body {
+    background:
+        radial-gradient(900px 420px at 85% -10%, rgba(245, 184, 61, .07), transparent 70%),
+        linear-gradient(180deg, #171b29, #0d1019);
+    background-attachment: fixed;
+}
+:root[data-theme="airox-gold"] body::before { opacity: .3; }
+:root[data-theme="airox-gold"] .sidebar nav a.active {
+    background: linear-gradient(270deg, rgba(245, 184, 61, .24), rgba(245, 184, 61, .04));
+    color: var(--pl-primary);
+    box-shadow: inset -3px 0 0 var(--pl-primary), 0 0 0 1px rgba(245, 184, 61, .35);
+}
+:root[data-theme="airox-gold"] .sidebar nav a.active::before { background: var(--pl-primary); }
+:root[data-theme="airox-gold"] .pl-vercard { background: linear-gradient(135deg, #171b29, #0d1019); }
+
+/* --- روشن بنفش (Airoxnet) · airox-violet (light) ---------------------------- */
+:root[data-theme="airox-violet"] {
+    --pl-bg: #f4f5fb; --pl-card: #ffffff; --pl-line: #ececf5; --pl-text: #1b1f4b; --pl-muted: #8b8fa8;
+    --pl-primary: #6d4aff; --pl-primary2: #5b5cf0; --pl-primary-soft: #ede9ff; --pl-hover: #f6f6fc;
+    --pl-link: #4a4f6d; --pl-icon: #9a9eb8; --pl-circle: #f1f2fa; --pl-circle-text: #5a5f7d;
+    --pl-shadow: 0 4px 22px rgba(60, 50, 140, .08);
+
+    --bg: var(--pl-bg);
+    --bg-glow-1: color-mix(in srgb, var(--pl-primary) 18%, transparent);
+    --bg-glow-2: color-mix(in srgb, var(--pl-primary2) 14%, transparent);
+    --bg-glow-3: color-mix(in srgb, var(--pl-primary) 8%, transparent);
+    --surface: color-mix(in srgb, var(--pl-card) 70%, transparent);
+    --surface-2: var(--pl-hover);
+    --surface-solid: var(--pl-card);
+    --sidebar-bg: color-mix(in srgb, var(--pl-card) 78%, transparent);
+    --border: color-mix(in srgb, var(--pl-line) 90%, transparent);
+    --border-strong: color-mix(in srgb, var(--pl-line) 60%, var(--pl-text) 9%);
+    --text: var(--pl-text);
+    --text-dim: var(--pl-link);
+    --text-faint: var(--pl-muted);
+    --accent: var(--pl-primary);
+    --accent-2: var(--pl-primary2);
+    --accent-soft: var(--pl-primary-soft);
+    --accent-text: color-mix(in srgb, var(--accent) 68%, var(--text));
+    --on-accent: #ffffff;
+    --ok: #0f9d6b;     --ok-soft: rgba(15, 157, 107, .14);
+    --warn: #b7791f;   --warn-soft: rgba(183, 121, 31, .14);
+    --danger: #e0455f; --danger-soft: rgba(224, 69, 95, .14);
+    --info: #0d84c4;   --info-soft: rgba(13, 132, 196, .14);
+    --shadow-sm: 0 1px 2px rgba(15, 23, 42, .06);
+    --shadow: var(--pl-shadow);
+    --shadow-lg: 0 30px 60px -30px rgba(15, 23, 42, .35);
+    --specular: inset 0 1px 0 rgba(255, 255, 255, .8);
+    --select-option-bg: var(--pl-card);
+    color-scheme: light;
+}
+
+/* --- chrome polish the fork carries on every skin ---------------------------
+   the active link keeps an inset bar on its inline-start edge and the rows
+   nudge toward the content on hover — both ride the accent, so they follow
+   whatever theme (or swatch override) is active. */
+.pl-nav a.active {
+    box-shadow: inset -3px 0 0 color-mix(in srgb, var(--accent) 82%, transparent);
+}
+.pl-nav a:hover { transform: translateX(-2px); }
+[dir="ltr"] .pl-nav a:hover { transform: translateX(2px); }
+
+/* the open-ticket counter on a nav row (Airoxnet's pl-badge) */
+.pl-nav .pl-badge {
+    margin-inline-start: auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 19px;
+    height: 19px;
+    padding: 0 5px;
+    border-radius: 99px;
+    background: var(--accent);
+    color: var(--on-accent);
+    font-size: 11px;
+    font-weight: 800;
+    flex: none;
+}
+
+/* the support/channel card under the version card (fork's pl-support) */
+.pl-channel {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 11px;
+    border-radius: 12px;
+    background: #229ed9;
+    color: #fff;
+    font-size: 13.5px;
+    font-weight: 700;
+    text-decoration: none;
+    transition: background var(--dur) var(--ease);
+}
+.pl-channel:hover { background: #1c8bc0; color: #fff; text-decoration: none; }
+
+/* The accent swatches stay meaningful on the fork themes too: they are the
+   per-admin override the fork's palette button provided, re-tinting --accent
+   on top of whichever theme is active. --accent-text and --accent-soft follow
+   through var()/color-mix, so only the hue tokens need restating. */
+[data-theme][data-accent="cyan"]    { --accent: #22d3ee; --accent-2: #0ea5e9; --accent-soft: rgba(34, 211, 238, .16); }
+[data-theme][data-accent="emerald"] { --accent: #34d399; --accent-2: #10b981; --accent-soft: rgba(52, 211, 153, .16); }
+[data-theme][data-accent="rose"]    { --accent: #fb7185; --accent-2: #f43f5e; --accent-soft: rgba(251, 113, 133, .16); }
+[data-theme][data-accent="amber"]   { --accent: #fbbf24; --accent-2: #f59e0b; --accent-soft: rgba(251, 191, 36, .16); }
+[data-theme][data-accent="blue"]    { --accent: #60a5fa; --accent-2: #3b82f6; --accent-soft: rgba(96, 165, 250, .16); }
+[data-theme][data-accent="violet"]  { --accent: #8b5cf6; --accent-2: #6366f1; --accent-soft: rgba(139, 92, 246, .16); }
+
+/* --- appearance page: theme cards + defaults form --------------------------- */
+.theme-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+    gap: 14px;
+}
+
+.theme-card {
+    appearance: none;
+    -webkit-appearance: none;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin: 0;
+    padding: 10px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius);
+    background: color-mix(in srgb, var(--surface-2) 70%, transparent);
+    color: var(--text);
+    cursor: pointer;
+    box-shadow: var(--specular);
+    text-align: start;
+    filter: none;
+}
+.theme-card:hover {
+    border-color: var(--accent);
+    transform: translateY(-2px);
+    filter: none;
+    box-shadow: var(--specular);
+}
+.theme-card.selected {
+    border-color: var(--accent);
+    box-shadow: var(--ring), var(--specular);
+}
+
+.theme-card .theme-preview {
+    position: relative;
+    display: block;
+    height: 64px;
+    border-radius: calc(var(--radius) - 4px);
+    border: 1px solid var(--border);
+    overflow: hidden;
+}
+.theme-card .theme-preview .tp-card {
+    position: absolute;
+    inset: 8px 8px auto 8px;
+    height: 16px;
+    border-radius: 6px;
+    opacity: .95;
+}
+.theme-card .theme-preview .tp-accent {
+    position: absolute;
+    inset-block-end: 8px;
+    inset-inline-start: 8px;
+    width: 34px;
+    height: 12px;
+    border-radius: 6px;
+}
+
+.theme-card .theme-name {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: var(--fs-sm);
+    font-weight: 700;
+}
+.theme-card .theme-check {
+    margin-inline-start: auto;
+    color: var(--accent);
+    font-weight: 800;
+    opacity: 0;
+    transition: opacity var(--dur) var(--ease);
+}
+.theme-card.selected .theme-check { opacity: 1; }
+
+.theme-card .theme-dots { display: flex; gap: 5px; }
+.theme-card .theme-dots i {
+    width: 13px;
+    height: 13px;
+    border-radius: 50%;
+    border: 1px solid rgba(127, 127, 127, .35);
+}

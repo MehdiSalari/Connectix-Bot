@@ -40,6 +40,13 @@
         // Icon + label per destination. `$active` is supplied by each view and
         // still names the same keys as before; rendering walks a grouped
         // structure over this flat map instead, Airoxnet style.
+        //
+        // Entries whose route has not been registered yet are listed too, but
+        // every render goes through $has() (Route::has), so a row only paints
+        // once the wave that owns it has landed its routes. `$navGroups` below
+        // is the four Airoxnet groups the fork's layout.php prints.
+        $has = fn (string $name): bool => Route::has($name);
+
         $nav = [
             'dashboard' => ['route' => 'admin.dashboard', 'label' => 'داشبورد', 'icon' => '<path d="M4 13h6V4H4v9Zm0 7h6v-5H4v5Zm10 0h6v-9h-6v9Zm0-16v5h6V4h-6Z"/>'],
             'users'     => ['route' => 'admin.users.index', 'label' => 'کاربران', 'icon' => '<path d="M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm0 2c-3.3 0-6 1.8-6 4v2h12v-2c0-2.2-2.7-4-6-4Zm8-1a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm.5 3c-.6 0-1.2.1-1.7.3 1.1 1 1.7 2.2 1.7 3.7v2h4v-2c0-2.2-2.2-4-4-4Z"/>'],
@@ -49,16 +56,37 @@
             'settings'  => ['route' => 'admin.settings.show', 'label' => 'تنظیمات ربات', 'icon' => '<path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Zm9 4a7.5 7.5 0 0 0-.1-1.2l2-1.6-2-3.4-2.4 1a7.6 7.6 0 0 0-2-1.2L16.1 3H11.9l-.4 2.6c-.7.3-1.4.7-2 1.2l-2.4-1-2 3.4 2 1.6a7.7 7.7 0 0 0 0 2.4l-2 1.6 2 3.4 2.4-1c.6.5 1.3.9 2 1.2l.4 2.6h4.2l.4-2.6c.7-.3 1.4-.7 2-1.2l2.4 1 2-3.4-2-1.6c.1-.4.1-.8.1-1.2Z"/>'],
             'guides'    => ['route' => 'admin.guides.index', 'label' => 'آموزش‌ها', 'icon' => '<path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm-2 14.5v-9l7 4.5-7 4.5Z"/>'],
             'broadcast' => ['route' => 'admin.broadcast.show', 'label' => 'پیام همگانی', 'icon' => '<path d="M18 8a3 3 0 0 1 0 6v3a1 1 0 0 1-1.5.9L11 15H7a3 3 0 0 1 0-6h4l5.5-3.9A1 1 0 0 1 18 6v2Zm-9 4a1 1 0 1 0 0 2 1 1 0 0 0 0-2ZM5 9a1 1 0 0 1 1 1v4a1 1 0 1 1-2 0v-4a1 1 0 0 1 1-1Z"/>'],
+            'appearance' => ['route' => 'admin.appearance', 'label' => 'ظاهر و تم', 'icon' => '<path d="M12 2a10 10 0 1 0 0 20c1.1 0 2-.9 2-2 0-.5-.2-1-.5-1.3-.3-.4-.5-.8-.5-1.2 0-1.1.9-2 2-2h2.4c3 0 5.6-2.4 5.6-5.5C23 5.9 18.1 2 12 2ZM6.5 12a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3Zm3-4a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3Zm5 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3Zm3 4a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3Z"/>'],
+            'resellers' => ['route' => 'admin.resellers.index', 'label' => 'نمایندگی‌ها', 'icon' => '<path d="M12 2 9.1 8.6 2 9.2l5.4 4.7L5.8 21 12 17.3 18.2 21l-1.6-7.1L22 9.2l-7.1-.6L12 2Z"/>'],
+            'tickets'   => ['route' => 'admin.tickets.index', 'label' => 'تیکت‌ها', 'icon' => '<path d="M12 2a9 9 0 1 0 0 18h1.8l3.9 2.5c.9.6 2.1-.1 2.1-1.1v-4.7A9 9 0 0 0 12 2Zm-4 8a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3Zm4 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3Zm4 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3Z"/>'],
+            'admins'    => ['route' => 'admin.admins.index', 'label' => 'ادمین‌ها', 'icon' => '<path d="M12 1 3 5v6c0 5.6 3.8 10.7 9 12 5.2-1.3 9-6.4 9-12V5l-9-4Zm0 6a3 3 0 1 1 0 6 3 3 0 0 1 0-6Zm0 12.5c-2 0-3.8-.9-5-2.3.1-1.7 3-2.7 5-2.7s4.9 1 5 2.7a6.5 6.5 0 0 1-5 2.3Z"/>'],
+            'gateways'  => ['route' => 'admin.gateways.index', 'label' => 'درگاه‌های پرداخت', 'icon' => '<path d="M2 6a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v2H2V6Zm0 5h20v7a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-7Zm3 3a1 1 0 0 0 0 2h4a1 1 0 1 0 0-2H5Z"/>'],
+            'panels'    => ['route' => 'admin.panels.index', 'label' => 'پنل‌های VPN و پلن‌ها', 'icon' => '<path d="M4 3h16a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Zm0 10h16a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2Zm2-8a1 1 0 1 0 0 2 1 1 0 0 0 0-2Zm0 10a1 1 0 1 0 0 2 1 1 0 0 0 0-2Z"/>'],
+            'crypto'    => ['route' => 'admin.crypto.index', 'label' => 'پرداخت کریپتو', 'icon' => '<path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm1 15.9V19h-2v-1.1a3.9 3.9 0 0 1-3-3.4h2c.1.9 1 1.5 2.1 1.5 1.2 0 1.9-.6 1.9-1.3 0-.6-.4-1-2-1.4-2-.5-3.6-1.2-3.6-3.2 0-1.5 1.1-2.7 2.6-3.1V6h2v1.1c1.5.4 2.6 1.5 2.7 3.1h-2c-.1-.8-.8-1.4-1.8-1.4s-1.7.5-1.7 1.2c0 .7.6 1 2.2 1.4 2 .5 3.5 1.2 3.5 3.2 0 1.7-1.2 2.9-2.9 3.3Z"/>'],
+            'coupons'   => ['route' => 'admin.coupons.index', 'label' => 'کد تخفیف', 'icon' => '<path d="M2 7a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v2a2 2 0 0 0 0 6v2a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-2a2 2 0 0 0 0-6V7Zm10.5 3h3v2h-3v-2Zm0 4h3v2h-3v-2Z"/>'],
+            'custom-plan' => ['route' => 'admin.custom-plan.index', 'label' => 'پلن سفارشی', 'icon' => '<path d="M21 3H3a1 1 0 0 0-1 1v5h20V4a1 1 0 0 0-1-1ZM2 11v9a1 1 0 0 0 1 1h7V11H2Zm12 10h7a1 1 0 0 0 1-1v-9h-8v10Z"/>'],
+            'flash-sales' => ['route' => 'admin.flash-sales.index', 'label' => 'حراج زمان‌دار', 'icon' => '<path d="M13 2 3 14h7l-1 8 11-13h-7l1-7Z"/>'],
+            'loyalty'   => ['route' => 'admin.loyalty.index', 'label' => 'سیستم امتیازدهی', 'icon' => '<path d="m12 17.3-6.2 3.7 1.7-7L2 9.2l7.1-.6L12 2l2.9 6.6 7.1.6-5.5 4.8 1.7 7L12 17.3Z"/>'],
+            'cards'     => ['route' => 'admin.cards.index', 'label' => 'کارت‌های مشکوک', 'icon' => '<path d="M12 2a5 5 0 1 0 0 10 5 5 0 0 0 0-10Zm0 12c-4.4 0-8 1.8-8 4v4h16v-4c0-2.2-3.6-4-8-4Z"/>'],
+            'buttons'   => ['route' => 'admin.buttons.index', 'label' => 'دکمه‌های صفحه اصلی', 'icon' => '<path d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Zm3 6h10v2H7v-2Zm0 4h6v2H7v-2Z"/>'],
+            'emojis'    => ['route' => 'admin.emojis.index', 'label' => 'ایموجی‌های پرمیوم', 'icon' => '<path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20ZM8.5 11a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3Zm7 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3ZM12 17.5c-2 0-3.8-1.1-4.7-2.8l1.7-.9c.6 1.1 1.7 1.7 3 1.7s2.4-.6 3-1.7l1.7.9c-.9 1.7-2.7 2.8-4.7 2.8Z"/>'],
+            'winback'   => ['route' => 'admin.winback.index', 'label' => 'بازگشت مشتری', 'icon' => '<path d="M12 21s-7.5-4.9-9.5-9C1 8.5 3 5 6.5 5c2 0 3.6 1 5.5 3 1.9-2 3.5-3 5.5-3C21 5 23 8.5 21.5 12c-2 4.1-9.5 9-9.5 9Z"/>'],
+            'notifications' => ['route' => 'admin.notifications.index', 'label' => 'یادآور و هشدار', 'icon' => '<path d="M12 22a2.5 2.5 0 0 0 2.5-2.5h-5A2.5 2.5 0 0 0 12 22Zm7-6v-5c0-3.1-1.6-5.6-4.5-6.3V4a2.5 2.5 0 0 0-5 0v.7C6.6 5.4 5 7.9 5 11v5l-2 2v1h18v-1l-2-2Z"/>'],
+            'features'  => ['route' => 'admin.features.index', 'label' => 'ویژگی‌های ویژه', 'icon' => '<path d="m7.5 5.6 3.5 8.4 1.4-3.4 3.4-1.4-8.3-3.6Zm-2.7-.7 2 4.9-4.9-2 2.9-2.9Zm14.4 14.2-2-4.9 4.9 2-2.9 2.9ZM3.4 3.4l4.9 2-2 4.9-2.9-6.9Zm17.2 17.2-4.9-2 2-4.9 2.9 6.9Z"/>'],
+            'account'   => ['route' => 'admin.account.show', 'label' => 'ایمیل و رمز عبور', 'icon' => '<path d="M12 1a5 5 0 0 0-5 5v3H6a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-9a2 2 0 0 0-2-2h-1V6a5 5 0 0 0-5-5Zm-3 5a3 3 0 1 1 6 0v3H9V6Zm3 8a1.5 1.5 0 0 1 .5 2.9V19a.5.5 0 0 1-1 0v-2.1A1.5 1.5 0 0 1 12 14Z"/>'],
+            'security'  => ['route' => 'admin.security.show', 'label' => 'امنیت حساب من', 'icon' => '<path d="M12 1 3 5v6c0 5.6 3.8 10.7 9 12 5.2-1.3 9-6.4 9-12V5l-9-4Zm0 5a3 3 0 0 1 3 3v1h.5a1.5 1.5 0 0 1 1.5 1.5v4A1.5 1.5 0 0 1 15.5 17h-7A1.5 1.5 0 0 1 7 15.5v-4A1.5 1.5 0 0 1 8.5 10H9v-1a3 3 0 0 1 3-3Zm0 2a1 1 0 0 0-1 1v1h2v-1a1 1 0 0 0-1-1Z"/>'],
+            'activity'  => ['route' => 'admin.activity.index', 'label' => 'فعالیت‌ها', 'icon' => '<path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm1 10.4 4 2.3-.9 1.5L11 13.5V6h2v6.4Z"/>'],
         ];
         $active = $active ?? '';
 
-        // چهار گروه Airoxnet: مرور، مدیریت، مالی، سیستم. سرگروه فقط وقتی
-        // رندر می‌شود که لااقل یکی از لینک‌هایش موجود باشد.
+        // چهار گروه Airoxnet، همان‌طور که layout.php فورک چاپ می‌کند: عمومی،
+        // فروشگاه، ربات، حساب. سرگروه فقط وقتی رندر می‌شود که لااقل یکی از
+        // لینک‌هایش موجود باشد؛ لینک‌هایِ بدون مسیرِ ثبت‌شده رد می‌شوند.
         $navGroups = [
-            'مرور'   => ['dashboard'],
-            'مدیریت' => ['users', 'orders'],
-            'مالی'   => ['wallet', 'sms'],
-            'سیستم'  => ['settings', 'guides', 'broadcast'],
+            'عمومی'    => ['dashboard', 'users', 'orders', 'wallet', 'sms', 'resellers', 'tickets', 'admins'],
+            'فروشگاه'  => ['gateways', 'panels', 'crypto', 'coupons', 'custom-plan', 'flash-sales', 'loyalty', 'cards'],
+            'ربات'     => ['settings', 'guides', 'appearance', 'broadcast', 'buttons', 'emojis', 'winback', 'notifications', 'features'],
+            'حساب'     => ['account', 'security', 'activity'],
         ];
 
         // A Tehran timestamp for the clock to start from: the JS ticks the
@@ -71,6 +99,35 @@
         $jalaliDate = \App\Support\JalaliDate::toPersianDigits(
             sprintf('%04d/%02d/%02d', $jalali['year'], $jalali['month'], $jalali['day'])
         );
+
+        // شمارندهٔ تیکت‌های باز، فقط وقتی مدل تیکت وجود دارد. یک کوئری سبک
+        // است، ولی هر پنلی نباید به خاطر یک شماره به دیتابیس ضربه بزند: خطا
+        // (جدولی که هنوز مهاجرت نشده، دیتابیسِ در دسترس نیست) یعنی صفر، و
+        // بدون خطا هم صفر یعنی بدون نشان.
+        $openTickets = 0;
+        if (class_exists(\App\Models\Ticket::class) && $has('admin.tickets.index')) {
+            try {
+                $openTickets = \App\Models\Ticket::query()->where('status', 'OPEN')->count();
+            } catch (\Throwable) {
+                $openTickets = 0;
+            }
+        }
+
+        // کانال تلگرام (کارت «کانال تلگرام» زیر کارت نسخه): فقط وقتی پیکربندی شده.
+        $channelTelegram = trim((string) (\App\Services\Panel\PanelSettingsService::class
+            ? app(\App\Services\Panel\PanelSettingsService::class)->channelTelegram()
+            : ''));
+
+        // pill وضعیت: همان flag ربات که بالای صفحه می‌آید، AND با سلامتِ
+        // خودِ دیتابیس — همان رفتار panelDbOk فورک. اگر پرس‌وجو خطا بخورد
+        // (نصب ناقص، جدول غایب) به‌جای ریختن صفحه، غیرفعال نشان داده می‌شود.
+        try {
+            \Illuminate\Support\Facades\DB::select('select 1');
+            $dbOk = true;
+        } catch (\Throwable) {
+            $dbOk = false;
+        }
+        $systemOk = (bool) ($systemActive ?? true) && $dbOk;
     @endphp
     <div class="shell">
         <aside class="sidebar" id="sidebar">
@@ -92,9 +149,12 @@
             <nav class="pl-nav">
                 @foreach ($navGroups as $groupLabel => $keys)
                     @php
+                        // یک لینک فقط وقتی رندر می‌شود که مسیرش ثبت شده باشد؛
+                        // موج‌های بعدی با ثبتِ مسیرشان، سایدبار را خودبه‌خود
+                        // پُر می‌کنند.
                         $groupItems = array_values(array_filter(
                             $keys,
-                            fn (string $key): bool => isset($nav[$key]),
+                            fn (string $key): bool => isset($nav[$key]) && $has($nav[$key]['route']),
                         ));
                     @endphp
 
@@ -109,6 +169,12 @@
                                 <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">{!! $item['icon'] !!}</svg>
                             </span>
                             <span>{{ $item['label'] }}</span>
+                            {{-- نشانِ تیکت‌های باز، فقط روی ردیف تیکت‌ها و فقط
+                                 وقتی شمارش بدون خطا عددی بزرگ‌تر از صفر داد —
+                                 همان pl-badge فورک. --}}
+                            @if ($key === 'tickets' && $openTickets > 0)
+                                <span class="pl-badge">{{ \App\Support\PersianCalendar::toPersianDigits((string) $openTickets) }}</span>
+                            @endif
                         </a>
                     @endforeach
                 @endforeach
@@ -127,6 +193,16 @@
                         <small>نسخهٔ {{ $panelVersion ?? '4.0.0' }}</small>
                     </span>
                 </div>
+
+                {{-- کارت «کانال تلگرام» فورک: فقط وقتی کانالی پیکربندی شده
+                     باشد. لینک بیرونی است، پس rel="noopener" با آن می‌رود. --}}
+                @if ($channelTelegram !== '')
+                    <a class="pl-channel" href="https://t.me/{{ $channelTelegram }}"
+                       target="_blank" rel="noopener">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M21.9 4.6 18.9 19c-.2 1-.8 1.3-1.7.8l-4.6-3.4-2.2 2.1c-.3.3-.5.5-1 .5l.3-4.7L18.4 6c.4-.3-.1-.5-.6-.2L7.3 12.4l-4.5-1.4c-1-.3-1-1 .2-1.5l17.2-6.6c.8-.3 1.5.2 1.2 1.7Z"/></svg>
+                        <span>کانال تلگرام</span>
+                    </a>
+                @endif
 
                 <div class="who">
                     <span class="avatar">{{ mb_strtoupper(mb_substr((string) ($admin?->email ?? 'G'), 0, 1)) }}</span>
@@ -168,9 +244,9 @@
                      pill نقطهٔ سبز/قرمز دارد و تاریخ سمت سرور ساخته شده تا با
                      خاموشیِ JS هم خوانده شود. --}}
                 <div class="pl-top-tools">
-                    <div class="pl-status{{ ($systemActive ?? true) ? '' : ' bad' }}" title="وضعیت ربات">
+                    <div class="pl-status{{ $systemOk ? '' : ' bad' }}" title="وضعیت ربات">
                         <span class="dot" aria-hidden="true"></span>
-                        <span class="pl-status-label">{{ ($systemActive ?? true) ? 'سیستم فعال' : 'سیستم غیرفعال' }}</span>
+                        <span class="pl-status-label">{{ $systemOk ? 'سیستم فعال' : 'سیستم غیرفعال' }}</span>
                     </div>
 
                     <div class="pl-hello">
