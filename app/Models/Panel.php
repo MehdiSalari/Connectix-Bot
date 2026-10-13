@@ -32,6 +32,7 @@ class Panel extends Model
         return [
             'is_active' => 'boolean',
             'created_at' => 'datetime',
+            'extra' => 'array',
         ];
     }
 
