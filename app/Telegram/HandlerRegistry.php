@@ -10,16 +10,22 @@ use App\Telegram\Handlers\AccountHandler;
 use App\Telegram\Handlers\AddAccountHandler;
 use App\Telegram\Handlers\AdminHandler;
 use App\Telegram\Handlers\CouponHandler;
+use App\Telegram\Handlers\CryptoHandler;
+use App\Telegram\Handlers\CustomPlanHandler;
 use App\Telegram\Handlers\DownloadHandler;
 use App\Telegram\Handlers\FaqHandler;
 use App\Telegram\Handlers\FreeTestHandler;
+use App\Telegram\Handlers\GatewayHandler;
 use App\Telegram\Handlers\GuideHandler;
+use App\Telegram\Handlers\LoyaltyHandler;
 use App\Telegram\Handlers\MainMenuHandler;
 use App\Telegram\Handlers\PaymentHandler;
 use App\Telegram\Handlers\PurchaseHandler;
 use App\Telegram\Handlers\RenewHandler;
+use App\Telegram\Handlers\ResellerHandler;
 use App\Telegram\Handlers\StartHandler;
 use App\Telegram\Handlers\SupportHandler;
+use App\Telegram\Handlers\TicketHandler;
 use App\Telegram\Handlers\WalletHandler;
 use Illuminate\Contracts\Container\Container;
 use Illuminate\Support\Facades\Log;
@@ -52,12 +58,18 @@ class HandlerRegistry
         PurchaseHandler::class,
         RenewHandler::class,
         PaymentHandler::class,
+        CryptoHandler::class,
+        GatewayHandler::class,
         CouponHandler::class,
+        CustomPlanHandler::class,
+        LoyaltyHandler::class,
         WalletHandler::class,
         AddAccountHandler::class,
         GuideHandler::class,
         DownloadHandler::class,
         SupportHandler::class,
+        TicketHandler::class,
+        ResellerHandler::class,
         FaqHandler::class,
         AdminHandler::class,
     ];

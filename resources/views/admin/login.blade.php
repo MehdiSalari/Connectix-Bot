@@ -36,30 +36,77 @@
                 @endif
             </div>
 
-            <h2>{{ $appName }} Login</h2>
-            <p class="sub">پنل مدیریت ربات — برای ادامه وارد شوید</p>
-            <p class="brand-tag" dir="ltr">VPN RESELLER PANEL</p>
+            @if ($twoFactor ?? false)
+                {{-- مرحله دوم ورود (verify_2fa.php فورک): رمز قبلاً قبول شده و
+                     فقط کد دوم لازم است؛ هیچ سشنی باز نشده تا کد درست بیاید. --}}
+                <h2>Two-Factor Verification</h2>
+                <p class="sub" id="promptText">Enter the 6-digit code from your authenticator app</p>
 
-            <form action="{{ route('admin.login.attempt') }}" method="post">
-                @csrf
-                <div class="input-group">
-                    <label for="email">Email</label>
-                    <input type="email" id="email" name="email" value="{{ old('email') }}"
-                           placeholder="example@domain.com" required autofocus autocomplete="username">
-                </div>
+                <form action="{{ route('admin.login.2fa') }}" method="post">
+                    @csrf
+                    <input type="hidden" name="use_backup" id="useBackupField" value="0">
+                    <div class="input-group">
+                        <label for="code" id="codeLabel">Authentication Code</label>
+                        <input type="text" id="code" name="code" placeholder="000000" maxlength="9"
+                               required autofocus autocomplete="one-time-code" inputmode="numeric" dir="ltr">
+                    </div>
 
-                <div class="input-group">
-                    <label for="password">Password</label>
-                    <input type="password" id="password" name="password" placeholder="••••••••"
-                           required autocomplete="current-password">
-                </div>
+                    <input type="submit" value="Verify">
 
-                <input type="submit" value="Login">
+                    @if ($errors->any())
+                        <p class="error">{{ $errors->first() }}</p>
+                    @endif
+                </form>
 
-                @if ($errors->any())
-                    <p class="error">{{ $errors->first() }}</p>
-                @endif
-            </form>
+                <p class="muted small center">
+                    <a href="#" id="toggleLink" onclick="toggleBackup(); return false;">Use a backup code instead</a>
+                </p>
+                <p class="muted small center">
+                    <a href="{{ route('admin.login.2fa.cancel') }}">Cancel and go back to login</a>
+                </p>
+
+                <script>
+                    (function () {
+                        var usingBackup = false;
+                        window.toggleBackup = function () {
+                            usingBackup = !usingBackup;
+                            document.getElementById('useBackupField').value = usingBackup ? '1' : '0';
+                            document.getElementById('codeLabel').textContent = usingBackup ? 'Backup Code' : 'Authentication Code';
+                            document.getElementById('promptText').textContent = usingBackup
+                                ? 'Enter one of your one-time backup codes'
+                                : 'Enter the 6-digit code from your authenticator app';
+                            document.getElementById('code').placeholder = usingBackup ? 'XXXX-XXXX' : '000000';
+                            document.getElementById('code').maxLength = usingBackup ? 9 : 6;
+                            document.getElementById('toggleLink').textContent = usingBackup ? 'Use authenticator code instead' : 'Use a backup code instead';
+                        };
+                    })();
+                </script>
+            @else
+                <h2>{{ $appName }} Login</h2>
+                <p class="sub">پنل مدیریت ربات — برای ادامه وارد شوید</p>
+                <p class="brand-tag" dir="ltr">VPN RESELLER PANEL</p>
+
+                <form action="{{ route('admin.login.attempt') }}" method="post">
+                    @csrf
+                    <div class="input-group">
+                        <label for="email">Email</label>
+                        <input type="email" id="email" name="email" value="{{ old('email') }}"
+                               placeholder="example@domain.com" required autofocus autocomplete="username">
+                    </div>
+
+                    <div class="input-group">
+                        <label for="password">Password</label>
+                        <input type="password" id="password" name="password" placeholder="••••••••"
+                               required autocomplete="current-password">
+                    </div>
+
+                    <input type="submit" value="Login">
+
+                    @if ($errors->any())
+                        <p class="error">{{ $errors->first() }}</p>
+                    @endif
+                </form>
+            @endif
 
             <p class="muted auth-tools">
                 <button type="button" class="icon-btn" data-theme-toggle aria-label="تغییر روشنایی">◐</button>

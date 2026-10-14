@@ -25,6 +25,7 @@ use App\Http\Controllers\Admin\AdminOrderController;
 use App\Http\Controllers\Admin\AdminOrderDetailsController;
 use App\Http\Controllers\Admin\AdminPanelNodeController;
 use App\Http\Controllers\Admin\AdminResellerController;
+use App\Http\Controllers\Admin\AdminSecurityController;
 use App\Http\Controllers\Admin\AdminSettingsController;
 use App\Http\Controllers\Admin\AdminSmsPaymentController;
 use App\Http\Controllers\Admin\AdminTicketController;
@@ -32,6 +33,7 @@ use App\Http\Controllers\Admin\AdminUserController;
 use App\Http\Controllers\Admin\AdminWalletTransactionController;
 use App\Http\Controllers\Admin\AdminWinbackController;
 use App\Http\Controllers\Bank\BankSmsController;
+use App\Http\Controllers\Pay\GatewayCallbackController;
 use App\Http\Controllers\Setup\SetupWizardController;
 use App\Http\Controllers\Telegram\TelegramWebhookController;
 use Illuminate\Support\Facades\Route;
@@ -71,6 +73,18 @@ Route::post('/telegram/webhook', TelegramWebhookController::class)
 Route::post('/bank/sms', BankSmsController::class)
     ->middleware('throttle:60,1')
     ->name('bank.sms');
+
+/*
+| Online gateway return + IPN
+|
+| Port of pay/callback.php: the browser returns here after paying (GET) and
+| NOWPayments posts its IPN to the same URL (POST, CSRF-exempt like the bank
+| webhook — the endpoint trusts nothing beyond the secret order token).
+|
+*/
+
+Route::match(['get', 'post'], '/pay/gateway/callback', GatewayCallbackController::class)
+    ->name('pay.gateway.callback');
 
 /*
 |--------------------------------------------------------------------------
@@ -396,6 +410,17 @@ Route::prefix('admin')->name('admin.')->group(function (): void {
         Route::get('activity', [AdminActivityController::class, 'index'])
             ->middleware('admin.role:admin,editor')
             ->name('activity.index');
+
+        /*
+         * امنیت حساب من — self-service TOTP 2FA (fork: pages/admin/security.php
+         * + services/TwoFactorAuth.php). GET renders the status/setup form;
+         * POST dispatches start_setup / confirm_setup / disable /
+         * regenerate_backup through the controller's __invoke. Sits with the
+         * other self-service account rows it is grouped with in the sidebar.
+         */
+        Route::match(['get', 'post'], 'security', AdminSecurityController::class)
+            ->middleware('admin.role:admin,editor')
+            ->name('security.show');
 
         /*
          * دکمه‌های صفحه اصلی: three screen tabs (main menu board with the

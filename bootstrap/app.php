@@ -1,7 +1,11 @@
 <?php
 
+use App\Http\Middleware\AuthenticateAdmin;
+use App\Http\Middleware\EnsureAdminRole;
 use App\Http\Middleware\EnsureInstalled;
+use App\Http\Middleware\ProtectSetup;
 use App\Http\Middleware\SecurityHeaders;
+use App\Http\Middleware\VerifyTelegramWebhook;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -30,6 +34,10 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->validateCsrfTokens(except: [
             'telegram/*',
             'bank/*',
+            // The online-gateway IPN (NOWPayments POSTs to
+            // /pay/gateway/callback) is server-to-server and authenticates
+            // with the secret order token, so a CSRF token cannot exist.
+            'pay/gateway/*',
         ]);
 
         /*
@@ -51,10 +59,10 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->prepend(SecurityHeaders::class);
 
         $middleware->alias([
-            'telegram.webhook' => \App\Http\Middleware\VerifyTelegramWebhook::class,
-            'admin.auth' => \App\Http\Middleware\AuthenticateAdmin::class,
-            'admin.role' => \App\Http\Middleware\EnsureAdminRole::class,
-            'setup.protect' => \App\Http\Middleware\ProtectSetup::class,
+            'telegram.webhook' => VerifyTelegramWebhook::class,
+            'admin.auth' => AuthenticateAdmin::class,
+            'admin.role' => EnsureAdminRole::class,
+            'setup.protect' => ProtectSetup::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
