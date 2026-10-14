@@ -54,7 +54,7 @@ class WinbackAdminService
     {
         $settings = WinbackSetting::query()->first();
         if (! $settings) {
-            $settings = new WinbackSetting();
+            $settings = new WinbackSetting;
             $settings->cron_secret = bin2hex(random_bytes(16));
         }
 
@@ -74,7 +74,7 @@ class WinbackAdminService
     private static function buyerCondition(string $alias = 'payments'): string
     {
         $markers = implode(',', array_map(
-            static fn (string $m): string => "'" . $m . "'",
+            static fn (string $m): string => "'".$m."'",
             self::PAID_MARKERS
         ));
 
@@ -118,7 +118,7 @@ class WinbackAdminService
         ];
 
         if ($limit !== null) {
-            $sql .= ' LIMIT ' . (int) $limit;
+            $sql .= ' LIMIT '.(int) $limit;
         }
 
         try {
@@ -182,7 +182,7 @@ class WinbackAdminService
             'status' => 'QUEUED',
             'total' => $totalUsers,
             'queued' => $totalUsers,
-            'message' => number_format($totalUsers) . ' پیام در صف ارسال قرار گرفت.',
+            'message' => number_format($totalUsers).' پیام در صف ارسال قرار گرفت.',
         ];
     }
 
@@ -231,11 +231,12 @@ class WinbackAdminService
      *
      * @return array{sent: int, failed: int, total: int}
      */
-    public static function processQueued(?callable $sender = null): array
+    public static function processQueued(?callable $sender = null, ?int $limit = null): array
     {
         $queued = WinbackLog::query()
             ->where('status', 'QUEUED')
             ->orderBy('id')
+            ->when($limit !== null, fn ($query) => $query->limit($limit))
             ->get();
 
         $sent = 0;
@@ -252,7 +253,7 @@ class WinbackAdminService
             ];
 
             if ($payload['text'] !== '' && $log->coupon_code) {
-                $payload['text'] .= "\n\n🎁 کد تخفیف بازگشت شما: " . $log->coupon_code;
+                $payload['text'] .= "\n\n🎁 کد تخفیف بازگشت شما: ".$log->coupon_code;
             }
 
             $ok = false;

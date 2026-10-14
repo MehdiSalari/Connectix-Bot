@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Services\Features;
 
 use App\Models\PanelSetting;
+use App\Services\Panel\PanelSettingsService;
+use App\Services\Telegram\TelegramService;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 
 /**
  * Scheduled database backup (بکاپ دیتابیس).
@@ -129,6 +131,86 @@ class DbBackupAdminService
         return ['ok' => $ok, 'error' => $ok ? null : $error, 'path' => $path];
     }
 
+    /**
+     * Is the scheduled backup due right now?
+     *
+     * Port of the fork's `DbBackupService::isDue` — the same "most recent
+     * scheduled slot that is <= now" arithmetic, evaluated on Tehran time
+     * (the fork ran with a Tehran PHP default timezone; this app runs UTC).
+     * The latest-slot trick is what makes a missed cron run or a server
+     * outage catch up instead of silently skipping a whole day/week.
+     */
+    public static function isDue(?Carbon $now = null): bool
+    {
+        $settings = self::get();
+
+        if (! $settings['enabled']) {
+            return false;
+        }
+
+        $nowTehran = ($now ?? now('Asia/Tehran'))->setTimezone('Asia/Tehran');
+        [$hour, $minute] = array_map('intval', explode(':', $settings['time']));
+
+        $slot = $nowTehran->copy()->setTime($hour, $minute, 0);
+
+        if ($settings['frequency'] === 'weekly') {
+            $diff = (((int) $nowTehran->format('N')) - (int) $settings['weekday'] + 7) % 7;
+            if ($diff > 0) {
+                $slot->subDays($diff);
+            }
+            if ($slot->gt($nowTehran)) {
+                $slot->subDays(7);
+            }
+        } elseif ($slot->gt($nowTehran)) {
+            $slot->subDay();
+        }
+
+        if ($settings['last_sent_at'] === '') {
+            return true;
+        }
+
+        try {
+            $last = Carbon::parse($settings['last_sent_at'], 'Asia/Tehran');
+        } catch (\Throwable) {
+            return true;
+        }
+
+        return $last->lt($slot);
+    }
+
+    /**
+     * The scheduler entry point (fork: cron/db_backup_cron.php — fires every
+     * 15 minutes and lets isDue() decide). When due, builds the dump and
+     * uploads it to the configured target chat through the bot.
+     *
+     * @param  callable|null  $sender  receives path/name/chat_id; defaults to
+     *                                 a Telegram sendDocument to the target.
+     * @return array{ok: bool, skipped: bool, error: string|null, path: string|null}
+     */
+    public static function runDue(?callable $sender = null): array
+    {
+        if (! self::isDue()) {
+            return ['ok' => false, 'skipped' => true, 'error' => null, 'path' => null];
+        }
+
+        $sender ??= function (array $payload): bool {
+            $response = app(TelegramService::class)->sendMultipart(
+                'sendDocument',
+                $payload['chat_id'],
+                'document',
+                $payload['path'],
+                ['caption' => 'Connectix database backup — '.$payload['name']],
+            );
+
+            return (bool) ($response['ok'] ?? false);
+        };
+
+        $result = self::sendNow($sender);
+        $result['skipped'] = false;
+
+        return $result;
+    }
+
     /** Where the dump lands: storage/app/backups/database-<ts>.sql. */
     public static function directory(): string
     {
@@ -153,7 +235,7 @@ class DbBackupAdminService
             throw new \RuntimeException('پوشه بکاپ قابل نوشتن نیست.');
         }
 
-        $path = $dir . '/database-' . now('Asia/Tehran')->format('Ymd-His') . '-' . substr(uniqid(), -4) . '.sql';
+        $path = $dir.'/database-'.now('Asia/Tehran')->format('Ymd-His').'-'.substr(uniqid(), -4).'.sql';
 
         $handle = @fopen($path, 'wb');
         if ($handle === false) {
@@ -161,7 +243,7 @@ class DbBackupAdminService
         }
 
         try {
-            fwrite($handle, "-- Connectix database backup\n-- Generated: " . now('Asia/Tehran')->format('Y-m-d H:i:s') . "\n-- Driver: {$driver}\n\n");
+            fwrite($handle, "-- Connectix database backup\n-- Generated: ".now('Asia/Tehran')->format('Y-m-d H:i:s')."\n-- Driver: {$driver}\n\n");
 
             foreach (self::tables() as $table) {
                 self::dumpTable($handle, $table);
@@ -217,7 +299,7 @@ class DbBackupAdminService
      */
     private static function dumpTable($handle, string $table): void
     {
-        $quoted = '`' . str_replace('`', '``', $table) . '`';
+        $quoted = '`'.str_replace('`', '``', $table).'`';
 
         fwrite($handle, "-- ----------------------------\n-- Table: {$table}\n-- ----------------------------\n");
 
@@ -228,7 +310,7 @@ class DbBackupAdminService
                 $create = $connection->select("SHOW CREATE TABLE {$quoted}");
                 $createRow = array_values((array) ($create[0] ?? []));
                 if (count($createRow) > 1) {
-                    fwrite($handle, 'DROP TABLE IF EXISTS ' . $quoted . ";\n" . (string) $createRow[1] . ";\n\n");
+                    fwrite($handle, 'DROP TABLE IF EXISTS '.$quoted.";\n".(string) $createRow[1].";\n\n");
                 }
             } catch (\Throwable $e) {
                 // SHOW CREATE unavailable — the INSERTs below still restore the data.
@@ -243,10 +325,10 @@ class DbBackupAdminService
         }
 
         $columns = array_keys((array) $rows[0]);
-        $colList = '`' . implode('`,`', array_map(
+        $colList = '`'.implode('`,`', array_map(
             static fn (string $c): string => str_replace('`', '``', $c),
             $columns
-        )) . '`';
+        )).'`';
 
         $batch = [];
         foreach ($rows as $row) {
@@ -254,16 +336,16 @@ class DbBackupAdminService
             foreach ((array) $row as $v) {
                 $values[] = self::literal($v);
             }
-            $batch[] = '(' . implode(',', $values) . ')';
+            $batch[] = '('.implode(',', $values).')';
 
             if (count($batch) === 500) {
-                fwrite($handle, "INSERT INTO {$quoted} ({$colList}) VALUES\n" . implode(",\n", $batch) . ";\n");
+                fwrite($handle, "INSERT INTO {$quoted} ({$colList}) VALUES\n".implode(",\n", $batch).";\n");
                 $batch = [];
             }
         }
 
         if ($batch !== []) {
-            fwrite($handle, "INSERT INTO {$quoted} ({$colList}) VALUES\n" . implode(",\n", $batch) . ";\n");
+            fwrite($handle, "INSERT INTO {$quoted} ({$colList}) VALUES\n".implode(",\n", $batch).";\n");
         }
 
         fwrite($handle, "\n");
@@ -281,7 +363,7 @@ class DbBackupAdminService
             return $value ? '1' : '0';
         }
 
-        return "'" . str_replace(['\\', "'"], ['\\\\', "\\'"], (string) $value) . "'";
+        return "'".str_replace(['\\', "'"], ['\\\\', "\\'"], (string) $value)."'";
     }
 
     public static function targetChatId(?array $c = null): ?string
@@ -300,7 +382,7 @@ class DbBackupAdminService
 
         $id = PanelSetting::query()->where('setting_key', $key)->value('setting_value');
         if ($id === null || $id === '') {
-            $ids = app(\App\Services\Panel\PanelSettingsService::class)->adminIds();
+            $ids = app(PanelSettingsService::class)->adminIds();
 
             if ($ids === []) {
                 return null;
