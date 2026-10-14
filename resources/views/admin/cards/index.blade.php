@@ -1,6 +1,52 @@
 @extends('layouts.admin', ['title' => 'کارت‌های مشکوک', 'active' => 'cards'])
 
 @section('content')
+    {{-- W3.12: the suspicion reporter's list. It sits above the rest of the
+         page because it is the section acted on; everything below is the
+         fork's multi-card view, unchanged. The form saves through this page's
+         own URL (no extra route), then redirects back so the address bar
+         holds no threshold to re-save on reload. --}}
+    <div class="card">
+        <div class="row row-spaced">
+            <div>
+                <h2>کارتهای مشکوک (۷ روز اخیر)</h2>
+                <p class="muted">کارتهایی که بیش از آستانه تکرار شدهاند؛ شماره کارت با چهار رقم آخر نمایش داده میشود.</p>
+            </div>
+            <div>
+                <form method="get" action="{{ route('admin.cards.index') }}" class="row">
+                    <div>
+                        <label for="card-track-threshold">آستانهٔ مشکوکسازی:</label>
+                        <input type="number" id="card-track-threshold" name="threshold" min="1"
+                               value="{{ $trackThreshold }}" class="ltr" style="width:90px">
+                    </div>
+                    <button type="submit" style="margin-left:0">ذخیره</button>
+                </form>
+            </div>
+        </div>
+        <table>
+            <thead>
+                <tr>
+                    <th>کد</th>
+                    <th>تکرار</th>
+                    <th>آخرین مشاهده</th>
+                    <th>چت</th>
+                </tr>
+            </thead>
+            <tbody>
+                @forelse ($suspicious as $row)
+                    <tr>
+                        <td class="ltr">{{ $row['card'] }}</td>
+                        <td class="strong">{{ number_format($row['count']) }}</td>
+                        <td>{{ $row['last_seen']?->format('Y-m-d H:i') ?? '—' }}</td>
+                        <td class="ltr">{{ $row['chat_id'] }}</td>
+                    </tr>
+                @empty
+                    <tr><td colspan="4" class="muted">کارت مشکوکی ثبت نشده است.</td></tr>
+                @endforelse
+            </tbody>
+        </table>
+    </div>
+
     <div class="card">
         <div class="row row-spaced">
             <div>

@@ -12,12 +12,28 @@ enum PaymentMethod: string
 {
     case Card = 'card';
     case Wallet = 'wallet';
+    case Loyalty = 'loyalty';
+    case Gateway = 'gateway';
+    case Custom = 'custom';
+    case Zarinpal = 'zarinpal';
+    case Nextpay = 'nextpay';
+    case Nowpayments = 'nowpayments';
+    case CryptoTon = 'crypto_ton';
+    case CryptoTrx = 'crypto_trx';
 
     public function label(): string
     {
         return match ($this) {
             self::Card => 'کارت به کارت',
             self::Wallet => 'کیف پول',
+            self::Loyalty => 'جایزه امتیاز',
+            self::Gateway => 'درگاه آنلاین',
+            self::Custom => 'سفارش اختصاصی',
+            self::Zarinpal => 'درگاه زرینپال',
+            self::Nextpay => 'درگاه نکست‌پی',
+            self::Nowpayments => 'درگاه NOWPayments',
+            self::CryptoTon => 'کریپتو (TON)',
+            self::CryptoTrx => 'کریپتو (TRX)',
         };
     }
 

@@ -137,3 +137,4 @@ class GatewayCallbackController
 
         return $this->renderPage($st['kind'], $st['title'], $result['message'] ?: $st['msg']);
     }
+}
