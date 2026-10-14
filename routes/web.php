@@ -157,6 +157,19 @@ Route::prefix('admin')->name('admin.')->group(function (): void {
         ->middleware('throttle:admin-login')
         ->name('login.attempt');
 
+    /*
+     * The TOTP second step (fork: verify_2fa.php + cancel_2fa.php). A
+     * totp_enabled admin who passed the password never opens a session —
+     * login() parks them here with only a pending_admin_id marker; the
+     * verified code (or a one-time backup code) completes the login, and
+     * cancel drops the pending marker back to the login form. Public by
+     * design, like login itself, and the controller throttles failures.
+     */
+    Route::match(['get', 'post'], 'login/2fa', [AdminLoginController::class, 'verify2fa'])
+        ->name('login.2fa');
+    Route::get('login/2fa/cancel', [AdminLoginController::class, 'cancelTwoFactor'])
+        ->name('login.2fa.cancel');
+
     Route::middleware('admin.auth')->group(function (): void {
         Route::post('logout', [AdminLoginController::class, 'logout'])->name('logout');
 
