@@ -62,7 +62,7 @@
 - [x] **W5.1** `HandlerRegistry` + مسیرهای وب همه صفحات جدید + منوی کناری با لینکهای فعال — ۲۴ مرجع سایدبار، صفر روت کمبودی (`admin.security.show` + `pay.gateway.callback` افزوده شد)
 - [x] **W5.2** `docs/feature-port.md` — جدول نگاشت هر قابلیت Airoxnet به فایل Laravel (۳۸ ارجاع تست + ۹ مرجع فایل، همه راستیآزماییشده)
 - [x] **W5.3** suite کامل سبز — **821 تست / 3375 assertion** + `pint --test` passed + `composer validate` valid + `git diff --check` OK
-- [ ] **W5.4** commit های تفکیک‌شده per-wave + push + آپدیت همین چک‌لیست
+- [x] **W5.4** commit های تفکیکشده per-wave + push (`8de701c` کرونها، `480af22` 2FA/روتها، `bd1f725` مستندات/pint) + آپدیت همین چکلیست
 
 ---
 
