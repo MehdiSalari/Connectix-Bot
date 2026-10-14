@@ -10,6 +10,7 @@ use App\Services\Features\DbBackupAdminService;
 use App\Services\Features\StartEmojiAdminService;
 use App\Services\Features\WelcomeCreditAdminService;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 /**
@@ -103,12 +104,12 @@ class AdminFeaturesController extends Controller
                     $result = DbBackupAdminService::sendNow();
                     $actionMsg = $result['ok']
                         ? ['type' => 'success', 'text' => 'بکاپ ساخته و ارسال شد.']
-                        : ['type' => 'error', 'text' => 'بکاپ ساخته شد؛ ' . ($result['error'] ?? 'ارسال انجام نشد.')];
+                        : ['type' => 'error', 'text' => 'بکاپ ساخته شد؛ '.($result['error'] ?? 'ارسال انجام نشد.')];
                 }
-            } catch (\Illuminate\Validation\ValidationException $e) {
+            } catch (ValidationException $e) {
                 $actionMsg = ['type' => 'error', 'text' => 'اطلاعات واردشده معتبر نیست.'];
             } catch (\Throwable $e) {
-                $actionMsg = ['type' => 'error', 'text' => 'خطا در پردازش: ' . $e->getMessage()];
+                $actionMsg = ['type' => 'error', 'text' => 'خطا در پردازش: '.$e->getMessage()];
             }
         }
 

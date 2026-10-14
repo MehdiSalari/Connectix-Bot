@@ -91,11 +91,11 @@ class PanelNodeService
      * form's «خالی بگذارید تا تغییر نکند».
      *
      * @param  array<string, mixed>  $input  name, type, base_url, username,
-     *                                        secret, is_active, plus optional
-     *                                        extra keys (inbound_id, flow,
-     *                                        sub_base, otp, squads,
-     *                                        proxies_json, inbounds_json,
-     *                                        verify_ssl).
+     *                                       secret, is_active, plus optional
+     *                                       extra keys (inbound_id, flow,
+     *                                       sub_base, otp, squads,
+     *                                       proxies_json, inbounds_json,
+     *                                       verify_ssl).
      */
     public function savePanel(?int $id, array $input): ?string
     {

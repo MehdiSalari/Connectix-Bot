@@ -8,7 +8,6 @@ use App\Models\PaymentCard;
 use App\Services\Resellers\CardTrackBotService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
 /**
@@ -79,11 +78,11 @@ class CardTrackBotTest extends TestCase
     {
         $cards = [
             [
-                'card'        => '1111222233334444',
+                'card' => '1111222233334444',
                 'users_count' => 4,
-                'uses'        => 4,
-                'chat_ids'    => '1,2,3,4',
-                'last_seen'   => now()->format('Y-m-d H:i:s'),
+                'uses' => 4,
+                'chat_ids' => '1,2,3,4',
+                'last_seen' => now()->format('Y-m-d H:i:s'),
             ],
         ];
 

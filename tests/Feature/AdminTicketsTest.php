@@ -8,7 +8,6 @@ use App\Enums\AdminRole;
 use App\Models\Admin;
 use App\Models\AdminActivity;
 use App\Models\Ticket;
-use App\Models\TicketMessage;
 use App\Services\Support\TicketService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;

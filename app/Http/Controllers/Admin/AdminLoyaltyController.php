@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
-use App\Models\PanelSetting;
+use App\Models\LoyaltyReward;
+use App\Models\User;
 use App\Services\Loyalty\LoyaltyAdminService;
 use App\Services\Plan\PlanService;
-use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
@@ -80,9 +80,9 @@ class AdminLoyaltyController extends Controller
                     $id = $validated['reward_id'] ?? null;
                     $result = $this->loyaltyService->saveReward($validated, $id ?: null);
                     if ($result) {
-                        if (!empty($validated['codes_text'])) {
+                        if (! empty($validated['codes_text'])) {
                             $added = $this->loyaltyService->addCodes($result, $validated['codes_text']);
-                            $actionMsg = ['type' => 'success', 'text' => ($id ? 'جایزه ویرایش شد.' : 'جایزه ساخته شد.') . " $added کد به لیست اضافه شد."];
+                            $actionMsg = ['type' => 'success', 'text' => ($id ? 'جایزه ویرایش شد.' : 'جایزه ساخته شد.')." $added کد به لیست اضافه شد."];
                         } else {
                             $actionMsg = ['type' => 'success', 'text' => $id ? 'جایزه ویرایش شد.' : 'جایزه ساخته شد.'];
                         }
@@ -94,7 +94,7 @@ class AdminLoyaltyController extends Controller
                     $actionMsg = ['type' => 'success', 'text' => 'جایزه حذف شد (کدهای قبلاً صادرشده معتبر می‌مانند).'];
                 } elseif ($action === 'adjust') {
                     $chatId = trim((string) ($validated['chat_id'] ?? ''));
-                    if ($chatId === '' || !\App\Models\User::where('chat_id', $chatId)->exists()) {
+                    if ($chatId === '' || ! User::where('chat_id', $chatId)->exists()) {
                         $actionMsg = ['type' => 'error', 'text' => 'کاربری با این آیدی پیدا نشد.'];
                     } else {
                         $amount = abs((int) ($validated['delta'] ?? 0));
@@ -104,19 +104,19 @@ class AdminLoyaltyController extends Controller
                             $mode = $validated['mode'] ?? 'deduct';
                             $delta = $mode === 'add' ? $amount : -$amount;
                             $reason = trim((string) ($validated['note'] ?? ''));
-                            $notifyReason = !empty($validated['notify_reason']);
+                            $notifyReason = ! empty($validated['notify_reason']);
 
                             $res = $this->loyaltyService->adjust($chatId, $delta, $reason, auth('admin')->id(), $notifyReason);
-                            if (!empty($res['ok'])) {
+                            if (! empty($res['ok'])) {
                                 $ap = number_format((int) $res['applied']);
                                 if ($mode === 'add') {
-                                    $actionMsg = ['type' => 'success', 'text' => $ap . ' امتیاز به کاربر اضافه شد. موجودی جدید: ' . number_format((int) $res['balance'])];
+                                    $actionMsg = ['type' => 'success', 'text' => $ap.' امتیاز به کاربر اضافه شد. موجودی جدید: '.number_format((int) $res['balance'])];
                                 } else {
-                                    $msg = $ap . ' امتیاز از کاربر کسر شد';
+                                    $msg = $ap.' امتیاز از کاربر کسر شد';
                                     if ((int) $res['applied'] < (int) $res['requested']) {
-                                        $msg .= ' (موجودی کاربر کمتر از ' . number_format((int) $res['requested']) . ' بود؛ فقط همین مقدار کسر شد)';
+                                        $msg .= ' (موجودی کاربر کمتر از '.number_format((int) $res['requested']).' بود؛ فقط همین مقدار کسر شد)';
                                     }
-                                    $msg .= '. موجودی جدید: ' . number_format((int) $res['balance']) . '. پیام کسر امتیاز برای کاربر ارسال شد' . ($notifyReason ? ' (همراه با دلیل).' : ' (بدون دلیل).');
+                                    $msg .= '. موجودی جدید: '.number_format((int) $res['balance']).'. پیام کسر امتیاز برای کاربر ارسال شد'.($notifyReason ? ' (همراه با دلیل).' : ' (بدون دلیل).');
                                     $actionMsg = ['type' => 'success', 'text' => $msg];
                                 }
                             } else {
@@ -128,7 +128,7 @@ class AdminLoyaltyController extends Controller
                     $rewardId = (int) ($validated['reward_id'] ?? 0);
                     $count = (int) ($validated['count'] ?? 1);
                     $count = max(1, min(500, $count));
-                    if (! \App\Models\LoyaltyReward::query()->where('id', $rewardId)->exists()) {
+                    if (! LoyaltyReward::query()->where('id', $rewardId)->exists()) {
                         $actionMsg = ['type' => 'error', 'text' => 'جایزه انتخابشده پیدا نشد.'];
                     } else {
                         $added = $this->loyaltyService->generateCodes($rewardId, $count);
@@ -144,7 +144,7 @@ class AdminLoyaltyController extends Controller
             } catch (\InvalidArgumentException $e) {
                 $actionMsg = ['type' => 'error', 'text' => $e->getMessage()];
             } catch (\Throwable $e) {
-                $actionMsg = ['type' => 'error', 'text' => 'خطا در پردازش: ' . $e->getMessage()];
+                $actionMsg = ['type' => 'error', 'text' => 'خطا در پردازش: '.$e->getMessage()];
             }
         }
 
@@ -156,12 +156,12 @@ class AdminLoyaltyController extends Controller
         $stats = $this->loyaltyService->stats();
         $rewards = $this->loyaltyService->allRewards();
         $plans = $this->planService->sellablePlans();
-        $plans = is_array($plans) ? array_values(array_filter($plans, static fn($p) => !array_key_exists('is_active', $p) || !empty($p['is_active']))) : [];
+        $plans = is_array($plans) ? array_values(array_filter($plans, static fn ($p) => ! array_key_exists('is_active', $p) || ! empty($p['is_active']))) : [];
         $top = $this->loyaltyService->topUsers(10);
         $kinds = $this->loyaltyService->rewardKinds();
 
         $lookupChat = trim((string) ($request->get('user') ?? ''));
-        $lookupUser = $lookupChat !== '' ? \App\Models\User::where('chat_id', $lookupChat)->first() : null;
+        $lookupUser = $lookupChat !== '' ? User::where('chat_id', $lookupChat)->first() : null;
 
         $manualSearch = trim((string) ($request->get('mcode') ?? ''));
         $manualList = $this->loyaltyService->manualRequests(false, $manualSearch, 100);

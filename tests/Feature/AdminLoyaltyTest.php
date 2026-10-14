@@ -7,6 +7,7 @@ namespace Tests\Feature;
 use App\Enums\AdminRole;
 use App\Models\Admin;
 use App\Models\LoyaltyCode;
+use App\Models\LoyaltyPoint;
 use App\Models\LoyaltyReward;
 use App\Models\User;
 use App\Services\Loyalty\LoyaltyAdminService;
@@ -244,7 +245,7 @@ class AdminLoyaltyTest extends TestCase
         $this->assertSame(0, LoyaltyAdminService::balance('777'));
         $this->assertSame(
             0,
-            (int) \App\Models\LoyaltyPoint::query()->where('chat_id', '777')->where('remaining', '<', 0)->count()
+            (int) LoyaltyPoint::query()->where('chat_id', '777')->where('remaining', '<', 0)->count()
         );
     }
 

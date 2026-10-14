@@ -6,12 +6,10 @@ namespace App\Services\Features;
 
 use App\Models\PanelSetting;
 use App\Models\User;
-use App\Models\WelcomeCreditLog;
-use App\Models\WalletTransaction;
 use App\Models\Wallet;
-use App\Models\Payment;
+use App\Models\WalletTransaction;
+use App\Models\WelcomeCreditLog;
 use App\Services\Bot\EmojiService;
-use App\Services\Features\StartEmojiAdminService;
 use App\Services\Telegram\TelegramService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -45,6 +43,7 @@ class WelcomeGiftService
     public static function get(): array
     {
         $d = self::defaults();
+
         return [
             'enabled' => self::read('welcome_credit_enabled') === '1',
             'amount' => max(0, (int) (self::read('welcome_credit_amount') ?? $d['amount'])),
@@ -76,6 +75,7 @@ class WelcomeGiftService
                     return false;
                 }
             }
+
             return true;
         } catch (\Throwable $e) {
             return false;
@@ -182,6 +182,7 @@ class WelcomeGiftService
             Log::warning('WelcomeGiftService::grantIfEligible failed', [
                 'error' => $e->getMessage(),
             ]);
+
             return false;
         }
     }

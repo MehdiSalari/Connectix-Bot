@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Services\Features;
 
-use App\Services\Features\WelcomeGiftService;
 use App\Services\Telegram\TelegramService;
 use Illuminate\Support\Facades\Log;
 
@@ -29,7 +28,7 @@ class WelcomeCreditBotService
         } catch (\Throwable $e) {
             Log::warning('WelcomeCreditBotService::grantIfEligible failed', [
                 'chat_id' => $chatId,
-                'error'   => $e->getMessage(),
+                'error' => $e->getMessage(),
             ]);
 
             return false;
@@ -44,11 +43,12 @@ class WelcomeCreditBotService
     {
         try {
             $res = app(TelegramService::class)->sendMessage((string) $chatId, $text, ['parse_mode' => 'HTML']);
+
             return (bool) ($res['ok'] ?? false);
         } catch (\Throwable $e) {
             Log::warning('WelcomeCreditBotService::notify failed', [
                 'chat_id' => $chatId,
-                'error'   => $e->getMessage(),
+                'error' => $e->getMessage(),
             ]);
 
             return false;

@@ -21,8 +21,7 @@ class LoyaltyHandler implements UpdateHandler
     public function __construct(
         private readonly TelegramService $telegram,
         private readonly AdminGuard $adminGuard,
-    ) {
-    }
+    ) {}
 
     public function supports(TelegramUpdate $update, User $user): bool
     {
@@ -34,6 +33,7 @@ class LoyaltyHandler implements UpdateHandler
         if ($text !== null) {
             return str_starts_with($text, 'loyalty_') || $text === 'loyalty';
         }
+
         return false;
     }
 
@@ -44,30 +44,36 @@ class LoyaltyHandler implements UpdateHandler
         if ($data !== null) {
             if ($data === 'loyalty_menu') {
                 $this->showMenu($update, $user);
+
                 return;
             }
             if (str_starts_with($data, 'loyalty_redeem:')) {
                 $parts = explode(':', $data);
                 $codeId = (int) ($parts[1] ?? 0);
                 $res = LoyaltyBotService::redeemCode($chatId, $codeId);
-                $msg = $res['ok'] ? '✅ با موفقیت انجام شد.' : ('❌ ' . ($res['error'] ?? 'خطا'));
+                $msg = $res['ok'] ? '✅ با موفقیت انجام شد.' : ('❌ '.($res['error'] ?? 'خطا'));
                 $this->render($update, $user, $msg, [[['text' => '🔙 بازگشت', 'callback_data' => 'loyalty_menu']]]);
+
                 return;
             }
             if ($data === 'loyalty_history') {
                 $this->showHistory($update, $user, 1);
+
                 return;
             }
             if (str_starts_with($data, 'loyalty_hist:')) {
                 $p = (int) explode(':', $data)[1];
                 $this->showHistory($update, $user, $p);
+
                 return;
             }
+
             return;
         }
         $text = (string) $update->text();
         if ($text === 'loyalty_menu' || $text === 'loyalty') {
             $this->showMenu($update, $user);
+
             return;
         }
     }
@@ -93,7 +99,7 @@ class LoyaltyHandler implements UpdateHandler
                 continue;
             }
             $reward = LoyaltyReward::query()->find($code->reward_id);
-            $rows[] = [['text' => ($reward ? $reward->title : 'کد') . ' | ' . ($reward ? $reward->cost : ''), 'callback_data' => 'loyalty_redeem:' . $code->id]];
+            $rows[] = [['text' => ($reward ? $reward->title : 'کد').' | '.($reward ? $reward->cost : ''), 'callback_data' => 'loyalty_redeem:'.$code->id]];
         }
         $rows[] = [['text' => '📜 تاریخچه', 'callback_data' => 'loyalty_history']];
         $rows[] = [['text' => '↪️ بازگشت', 'callback_data' => 'main_menu']];
@@ -116,11 +122,11 @@ class LoyaltyHandler implements UpdateHandler
         $lines = '';
         foreach ($items as $it) {
             $amt = $it['amount'];
-            $lines .= ($amt > 0 ? '+' . $amt : $amt) . ' | ' . ($it['note'] ?? '') . "\n";
+            $lines .= ($amt > 0 ? '+'.$amt : $amt).' | '.($it['note'] ?? '')."\n";
         }
         $rows = [];
         if ($page > 1) {
-            $rows[] = [['text' => '⏪ قبلی', 'callback_data' => 'loyalty_hist:' . ($page - 1)]];
+            $rows[] = [['text' => '⏪ قبلی', 'callback_data' => 'loyalty_hist:'.($page - 1)]];
         }
         $rows[] = [['text' => '🔙 بازگشت', 'callback_data' => 'loyalty_menu']];
         $this->render($update, $user, "<pre>{$lines}</pre>", $rows);
@@ -133,6 +139,7 @@ class LoyaltyHandler implements UpdateHandler
         $mid = $update->callbackMessageId();
         if ($mid !== null) {
             $this->telegram->editMessageText($chatId, $mid, $text, ['parse_mode' => 'HTML', 'reply_markup' => $keyboard]);
+
             return;
         }
         $this->telegram->sendMessage($chatId, $text, ['parse_mode' => 'HTML', 'reply_markup' => $keyboard]);

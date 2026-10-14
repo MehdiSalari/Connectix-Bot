@@ -11,6 +11,7 @@ use App\Models\WinbackLog;
 use App\Models\WinbackSent;
 use App\Services\Winback\WinbackAdminService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 /**
@@ -68,7 +69,7 @@ class AdminWinbackTest extends TestCase
         // Raw insert: the model casts `method` to the PaymentMethod enum,
         // which has no 'loyalty' case — and the loyalty exclusion is exactly
         // what the eligibility test needs to exercise.
-        \Illuminate\Support\Facades\DB::table('payments')->insert([
+        DB::table('payments')->insert([
             'chat_id' => $chatId,
             'client_id' => 'new',
             'plan_id' => 'plan-x',

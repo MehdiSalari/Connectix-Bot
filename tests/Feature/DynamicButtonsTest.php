@@ -6,10 +6,6 @@ namespace Tests\Feature;
 
 use App\Models\BotButton;
 use App\Models\PanelSetting;
-use App\Models\User;
-use App\Models\Wallet;
-use App\Models\WalletTransaction;
-use App\Models\WelcomeCreditLog;
 use App\Services\Bot\ButtonColorService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;

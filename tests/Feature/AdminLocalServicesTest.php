@@ -5,21 +5,19 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use App\Enums\AdminRole;
+use App\Enums\WalletOperation;
+use App\Enums\WalletTransactionStatus;
+use App\Enums\WalletTransactionType;
 use App\Models\Admin;
 use App\Models\Client;
 use App\Models\LocalPlan;
 use App\Models\Panel;
 use App\Models\User;
 use App\Models\Wallet;
-use App\Enums\WalletOperation;
-use App\Enums\WalletTransactionStatus;
-use App\Enums\WalletTransactionType;
 use App\Models\WalletTransaction;
 use App\Services\Local\LocalUserService;
-use App\Services\Panels\PanelNodeService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Crypt;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
@@ -126,7 +124,7 @@ class AdminLocalServicesTest extends TestCase
             'name' => 'Test User',
             'username' => 'testuser',
         ])->assertRedirect()
-         ->assertSessionHas('success');
+            ->assertSessionHas('success');
 
         $user = User::query()->where('chat_id', '555000111')->first();
         $this->assertNotNull($user);
@@ -216,7 +214,7 @@ class AdminLocalServicesTest extends TestCase
             'charge_wallet' => false,
             'note' => 'Test note',
         ])->assertRedirect()
-         ->assertSessionHas('success');
+            ->assertSessionHas('success');
 
         $client = Client::query()->where('chat_id', '555000333')->first();
         $this->assertNotNull($client);
@@ -265,7 +263,7 @@ class AdminLocalServicesTest extends TestCase
             'plan_id' => $plan->id,
             'charge_wallet' => true,
         ])->assertRedirect()
-         ->assertSessionHas('success');
+            ->assertSessionHas('success');
 
         // Wallet debited
         $wallet->refresh();
@@ -304,7 +302,7 @@ class AdminLocalServicesTest extends TestCase
             'remote_key' => 'remote_user_123',
             'chat_id' => '555000555',
         ])->assertRedirect()
-         ->assertSessionHas('success');
+            ->assertSessionHas('success');
 
         $client = Client::query()->where('chat_id', '555000555')->first();
         $this->assertNotNull($client);
@@ -353,7 +351,7 @@ class AdminLocalServicesTest extends TestCase
             'plan_id' => $plan->id,
             'charge_wallet' => false,
         ])->assertRedirect()
-         ->assertSessionHas('success');
+            ->assertSessionHas('success');
 
         // Wave 3 keeps the same local row (the panel side is wave 4) and
         // refreshes the device count from the plan.
@@ -452,13 +450,13 @@ class AdminLocalServicesTest extends TestCase
         $this->post(route('admin.localservices.services.reset-traffic'), [
             'client_id' => $client->id,
         ])->assertRedirect()
-         ->assertSessionHas('success');
+            ->assertSessionHas('success');
 
         // Unknown client is refused
         $this->post(route('admin.localservices.services.reset-traffic'), [
             'client_id' => 'P'.$panel->id.'_NOPE',
         ])->assertRedirect()
-         ->assertSessionHas('error');
+            ->assertSessionHas('error');
     }
 
     /** @test */
@@ -498,7 +496,7 @@ class AdminLocalServicesTest extends TestCase
         $this->post(route('admin.localservices.services.destroy'), [
             'client_id' => $client->id,
         ])->assertRedirect()
-         ->assertSessionHas('success');
+            ->assertSessionHas('success');
 
         $client->refresh();
         $this->assertTrue((bool) $client->is_deleted);

@@ -9,6 +9,7 @@ use App\Services\Panel\PanelSettingsService;
 use App\Services\Shop\CustomPlanConfigService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 /**
@@ -69,7 +70,7 @@ class AdminCustomPlanController extends Controller
                 'text_ask_days' => $validated['text_ask_days'] ?? '',
                 'text_summary_title' => $validated['text_summary_title'] ?? '',
             ]);
-        } catch (\Illuminate\Validation\ValidationException $e) {
+        } catch (ValidationException $e) {
             return back()->withErrors($e->errors())->withInput();
         }
 

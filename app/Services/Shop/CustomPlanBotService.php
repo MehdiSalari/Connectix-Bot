@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Services\Shop;
 
+use App\Models\CustomPlanSetting;
+use App\Services\Crypto\CryptoPayService;
+use App\Services\Gateways\OnlineGatewayService;
 use Illuminate\Support\Facades\Schema;
 
 class CustomPlanBotService
@@ -18,7 +21,7 @@ class CustomPlanBotService
             return self::defaults();
         }
 
-        $settings = \App\Models\CustomPlanSetting::query()->find(1);
+        $settings = CustomPlanSetting::query()->find(1);
 
         if ($settings === null) {
             return self::defaults();
@@ -75,14 +78,14 @@ class CustomPlanBotService
         if ($gb < $minGb) {
             return [
                 'ok' => false,
-                'error' => 'حداقل حجم قابل انتخاب ' . self::fmt($s['min_gb']) . ' گیگابایت است.',
+                'error' => 'حداقل حجم قابل انتخاب '.self::fmt($s['min_gb']).' گیگابایت است.',
             ];
         }
 
         if ($gb > $maxGb) {
             return [
                 'ok' => false,
-                'error' => 'حداکثر حجم قابل انتخاب ' . self::fmt($s['max_gb']) . ' گیگابایت است.',
+                'error' => 'حداکثر حجم قابل انتخاب '.self::fmt($s['max_gb']).' گیگابایت است.',
             ];
         }
 
@@ -126,7 +129,7 @@ class CustomPlanBotService
 
     public static function buildOrderText(int $gb, int $days, int $total): string
     {
-        return 'سفارش پلن سفارشی: ' . $gb . ' گیگابایت / ' . $days . ' روز - جمع: ' . number_format($total) . ' تومان';
+        return 'سفارش پلن سفارشی: '.$gb.' گیگابایت / '.$days.' روز - جمع: '.number_format($total).' تومان';
     }
 
     public static function paymentMethodsRows(string $mode = 'buy'): array
@@ -135,14 +138,14 @@ class CustomPlanBotService
             [
                 [
                     'text' => '💰 | کیف پول',
-                    'callback_data' => 'pay_wallet:custom:' . $mode,
+                    'callback_data' => 'pay_wallet:custom:'.$mode,
                 ],
             ],
         ];
 
         try {
             if (class_exists('App\\Services\\Gateways\\OnlineGatewayService')) {
-                $gwRows = \App\Services\Gateways\OnlineGatewayService::buttonRows($mode);
+                $gwRows = OnlineGatewayService::buttonRows($mode);
                 foreach ($gwRows as $r) {
                     $rows[] = $r;
                 }
@@ -153,7 +156,7 @@ class CustomPlanBotService
 
         try {
             if (class_exists('App\\Services\\Crypto\\CryptoPayService')) {
-                $netRows = \App\Services\Crypto\CryptoPayService::nets();
+                $netRows = CryptoPayService::nets();
                 foreach ($netRows as $r) {
                     $rows[] = $r;
                 }

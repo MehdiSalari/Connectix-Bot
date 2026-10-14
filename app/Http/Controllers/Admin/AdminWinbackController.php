@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Services\Winback\WinbackAdminService;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 /**
@@ -46,12 +47,12 @@ class AdminWinbackController extends Controller
                     $actionMsg = ['type' => $result['success'] ? 'success' : 'error', 'text' => $result['message']];
                 } elseif ($action === 'stop') {
                     $cancelled = $this->winbackService->stopCampaign();
-                    $actionMsg = ['type' => 'success', 'text' => number_format($cancelled) . ' پیام از صف ارسال خارج شد.'];
+                    $actionMsg = ['type' => 'success', 'text' => number_format($cancelled).' پیام از صف ارسال خارج شد.'];
                 }
-            } catch (\Illuminate\Validation\ValidationException $e) {
+            } catch (ValidationException $e) {
                 $actionMsg = ['type' => 'error', 'text' => 'اطلاعات واردشده معتبر نیست.'];
             } catch (\Throwable $e) {
-                $actionMsg = ['type' => 'error', 'text' => 'خطا در پردازش: ' . $e->getMessage()];
+                $actionMsg = ['type' => 'error', 'text' => 'خطا در پردازش: '.$e->getMessage()];
             }
         }
 

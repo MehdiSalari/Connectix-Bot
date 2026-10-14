@@ -37,7 +37,7 @@
 - [x] **W3.9** پلن سفارشی (`custom-plan`) — قیمت/GB/روز + متن‌ها
 - [x] **W3.10** حراج زمان‌دار (`flash-sales`) — تعریف/فعال‌سازی/حذف + بنر و تایمر ربات
 - [x] **W3.11** سیستم امتیازدهی (`loyalty`) — تنظیم امتیاز، جوایز، لیست کدها، کسر/افزودن دستی با دلیل
-- [ ] **W3.12** کارت‌های مشکوک (`cards`) — آستانه + لیست کارت‌های تکراری
+- [x] **W3.12** کارت‌های مشکوک (`cards`) — آستانه + لیست کارت‌های تکراری
 - [x] **W3.13** دکمه‌های صفحه اصلی (`buttons`) — ۳ صفحه (main_menu / buy_screen / os_screen)، برچسب، ایموجی، رنگ، ردیف/ستون
 - [x] **W3.14** ایموجی‌های پرمیوم (`emojis`) — ثبت/ویرایش/پک/پیش‌نمایش
 - [x] **W3.15** یادآور و هشدار (`notifications`) — روز قبل انقضا، درصد مصرف، تست ارسال
@@ -48,20 +48,20 @@
 
 - [x] **W4.1** `CryptoPayService` — سفارش TRX/TON، نرخ نوبیتکس، استخراج هش، تایید خودکار، دکمه‌های ادمین؛ callback data `crypto_*`
 - [x] **W4.2** `OnlineGatewayService` — زرین‌پال/نکست‌پی/NOWPayments، callback `gw_*`، callback URL
-- [ ] **W4.3** `CustomPlanService` — فروش GB/روز دلخواه، callback `customplan_*`
+- [x] **W4.3** `CustomPlanService` — فروش GB/روز دلخواه، callback `customplan_*`
 - [x] **W4.4** `TicketService` — تیکت در ربات، callback های `tickets*`/`myticket`/`reply`/`close`/`user`/`uclose`/`tkhist` + rateTicket
 - [x] **W4.5** `ResellerService` — درخواست/تایید نمایندگی، کمیسیون، callback های `repreqok/no` + سهمیه تست
-- [ ] **W4.6** `LoyaltyService` — امتیاز از پرداخت، تبدیل به کد، اعمال در پرداخت، پیام ربات
+- [x] **W4.6** `LoyaltyService` — امتیاز از پرداخت، تبدیل به کد، اعمال در پرداخت، پیام ربات
 - [x] **W4.7** دکمه‌های داینامیک + رنگ خودکار (`autoButtonColor`) در `KeyboardFactory` — خواندن `bot_buttons` + `default_button_color`
 - [x] **W4.8** حراج زمان‌دار در خرید — قیمت خط‌خورده، تایمر، اعمال در همه روش‌های پرداخت
-- [ ] **W4.9** `FlashSaleService`/`CardTrackService`/`WelcomeCreditService`/`NotificationService`/`WinbackService` + کران‌ها
+- [x] **W4.9** `FlashSaleService`/`CardTrackService`/`WelcomeCreditService`/`NotificationService`/`WinbackService` + کرانها — سیمکشی `routes/console.php` + `CronWiringTest` (8 تست)
 - [x] **W4.10** شماره کارت پرداخت‌کننده در رسیدها (`payments.src_card`) + نمایش در لیست‌ها
 
 ## موج ۵ — همگرایی و تست نهایی
 
-- [ ] **W5.1** `HandlerRegistry` + مسیرهای وب همه صفحات جدید + منوی کناری با لینک‌های فعال
-- [ ] **W5.2** `docs/feature-port.md` — جدول نگاشت هر قابلیت Airoxnet به فایل Laravel
-- [ ] **W5.3** suite کامل سبز (همه تست‌های فعلی + تست‌های جدید) + Pint + composer validate + git diff --check
+- [x] **W5.1** `HandlerRegistry` + مسیرهای وب همه صفحات جدید + منوی کناری با لینکهای فعال — ۲۴ مرجع سایدبار، صفر روت کمبودی (`admin.security.show` + `pay.gateway.callback` افزوده شد)
+- [x] **W5.2** `docs/feature-port.md` — جدول نگاشت هر قابلیت Airoxnet به فایل Laravel (۳۸ ارجاع تست + ۹ مرجع فایل، همه راستیآزماییشده)
+- [x] **W5.3** suite کامل سبز — **821 تست / 3375 assertion** + `pint --test` passed + `composer validate` valid + `git diff --check` OK
 - [ ] **W5.4** commit های تفکیک‌شده per-wave + push + آپدیت همین چک‌لیست
 
 ---

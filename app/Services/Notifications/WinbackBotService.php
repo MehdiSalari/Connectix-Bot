@@ -94,11 +94,11 @@ class WinbackBotService
             $delta = (int) $today->diffInDays($expiresDay, false);
 
             $result[$delta][] = [
-                'id'         => $row->id,
-                'chat_id'    => $row->chat_id,
-                'username'   => $row->username,
+                'id' => $row->id,
+                'chat_id' => $row->chat_id,
+                'username' => $row->username,
                 'expire_date' => $row->expire_date,
-                'days_left'  => $delta,
+                'days_left' => $delta,
             ];
         }
 
@@ -121,16 +121,16 @@ class WinbackBotService
         $name = $client['username'] ?: ($client['chat_id'] ?: 'دوست عزیز');
         $text = str_replace(['{name}', '{نام}'], $name, (string) ($settings['message_text'] ?? ''));
         if ($code !== '') {
-            $text .= "\n\n🎁 کد تخفیف بازگشت شما: <code>" . htmlspecialchars($code, ENT_QUOTES, 'UTF-8') . "</code>";
+            $text .= "\n\n🎁 کد تخفیف بازگشت شما: <code>".htmlspecialchars($code, ENT_QUOTES, 'UTF-8').'</code>';
         }
 
         try {
             $log = WinbackLog::create([
-                'chat_id'     => $chatId,
-                'message'     => $settings['message_text'] ?? '',
+                'chat_id' => $chatId,
+                'message' => $settings['message_text'] ?? '',
                 'coupon_code' => $code ?: null,
-                'status'      => 'SENDING',
-                'created_at'  => now(),
+                'status' => 'SENDING',
+                'created_at' => now(),
             ]);
 
             $cycle = self::cycleKey($client);

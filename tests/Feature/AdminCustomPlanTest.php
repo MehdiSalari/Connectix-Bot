@@ -7,6 +7,7 @@ namespace Tests\Feature;
 use App\Enums\AdminRole;
 use App\Models\Admin;
 use App\Models\CustomPlanSetting;
+use App\Services\Shop\CustomPlanConfigService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -65,7 +66,7 @@ class AdminCustomPlanTest extends TestCase
             ->assertSee('پلن سفارشی')
             ->assertSee('قیمت هر گیگابایت');
 
-        $this->assertSame(5000, app(\App\Services\Shop\CustomPlanConfigService::class)->priceFor(1, 0));
+        $this->assertSame(5000, app(CustomPlanConfigService::class)->priceFor(1, 0));
     }
 
     public function test_saving_creates_the_single_settings_row(): void
@@ -141,7 +142,7 @@ class AdminCustomPlanTest extends TestCase
         $this->assertDatabaseHas('panel_settings', ['setting_key' => 'customplan_text_summary_title', 'setting_value' => '📋 سفارش شما:']);
 
         // They read back merged with the row, the way the bot flow will.
-        $settings = app(\App\Services\Shop\CustomPlanConfigService::class)->all();
+        $settings = app(CustomPlanConfigService::class)->all();
 
         $this->assertSame('📐 چند گیگ می‌خواهی؟', $settings['text_ask_gb']);
 

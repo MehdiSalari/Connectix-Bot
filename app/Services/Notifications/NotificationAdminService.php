@@ -7,10 +7,9 @@ namespace App\Services\Notifications;
 use App\Models\Client;
 use App\Models\NotificationSetting;
 use App\Models\PlanNotificationSent;
-use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
 use App\Support\JalaliCalendar;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * Admin-facing service for notification settings (expiry/usage reminders).
@@ -26,7 +25,7 @@ class NotificationAdminService
     public static function getSettings(): array
     {
         $settings = NotificationSetting::first();
-        if (!$settings) {
+        if (! $settings) {
             $settings = NotificationSetting::create([
                 'is_active' => true,
                 'expiry_days_before' => '3,1',
@@ -40,11 +39,11 @@ class NotificationAdminService
     public static function saveSettings(array $data): bool
     {
         $settings = NotificationSetting::first();
-        if (!$settings) {
-            $settings = new NotificationSetting();
+        if (! $settings) {
+            $settings = new NotificationSetting;
         }
 
-        $settings->is_active = !empty($data['is_active']);
+        $settings->is_active = ! empty($data['is_active']);
         $settings->expiry_days_before = self::sanitizeNumberList($data['expiry_days_before'] ?? '3,1');
         $settings->usage_percent_thresholds = self::sanitizeNumberList($data['usage_percent_thresholds'] ?? '80,90');
         $settings->updated_at = now();
@@ -54,9 +53,10 @@ class NotificationAdminService
 
     private static function sanitizeNumberList(string $csv): string
     {
-        $parts = array_filter(array_map('trim', explode(',', $csv)), fn($v) => is_numeric($v) && (int) $v > 0);
+        $parts = array_filter(array_map('trim', explode(',', $csv)), fn ($v) => is_numeric($v) && (int) $v > 0);
         $parts = array_unique(array_map('intval', $parts));
         sort($parts);
+
         return $parts === [] ? '0' : implode(',', $parts);
     }
 
@@ -131,7 +131,7 @@ class NotificationAdminService
     /** Last sent summary from plan_notifications_sent grouped by notif_type/day */
     public static function lastSentSummary(int $limit = 10): array
     {
-        if (!Schema::hasTable('plan_notifications_sent')) {
+        if (! Schema::hasTable('plan_notifications_sent')) {
             return [];
         }
 

@@ -5,7 +5,12 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use App\Models\CustomPlanSetting;
+use App\Models\User;
 use App\Services\Shop\CustomPlanBotService;
+use App\Services\User\UserStateService;
+use App\Telegram\Handlers\CustomPlanHandler;
+use App\Telegram\TelegramUpdate;
+use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -37,7 +42,7 @@ class CustomPlanBotTest extends TestCase
     private function createCustomPlanSettings(array $overrides = []): void
     {
         if (! Schema::hasTable('custom_plan_settings')) {
-            \Schema::create('custom_plan_settings', function (\Illuminate\Database\Schema\Blueprint $table) {
+            \Schema::create('custom_plan_settings', function (Blueprint $table) {
                 $table->id();
                 $table->boolean('is_active')->default(true);
                 $table->integer('price_per_gb')->default(5000);
@@ -53,12 +58,12 @@ class CustomPlanBotTest extends TestCase
 
         if (Schema::hasTable('payments')) {
             if (! Schema::hasColumn('payments', 'custom_gb')) {
-                \Schema::table('payments', function (\Illuminate\Database\Schema\Blueprint $table) {
+                \Schema::table('payments', function (Blueprint $table) {
                     $table->decimal('custom_gb', 8, 2)->nullable();
                 });
             }
             if (! Schema::hasColumn('payments', 'custom_days')) {
-                \Schema::table('payments', function (\Illuminate\Database\Schema\Blueprint $table) {
+                \Schema::table('payments', function (Blueprint $table) {
                     $table->integer('custom_days')->nullable();
                 });
             }
@@ -152,14 +157,14 @@ class CustomPlanBotTest extends TestCase
     {
         $this->createCustomPlanSettings();
         $this->makeUser('1001', 'Test');
-        $user = \App\Models\User::where('chat_id', '1001')->first();
-        $state = app(\App\Services\User\UserStateService::class);
+        $user = User::where('chat_id', '1001')->first();
+        $state = app(UserStateService::class);
         $state->set($user, [
             'gb' => 10,
             'days' => 30,
         ]);
-        $handler = app(\App\Telegram\Handlers\CustomPlanHandler::class);
-        $update = \App\Telegram\TelegramUpdate::fromArray([
+        $handler = app(CustomPlanHandler::class);
+        $update = TelegramUpdate::fromArray([
             'callback_query' => [
                 'id' => 'cb1',
                 'data' => 'customplan_buy:1',
@@ -184,8 +189,8 @@ class CustomPlanBotTest extends TestCase
     {
         $this->createCustomPlanSettings();
         $this->makeUser('1002', 'Test2');
-        $user = \App\Models\User::where('chat_id', '1002')->first();
-        $state = app(\App\Services\User\UserStateService::class);
+        $user = User::where('chat_id', '1002')->first();
+        $state = app(UserStateService::class);
         $state->set($user, [
             'action' => 'customplan_pending',
             'chat_id' => '1002',
@@ -194,8 +199,8 @@ class CustomPlanBotTest extends TestCase
             'total' => 80000,
             'plan_id' => '1',
         ]);
-        $handler = app(\App\Telegram\Handlers\CustomPlanHandler::class);
-        $update = \App\Telegram\TelegramUpdate::fromArray([
+        $handler = app(CustomPlanHandler::class);
+        $update = TelegramUpdate::fromArray([
             'callback_query' => [
                 'id' => 'cb2',
                 'data' => 'customplan_confirm:1',
@@ -218,15 +223,15 @@ class CustomPlanBotTest extends TestCase
     {
         $this->createCustomPlanSettings();
         $this->makeUser('1003', 'Test3');
-        $user = \App\Models\User::where('chat_id', '1003')->first();
-        $state = app(\App\Services\User\UserStateService::class);
+        $user = User::where('chat_id', '1003')->first();
+        $state = app(UserStateService::class);
         $state->set($user, [
             'action' => 'customplan_pending',
             'gb' => 5,
             'days' => 10,
         ]);
-        $handler = app(\App\Telegram\Handlers\CustomPlanHandler::class);
-        $update = \App\Telegram\TelegramUpdate::fromArray([
+        $handler = app(CustomPlanHandler::class);
+        $update = TelegramUpdate::fromArray([
             'callback_query' => [
                 'id' => 'cb3',
                 'data' => 'customplan_cancel',
@@ -244,11 +249,11 @@ class CustomPlanBotTest extends TestCase
         $this->assertNull($st);
     }
 
-    private function makeUser(string $chatId, ?string $name = 'Test'): \App\Models\User
+    private function makeUser(string $chatId, ?string $name = 'Test'): User
     {
-        return \App\Models\User::query()->create([
+        return User::query()->create([
             'chat_id' => $chatId,
-            'telegram_id' => 'tg_' . $chatId,
+            'telegram_id' => 'tg_'.$chatId,
             'name' => $name,
             'created_at' => now(),
         ]);

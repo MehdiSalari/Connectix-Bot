@@ -7,11 +7,11 @@ namespace Tests\Feature;
 use App\Models\WinbackLog;
 use App\Models\WinbackSent;
 use App\Models\WinbackSetting;
-use App\Services\Winback\WinbackAdminService;
 use App\Services\Notifications\WinbackBotService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Schema;
 use Tests\TestCase;
 
 /**
@@ -40,22 +40,22 @@ class WinbackBotTest extends TestCase
         ]);
 
         WinbackSetting::query()->create([
-            'is_active'    => true,
+            'is_active' => true,
             'inactive_days' => 30,
             'message_text' => 'سلام {name} 👋',
-            'coupon_code'  => '',
-            'cron_secret'  => 'test-secret',
+            'coupon_code' => '',
+            'cron_secret' => 'test-secret',
         ]);
     }
 
     private function makeClient(string $chatId, int $daysFromNow): void
     {
-        $date = \Illuminate\Support\Carbon::now('Asia/Tehran')->addDays($daysFromNow)->format('Y-m-d H:i:s');
+        $date = Carbon::now('Asia/Tehran')->addDays($daysFromNow)->format('Y-m-d H:i:s');
 
-        \Illuminate\Support\Facades\DB::table('clients')->insert([
-            'id'         => $chatId,
-            'chat_id'    => $chatId,
-            'username'   => 'Client ' . $chatId,
+        DB::table('clients')->insert([
+            'id' => $chatId,
+            'chat_id' => $chatId,
+            'username' => 'Client '.$chatId,
             'expire_date' => $date,
         ]);
     }
@@ -67,7 +67,7 @@ class WinbackBotTest extends TestCase
         $this->makeClient('3', 3);
         $this->makeClient('4', 40); // outside the window
 
-        $now = \Illuminate\Support\Carbon::now('Asia/Tehran');
+        $now = Carbon::now('Asia/Tehran');
         $due = WinbackBotService::dueClients($now);
 
         $this->assertArrayHasKey(1, $due);
@@ -79,18 +79,18 @@ class WinbackBotTest extends TestCase
 
     public function test_due_clients_is_empty_when_column_missing(): void
     {
-        $now = \Illuminate\Support\Carbon::now('Asia/Tehran');
+        $now = Carbon::now('Asia/Tehran');
         $this->assertSame([], WinbackBotService::dueClients($now));
     }
 
     public function test_trigger_creates_log_and_sent_and_sends_message(): void
     {
         $client = [
-            'id'         => 'chat-1',
-            'chat_id'    => 'chat-1',
-            'username'   => 'Client One',
+            'id' => 'chat-1',
+            'chat_id' => 'chat-1',
+            'username' => 'Client One',
             'expire_date' => '2030-01-01 23:59',
-            'days_left'  => 1,
+            'days_left' => 1,
         ];
 
         $result = WinbackBotService::trigger('chat-1', $client, 'SAVE10');
@@ -109,11 +109,11 @@ class WinbackBotTest extends TestCase
     public function test_trigger_is_idempotent_per_cycle(): void
     {
         $client = [
-            'id'         => 'chat-1',
-            'chat_id'    => 'chat-1',
-            'username'   => 'Client One',
+            'id' => 'chat-1',
+            'chat_id' => 'chat-1',
+            'username' => 'Client One',
             'expire_date' => '2030-01-01 23:59',
-            'days_left'  => 1,
+            'days_left' => 1,
         ];
 
         $first = WinbackBotService::trigger('chat-1', $client);

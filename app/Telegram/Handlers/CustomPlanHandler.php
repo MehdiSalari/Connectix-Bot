@@ -6,21 +6,20 @@ namespace App\Telegram\Handlers;
 
 use App\Models\Payment;
 use App\Models\User;
+use App\Services\Panel\PanelSettingsService;
 use App\Services\Shop\CustomPlanBotService;
 use App\Services\Telegram\TelegramService;
 use App\Services\User\UserStateService;
 use App\Telegram\Contracts\UpdateHandler;
 use App\Telegram\TelegramUpdate;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Http;
 
 class CustomPlanHandler implements UpdateHandler
 {
     public function __construct(
         private readonly TelegramService $telegram,
         private readonly UserStateService $state,
-    ) {
-    }
+    ) {}
 
     public function supports(TelegramUpdate $update, User $user): bool
     {
@@ -48,6 +47,7 @@ class CustomPlanHandler implements UpdateHandler
     private function argument(string $data): string
     {
         $parts = explode(':', $data, 2);
+
         return $parts[1] ?? '';
     }
 
@@ -65,16 +65,18 @@ class CustomPlanHandler implements UpdateHandler
                     [['text' => '🔙 | بازگشت', 'callback_data' => 'main_menu']],
                 ]]),
             ]);
+
             return;
         }
 
         $priceResult = CustomPlanBotService::priceFor($gb, $days);
-        if (!$priceResult['ok']) {
+        if (! $priceResult['ok']) {
             $this->telegram->sendMessage($user->chat_id, $priceResult['error'], [
                 'reply_markup' => json_encode(['inline_keyboard' => [
                     [['text' => '🔙 | بازگشت', 'callback_data' => 'main_menu']],
                 ]]),
             ]);
+
             return;
         }
 
@@ -92,7 +94,7 @@ class CustomPlanHandler implements UpdateHandler
         $text = CustomPlanBotService::buildOrderText($gb, $days, $total);
         $keyboard = [
             'inline_keyboard' => [
-                [['text' => '✅ | تایید', 'callback_data' => 'customplan_confirm' . ($planId !== '' ? ':' . $planId : '')]],
+                [['text' => '✅ | تایید', 'callback_data' => 'customplan_confirm'.($planId !== '' ? ':'.$planId : '')]],
                 [['text' => '❌ | انصراف', 'callback_data' => 'customplan_cancel']],
             ],
         ];
@@ -109,6 +111,7 @@ class CustomPlanHandler implements UpdateHandler
                     [['text' => '🔙 | بازگشت', 'callback_data' => 'main_menu']],
                 ]]),
             ]);
+
             return;
         }
 
@@ -118,6 +121,7 @@ class CustomPlanHandler implements UpdateHandler
                     [['text' => '🔙 | بازگشت', 'callback_data' => 'main_menu']],
                 ]]),
             ]);
+
             return;
         }
 
@@ -163,6 +167,7 @@ class CustomPlanHandler implements UpdateHandler
                 $this->telegram->editMessageText($user->chat_id, $messageId, $text, [
                     'reply_markup' => json_encode($keyboard),
                 ]);
+
                 return;
             } catch (\Throwable $e) {
                 // fallback to send
@@ -180,8 +185,8 @@ class CustomPlanHandler implements UpdateHandler
         $panelAdmins = [];
 
         try {
-            if (method_exists(\App\Services\Panel\PanelSettingsService::class, 'adminChatIds')) {
-                $panelAdmins = \App\Services\Panel\PanelSettingsService::adminChatIds();
+            if (method_exists(PanelSettingsService::class, 'adminChatIds')) {
+                $panelAdmins = PanelSettingsService::adminChatIds();
             }
         } catch (\Throwable $e) {
             // ignore
@@ -189,11 +194,11 @@ class CustomPlanHandler implements UpdateHandler
 
         $allAdmins = array_unique(array_merge($adminIds, $panelAdmins));
 
-        $text = 'درخواست پلن سفارشی جدید' . PHP_EOL .
-            'کاربر: ' . ($user->telegram_id ?? $user->chat_id) . PHP_EOL .
-            'حجم: ' . $gb . ' گیگابایت' . PHP_EOL .
-            'مدت: ' . $days . ' روز' . PHP_EOL .
-            'مبلغ: ' . number_format($total) . ' تومان';
+        $text = 'درخواست پلن سفارشی جدید'.PHP_EOL.
+            'کاربر: '.($user->telegram_id ?? $user->chat_id).PHP_EOL.
+            'حجم: '.$gb.' گیگابایت'.PHP_EOL.
+            'مدت: '.$days.' روز'.PHP_EOL.
+            'مبلغ: '.number_format($total).' تومان';
 
         foreach ($allAdmins as $adminId) {
             try {

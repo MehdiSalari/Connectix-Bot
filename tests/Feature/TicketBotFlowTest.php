@@ -6,7 +6,7 @@ namespace Tests\Feature;
 
 use App\Models\Ticket;
 use App\Models\User;
-use App\Services\Support\TicketService;
+use App\Services\User\UserStateService;
 use App\Telegram\Handlers\TicketHandler;
 use App\Telegram\TelegramUpdate;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -228,7 +228,7 @@ class TicketBotFlowTest extends TestCase
     {
         $this->makeUser(self::ME);
         $user = User::query()->where('chat_id', (string) self::ME)->firstOrFail();
-        $this->app->make(\App\Services\User\UserStateService::class)->set($user, ['action' => 'buy', 'step' => 'group']);
+        $this->app->make(UserStateService::class)->set($user, ['action' => 'buy', 'step' => 'group']);
 
         $this->press('tickets');
 
@@ -246,7 +246,7 @@ class TicketBotFlowTest extends TestCase
         );
 
         $user->refresh();
-        $this->assertSame([], $this->app->make(\App\Services\User\UserStateService::class)->get($user) ?? [],
+        $this->assertSame([], $this->app->make(UserStateService::class)->get($user) ?? [],
             'legacy cleared the half-finished flow on the tickets page');
     }
 
@@ -262,7 +262,7 @@ class TicketBotFlowTest extends TestCase
 
         $this->assertSame(
             'ticket_new',
-            ($this->app->make(\App\Services\User\UserStateService::class)->get($user) ?? [])['action'] ?? null,
+            ($this->app->make(UserStateService::class)->get($user) ?? [])['action'] ?? null,
         );
     }
 
@@ -297,7 +297,7 @@ class TicketBotFlowTest extends TestCase
 
         // And the state was dropped, as legacy did.
         $user = User::query()->where('chat_id', (string) self::ME)->firstOrFail();
-        $this->assertNull($this->app->make(\App\Services\User\UserStateService::class)->get($user));
+        $this->assertNull($this->app->make(UserStateService::class)->get($user));
     }
 
     public function test_the_list_paginates_five_a_page_and_walks_page_two(): void
@@ -413,7 +413,7 @@ class TicketBotFlowTest extends TestCase
         $this->press('user_'.$ticket->id);
 
         $user = User::query()->where('chat_id', (string) self::ME)->firstOrFail();
-        $state = $this->app->make(\App\Services\User\UserStateService::class)->get($user) ?? [];
+        $state = $this->app->make(UserStateService::class)->get($user) ?? [];
 
         $this->assertSame('user_reply', $state['action'] ?? null);
         $this->assertSame($ticket->id, $state['ticket_id'] ?? null);
@@ -422,7 +422,7 @@ class TicketBotFlowTest extends TestCase
         $this->send('پیگیری می‌کنم');
 
         $this->assertNull(
-            $this->app->make(\App\Services\User\UserStateService::class)->get($user->refresh()),
+            $this->app->make(UserStateService::class)->get($user->refresh()),
             'state cleared after the step',
         );
 
@@ -450,7 +450,7 @@ class TicketBotFlowTest extends TestCase
 
         $this->assertStringContainsString('⛔ دسترسی غیرمجاز.', $this->lastText());
         $this->assertNull(
-            $this->app->make(\App\Services\User\UserStateService::class)->get($user),
+            $this->app->make(UserStateService::class)->get($user),
             'a non-admin never enters the admin reply step',
         );
 
@@ -472,7 +472,7 @@ class TicketBotFlowTest extends TestCase
         $this->press('reply_'.$ticket->id, self::ADMIN);
 
         $admin = User::query()->where('chat_id', (string) self::ADMIN)->firstOrFail();
-        $state = $this->app->make(\App\Services\User\UserStateService::class)->get($admin) ?? [];
+        $state = $this->app->make(UserStateService::class)->get($admin) ?? [];
 
         $this->assertSame('admin_reply', $state['action'] ?? null);
         $this->assertStringContainsString('سابقه گفتگو', $this->lastText());
@@ -498,7 +498,7 @@ class TicketBotFlowTest extends TestCase
 
         // Crafted state: a customer who wrote the action blob themselves.
         $user = User::query()->where('chat_id', (string) self::ME)->firstOrFail();
-        $this->app->make(\App\Services\User\UserStateService::class)->set($user, [
+        $this->app->make(UserStateService::class)->set($user, [
             'action' => 'admin_reply',
             'ticket_id' => $ticket->id,
         ]);
@@ -509,7 +509,7 @@ class TicketBotFlowTest extends TestCase
         $this->assertSame('OPEN', $ticket->fresh()->status, 'no message was written');
 
         // The step was dropped either way, as legacy cleared before acting.
-        $this->assertNull($this->app->make(\App\Services\User\UserStateService::class)->get($user->fresh()));
+        $this->assertNull($this->app->make(UserStateService::class)->get($user->fresh()));
     }
 
     public function test_the_customer_closes_the_ticket_and_the_admin_is_told(): void

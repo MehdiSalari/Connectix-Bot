@@ -6,7 +6,6 @@ namespace Tests\Feature;
 
 use App\Enums\AdminRole;
 use App\Models\Admin;
-use App\Models\PanelSetting;
 use App\Models\User;
 use App\Models\WelcomeCreditLog;
 use App\Services\Features\DbBackupAdminService;

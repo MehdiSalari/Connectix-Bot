@@ -6,17 +6,14 @@ namespace App\Services\Purchase;
 
 use App\Enums\PaymentMethod;
 use App\Models\Client;
-use App\Models\LoyaltyRedemption;
 use App\Models\Payment;
 use App\Models\User;
 use App\Services\Connectix\ConnectixService;
-use App\Services\Loyalty\LoyaltyAdminService;
 use App\Services\Plan\PlanService;
 use App\Services\Shop\FlashSaleAdminService;
 use App\Services\User\UserStateService;
 use App\Services\Wallet\WalletService;
 use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -273,9 +270,6 @@ class PurchaseService
     /**
      * Flash sale confirmation line: original + sale + remaining time.
      * For handlers to use in confirmation messages.
-     *
-     * @param  string  $planId
-     * @return string|null
      */
     public function flashLine(string $planId): ?string
     {

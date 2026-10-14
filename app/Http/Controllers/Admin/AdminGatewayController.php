@@ -10,6 +10,7 @@ use App\Services\Panel\PanelSettingsService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 /**
@@ -79,7 +80,7 @@ class AdminGatewayController extends Controller
 
         try {
             $this->gateways->save($validated['gateway_name'], $fields);
-        } catch (\Illuminate\Validation\ValidationException $e) {
+        } catch (ValidationException $e) {
             return back()->withErrors($e->errors())->withInput();
         }
 
@@ -97,7 +98,7 @@ class AdminGatewayController extends Controller
 
         try {
             $this->gateways->toggle($validated['gateway_name'], (bool) $validated['active']);
-        } catch (\Illuminate\Validation\ValidationException $e) {
+        } catch (ValidationException $e) {
             return back()->withErrors($e->errors());
         }
 

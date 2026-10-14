@@ -25,9 +25,9 @@ class ButtonColorService
     /**
      * Resolve the final style value for a button.
      *
-     * @param  string  $label       Button text as shown to the user
+     * @param  string  $label  Button text as shown to the user
      * @param  string|null  $explicit  Button's own color ('blue'|'green'|'red'|'none'|null)
-     * @return string|null  Telegram 'style' value ('primary'|'success'|'danger') or null
+     * @return string|null Telegram 'style' value ('primary'|'success'|'danger') or null
      */
     public static function colorFor(string $label, ?string $explicit = null): ?string
     {
@@ -44,6 +44,7 @@ class ButtonColorService
 
         // 3. Fall back to panel default
         $default = self::defaultColor();
+
         return $default !== null ? self::mapToTelegramStyle($default) : null;
     }
 

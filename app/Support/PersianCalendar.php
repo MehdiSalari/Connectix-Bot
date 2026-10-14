@@ -143,7 +143,7 @@ class PersianCalendar
     /**
      * Midnight (Tehran) of a Jalali date.
      *
-     * @param list<int> $gregorian
+     * @param  list<int>  $gregorian
      */
     private static function jalaliToCarbon(int $year, int $month, int $day): Carbon
     {

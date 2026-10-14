@@ -7,7 +7,6 @@ namespace App\Services\Resellers;
 use App\Models\AdminActivity;
 use App\Models\PaymentCard;
 use App\Services\Telegram\TelegramService;
-use App\Support\JalaliCalendar;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -28,10 +27,11 @@ use Illuminate\Support\Facades\Schema;
 class CardTrackBotService
 {
     private const DEFAULT_THRESHOLD = 3;
+
     private const LOOKBACK_DAYS = 7;
 
     /** @return array<int, array<string, mixed>> */
-    public static function suspiciousCards(int $threshold = null): array
+    public static function suspiciousCards(?int $threshold = null): array
     {
         if (! Schema::hasTable('payment_cards')) {
             return [];
@@ -53,18 +53,18 @@ class CardTrackBotService
         $result = [];
         foreach ($rows as $r) {
             $result[] = [
-                'card'        => (string) $r->card,
+                'card' => (string) $r->card,
                 'users_count' => (int) $r->users_count,
-                'uses'        => (int) $r->uses,
-                'chat_ids'    => (string) $r->chat_ids,
-                'last_seen'   => $r->last_seen,
+                'uses' => (int) $r->uses,
+                'chat_ids' => (string) $r->chat_ids,
+                'last_seen' => $r->last_seen,
             ];
         }
 
         return $result;
     }
 
-    public static function reportText(array $cards = null): string
+    public static function reportText(?array $cards = null): string
     {
         $cards = $cards ?? self::suspiciousCards();
 
@@ -79,12 +79,12 @@ class CardTrackBotService
         foreach ($cards as $idx => $c) {
             $num = $idx + 1;
             $masked = self::maskCard($c['card']);
-            $lines[] = $num . '. کارت: <code>' . htmlspecialchars($masked, ENT_QUOTES, 'UTF-8') . '</code>';
-            $lines[] = '   تعداد کاربرهای متفاوت: ' . $c['users_count'];
-            $lines[] = '   تعداد دفعات استفاده: ' . $c['uses'];
+            $lines[] = $num.'. کارت: <code>'.htmlspecialchars($masked, ENT_QUOTES, 'UTF-8').'</code>';
+            $lines[] = '   تعداد کاربرهای متفاوت: '.$c['users_count'];
+            $lines[] = '   تعداد دفعات استفاده: '.$c['uses'];
             $ids = array_map('trim', explode(',', (string) $c['chat_ids']));
             $ids = array_slice($ids, 0, 10);
-            $lines[] = '   آیدی‌های مرتبط: ' . implode('، ', array_map(fn ($i) => '<code>' . htmlspecialchars((string) $i, ENT_QUOTES, 'UTF-8') . '</code>', $ids));
+            $lines[] = '   آیدی‌های مرتبط: '.implode('، ', array_map(fn ($i) => '<code>'.htmlspecialchars((string) $i, ENT_QUOTES, 'UTF-8').'</code>', $ids));
             $lines[] = '';
         }
 
@@ -94,7 +94,7 @@ class CardTrackBotService
     }
 
     /** @return array{sent: int, failed: int} */
-    public static function notifyAdmins(string $text = null): array
+    public static function notifyAdmins(?string $text = null): array
     {
         $text = $text ?? self::reportText();
         $ids = self::adminIds();
@@ -111,7 +111,7 @@ class CardTrackBotService
                 $sent++;
             } catch (\Throwable $e) {
                 $failed++;
-                Log::warning('CardTrackBotService::notifyAdmins failed for admin ' . $adminId, [
+                Log::warning('CardTrackBotService::notifyAdmins failed for admin '.$adminId, [
                     'error' => $e->getMessage(),
                 ]);
             }
@@ -130,6 +130,7 @@ class CardTrackBotService
                 return self::DEFAULT_THRESHOLD;
             }
             $t = (int) $v;
+
             return max(2, $t);
         } catch (\Throwable $e) {
             return self::DEFAULT_THRESHOLD;
@@ -151,21 +152,22 @@ class CardTrackBotService
         if (strlen($digits) <= 4) {
             return $digits;
         }
-        return str_repeat('*', max(0, strlen($digits) - 4)) . substr($digits, -4);
+
+        return str_repeat('*', max(0, strlen($digits) - 4)).substr($digits, -4);
     }
 
     private static function logActivity(int $sent, int $failed, string $text): void
     {
         try {
             AdminActivity::query()->create([
-                'action'      => 'card_track_bot_notify',
+                'action' => 'card_track_bot_notify',
                 'subject_type' => 'payment_cards',
-                'meta'         => json_encode([
-                    'sent'    => $sent,
-                    'failed'  => $failed,
+                'meta' => json_encode([
+                    'sent' => $sent,
+                    'failed' => $failed,
                     'preview' => mb_substr($text, 0, 200),
                 ], JSON_UNESCAPED_UNICODE),
-                'created_at'   => now(),
+                'created_at' => now(),
             ]);
         } catch (\Throwable $e) {
             // ignore

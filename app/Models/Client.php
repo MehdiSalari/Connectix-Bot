@@ -6,8 +6,8 @@ namespace App\Models;
 
 use App\Support\JalaliCalendar;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Carbon;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Carbon;
 
 /**
  * A Connectix panel client linked to a Telegram account.

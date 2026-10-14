@@ -2,11 +2,12 @@
 
 declare(strict_types=1);
 
-require __DIR__ . '/vendor/autoload.php';
-$app = require __DIR__ . '/bootstrap/app.php';
-$app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+require __DIR__.'/vendor/autoload.php';
+$app = require __DIR__.'/bootstrap/app.php';
+$app->make(Kernel::class)->bootstrap();
 
 use App\Services\Connectix\ConnectixService;
+use Illuminate\Contracts\Console\Kernel;
 
 $svc = app(ConnectixService::class);
 
@@ -15,8 +16,8 @@ for ($p = 1; $p <= 3; $p++) {
         $payload = $svc->listClients($p);
     } catch (Throwable $e) {
         echo "page=$p ERROR: {$e->getMessage()}\n";
-        continue
-        ;
+
+        continue;
     }
 
     $clients = is_array($payload['clients'] ?? null) ? $payload['clients'] : [];

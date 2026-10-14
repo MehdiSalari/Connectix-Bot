@@ -47,7 +47,7 @@ class StartEmojiAdminService
         $char = htmlspecialchars($c['emoji_char'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 
         if ($c['custom_emoji_id'] !== '') {
-            return '<tg-emoji emoji-id="' . $c['custom_emoji_id'] . '">' . $char . '</tg-emoji>';
+            return '<tg-emoji emoji-id="'.$c['custom_emoji_id'].'">'.$char.'</tg-emoji>';
         }
 
         return $char;

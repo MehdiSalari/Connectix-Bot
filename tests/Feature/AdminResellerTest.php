@@ -6,7 +6,6 @@ namespace Tests\Feature;
 
 use App\Enums\AdminRole;
 use App\Models\Admin;
-use App\Models\PanelSetting;
 use App\Models\Reseller;
 use App\Models\ResellerRequest;
 use App\Models\User;

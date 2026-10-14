@@ -96,8 +96,8 @@ class KeyboardFactory
         $rows = [];
 
         foreach ($buttons as $button) {
-            $emoji = $button->emoji !== '' ? trim($button->emoji) . ' | ' : '';
-            $text = $emoji . $button->current_label;
+            $emoji = $button->emoji !== '' ? trim($button->emoji).' | ' : '';
+            $text = $emoji.$button->current_label;
 
             $style = ButtonColorService::colorFor($text, $button->button_color);
 

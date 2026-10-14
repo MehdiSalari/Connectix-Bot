@@ -9,7 +9,6 @@ use App\Models\LoyaltyPoint;
 use App\Models\LoyaltyRedemption;
 use App\Models\LoyaltyReward;
 use App\Models\PanelSetting;
-use App\Models\User;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -30,27 +29,28 @@ class LoyaltyAdminService
     public static function defaults(): array
     {
         return [
-            'enabled'          => '0',
-            'rate_toman'       => '1000',
-            'first_bonus'      => '20',
-            'renew_bonus'      => '10',
-            'daily_enabled'    => '0',
-            'daily_points'     => '1',
-            'daily_month_cap'  => '30',
-            'expiry_months'    => '12',
-            'exclude_resellers'=> '1',
-            'notify_bot'       => '1',
-            'webapp_label'     => '',
-            'code_valid_days'  => '7',
-            'admin_contact'    => '',
+            'enabled' => '0',
+            'rate_toman' => '1000',
+            'first_bonus' => '20',
+            'renew_bonus' => '10',
+            'daily_enabled' => '0',
+            'daily_points' => '1',
+            'daily_month_cap' => '30',
+            'expiry_months' => '12',
+            'exclude_resellers' => '1',
+            'notify_bot' => '1',
+            'webapp_label' => '',
+            'code_valid_days' => '7',
+            'admin_contact' => '',
         ];
     }
 
     public static function setting(string $key): ?string
     {
         $d = self::defaults();
+
         return PanelSetting::query()
-            ->where('setting_key', 'loyalty_' . $key)
+            ->where('setting_key', 'loyalty_'.$key)
             ->value('setting_value') ?? $d[$key] ?? null;
     }
 
@@ -71,11 +71,11 @@ class LoyaltyAdminService
         foreach ($intKeys as $k => [$min, $max]) {
             if (isset($in[$k])) {
                 $val = max($min, min($max, (int) $in[$k]));
-                self::setPanelSetting('loyalty_' . $k, (string) $val);
+                self::setPanelSetting('loyalty_'.$k, (string) $val);
             }
         }
         foreach ($boolKeys as $k) {
-            self::setPanelSetting('loyalty_' . $k, !empty($in[$k]) ? '1' : '0');
+            self::setPanelSetting('loyalty_'.$k, ! empty($in[$k]) ? '1' : '0');
         }
         if (isset($in['admin_contact'])) {
             self::setPanelSetting('loyalty_admin_contact', mb_substr(trim((string) $in['admin_contact']), 0, 64));
@@ -103,12 +103,12 @@ class LoyaltyAdminService
     public static function rewardKinds(): array
     {
         return [
-            'percent'     => 'کد تخفیف درصدی',
-            'fixed'       => 'کد تخفیف مبلغ ثابت',
-            'free_plan'   => 'پلن رایگان (با کد)',
-            'auto_plan'   => 'پلن رایگان خودکار (مستقیم تحویل، بدون کد)',
-            'code_list'   => 'کد تخفیف از لیست (ادمین لیست می‌دهد)',
-            'manual'      => 'جایزهٔ دستی (کد ۸ کاراکتری؛ تحویل جایزه توسط ادمین)',
+            'percent' => 'کد تخفیف درصدی',
+            'fixed' => 'کد تخفیف مبلغ ثابت',
+            'free_plan' => 'پلن رایگان (با کد)',
+            'auto_plan' => 'پلن رایگان خودکار (مستقیم تحویل، بدون کد)',
+            'code_list' => 'کد تخفیف از لیست (ادمین لیست می‌دهد)',
+            'manual' => 'جایزهٔ دستی (کد ۸ کاراکتری؛ تحویل جایزه توسط ادمین)',
         ];
     }
 
@@ -128,7 +128,7 @@ class LoyaltyAdminService
     {
         $kinds = self::rewardKinds();
         $kind = $in['kind'] ?? 'percent';
-        if (!array_key_exists($kind, $kinds)) {
+        if (! array_key_exists($kind, $kinds)) {
             $kind = 'percent';
         }
 
@@ -153,37 +153,40 @@ class LoyaltyAdminService
             return null;
         }
 
-        $nullInt = static fn($v) => (isset($v) && trim((string) $v) !== '') ? max(0, (int) $v) : null;
+        $nullInt = static fn ($v) => (isset($v) && trim((string) $v) !== '') ? max(0, (int) $v) : null;
 
         $data = [
-            'title'           => $title,
-            'description'     => mb_substr(trim((string) ($in['description'] ?? '')), 0, 255),
-            'kind'            => $kind,
-            'value'           => $value,
-            'plan_id'         => $planId !== '' ? $planId : null,
-            'plan_title'      => $planId !== '' ? mb_substr((string) ($in['plan_title'] ?? ''), 0, 255) : null,
-            'cost'            => $cost,
-            'stock'           => $nullInt($in['stock'] ?? null),
-            'per_user_month'  => $nullInt($in['per_user_month'] ?? null),
-            'valid_days'      => $nullInt($in['valid_days'] ?? null),
-            'starts_at'       => self::parseDateTime($in['starts_at'] ?? null),
-            'ends_at'         => self::parseDateTime($in['ends_at'] ?? null),
-            'is_active'       => !empty($in['is_active']) ? 1 : 0,
-            'sort_order'      => (int) ($in['sort_order'] ?? 0),
+            'title' => $title,
+            'description' => mb_substr(trim((string) ($in['description'] ?? '')), 0, 255),
+            'kind' => $kind,
+            'value' => $value,
+            'plan_id' => $planId !== '' ? $planId : null,
+            'plan_title' => $planId !== '' ? mb_substr((string) ($in['plan_title'] ?? ''), 0, 255) : null,
+            'cost' => $cost,
+            'stock' => $nullInt($in['stock'] ?? null),
+            'per_user_month' => $nullInt($in['per_user_month'] ?? null),
+            'valid_days' => $nullInt($in['valid_days'] ?? null),
+            'starts_at' => self::parseDateTime($in['starts_at'] ?? null),
+            'ends_at' => self::parseDateTime($in['ends_at'] ?? null),
+            'is_active' => ! empty($in['is_active']) ? 1 : 0,
+            'sort_order' => (int) ($in['sort_order'] ?? 0),
         ];
 
         if ($id) {
             LoyaltyReward::where('id', $id)->update($data);
+
             return $id;
         }
 
         $reward = LoyaltyReward::create($data);
+
         return $reward->id;
     }
 
     public static function deleteReward(int $id): bool
     {
         LoyaltyCode::where('reward_id', $id)->delete();
+
         return LoyaltyReward::where('id', $id)->delete() > 0;
     }
 
@@ -195,6 +198,7 @@ class LoyaltyAdminService
         }
         $v = str_replace('T', ' ', $v);
         $ts = strtotime($v);
+
         return $ts === false ? null : date('Y-m-d H:i:s', $ts);
     }
 
@@ -213,8 +217,8 @@ class LoyaltyAdminService
             }
             try {
                 LoyaltyCode::create([
-                    'reward_id'  => $rewardId,
-                    'code'       => $c,
+                    'reward_id' => $rewardId,
+                    'code' => $c,
                     'created_at' => self::now(),
                 ]);
                 $added++;
@@ -222,6 +226,7 @@ class LoyaltyAdminService
                 // duplicate in this list — skip
             }
         }
+
         return $added;
     }
 
@@ -256,14 +261,15 @@ class LoyaltyAdminService
             return ['ok' => false, 'error' => 'برای ارسال دلیل به کاربر، ابتدا دلیل را بنویسید.'];
         }
 
-        $note = ($reason !== '' ? $reason : 'تنظیم دستی') . ' (ادمین ' . $adminId . ')';
+        $note = ($reason !== '' ? $reason : 'تنظیم دستی').' (ادمین '.$adminId.')';
         $userNote = ($notifyUser && $reason !== '') ? $reason : null;
 
         if ($delta > 0) {
-            if (!self::earn($chatId, $delta, 'admin', null, $note, $userNote)) {
+            if (! self::earn($chatId, $delta, 'admin', null, $note, $userNote)) {
                 return ['ok' => false, 'error' => 'ثبت نشد.'];
             }
             $bal = self::balance($chatId);
+
             return ['ok' => true, 'applied' => $delta, 'requested' => $delta, 'balance' => $bal];
         }
 
@@ -275,9 +281,9 @@ class LoyaltyAdminService
             return ['ok' => false, 'error' => 'این کاربر امتیازی ندارد.'];
         }
 
-        if (!self::spend($chatId, $take, 'admin', null, $note, $userNote)) {
+        if (! self::spend($chatId, $take, 'admin', null, $note, $userNote)) {
             $take = min(self::balance($chatId), $want);
-            if ($take <= 0 || !self::spend($chatId, $take, 'admin', null, $note, $userNote)) {
+            if ($take <= 0 || ! self::spend($chatId, $take, 'admin', null, $note, $userNote)) {
                 return ['ok' => false, 'error' => 'ثبت نشد.'];
             }
         }
@@ -303,7 +309,7 @@ class LoyaltyAdminService
             ->where('remaining', '>', 0)
             ->where(function ($q) {
                 $q->whereNull('expires_at')
-                  ->orWhere('expires_at', '>', self::now());
+                    ->orWhere('expires_at', '>', self::now());
             })
             ->sum('remaining');
     }
@@ -319,15 +325,16 @@ class LoyaltyAdminService
 
         try {
             LoyaltyPoint::create([
-                'chat_id'    => $chatId,
-                'amount'     => $points,
-                'remaining'  => $points,
-                'type'       => $type,
-                'ref'        => $ref,
-                'note'       => mb_substr($note, 0, 255),
+                'chat_id' => $chatId,
+                'amount' => $points,
+                'remaining' => $points,
+                'type' => $type,
+                'ref' => $ref,
+                'note' => mb_substr($note, 0, 255),
                 'expires_at' => $expires,
                 'created_at' => self::now(),
             ]);
+
             return true;
         } catch (\Throwable $e) {
             return false; // duplicate (type, ref) or DB hiccup
@@ -341,14 +348,14 @@ class LoyaltyAdminService
         }
 
         try {
-            DB::transaction(function () use ($chatId, $points, $type, $ref, $note, $userNote) {
+            DB::transaction(function () use ($chatId, $points, $type, $ref, $note) {
                 $rows = LoyaltyPoint::query()
                     ->where('chat_id', $chatId)
                     ->where('amount', '>', 0)
                     ->where('remaining', '>', 0)
                     ->where(function ($q) {
                         $q->whereNull('expires_at')
-                          ->orWhere('expires_at', '>', self::now());
+                            ->orWhere('expires_at', '>', self::now());
                     })
                     ->orderByRaw('(expires_at IS NULL) ASC')
                     ->orderBy('expires_at', 'asc')
@@ -363,7 +370,9 @@ class LoyaltyAdminService
 
                 $left = $points;
                 foreach ($rows as $row) {
-                    if ($left <= 0) break;
+                    if ($left <= 0) {
+                        break;
+                    }
                     $take = min($left, $row->remaining);
                     $row->remaining -= $take;
                     $row->save();
@@ -371,16 +380,17 @@ class LoyaltyAdminService
                 }
 
                 LoyaltyPoint::create([
-                    'chat_id'    => $chatId,
-                    'amount'     => -$points,
-                    'remaining'  => 0,
-                    'type'       => $type,
-                    'ref'        => $ref,
-                    'note'       => mb_substr($note, 0, 255),
+                    'chat_id' => $chatId,
+                    'amount' => -$points,
+                    'remaining' => 0,
+                    'type' => $type,
+                    'ref' => $ref,
+                    'note' => mb_substr($note, 0, 255),
                     'expires_at' => null,
                     'created_at' => self::now(),
                 ]);
             });
+
             return true;
         } catch (\Throwable $e) {
             return false;
@@ -403,14 +413,14 @@ class LoyaltyAdminService
         $out = ['issued' => 0, 'spent' => 0, 'alive' => 0, 'users' => 0, 'redemptions' => 0, 'codes_used' => 0];
 
         try {
-            $out['issued'] = (int) $pdo->query("SELECT COALESCE(SUM(amount),0) FROM loyalty_points WHERE amount > 0")->fetchColumn();
+            $out['issued'] = (int) $pdo->query('SELECT COALESCE(SUM(amount),0) FROM loyalty_points WHERE amount > 0')->fetchColumn();
             $out['spent'] = (int) $pdo->query("SELECT COALESCE(-SUM(amount),0) FROM loyalty_points WHERE type = 'redeem'")->fetchColumn();
-            $stmt = $pdo->prepare("SELECT COALESCE(SUM(remaining),0) FROM loyalty_points WHERE amount > 0 AND remaining > 0 AND (expires_at IS NULL OR expires_at > ?)");
+            $stmt = $pdo->prepare('SELECT COALESCE(SUM(remaining),0) FROM loyalty_points WHERE amount > 0 AND remaining > 0 AND (expires_at IS NULL OR expires_at > ?)');
             $stmt->execute([$now]);
             $out['alive'] = (int) $stmt->fetchColumn();
-            $out['users'] = (int) $pdo->query("SELECT COUNT(DISTINCT chat_id) FROM loyalty_points")->fetchColumn();
-            $out['redemptions'] = (int) $pdo->query("SELECT COUNT(*) FROM loyalty_redemptions")->fetchColumn();
-            $out['codes_used'] = (int) $pdo->query("SELECT COUNT(*) FROM loyalty_redemptions WHERE used_at IS NOT NULL")->fetchColumn();
+            $out['users'] = (int) $pdo->query('SELECT COUNT(DISTINCT chat_id) FROM loyalty_points')->fetchColumn();
+            $out['redemptions'] = (int) $pdo->query('SELECT COUNT(*) FROM loyalty_redemptions')->fetchColumn();
+            $out['codes_used'] = (int) $pdo->query('SELECT COUNT(*) FROM loyalty_redemptions WHERE used_at IS NOT NULL')->fetchColumn();
         } catch (\Throwable $e) {
             // leave zeros
         }
@@ -431,25 +441,26 @@ class LoyaltyAdminService
     public static function typeLabel(string $type): string
     {
         return [
-            'purchase'    => 'خرید',
+            'purchase' => 'خرید',
             'bonus_first' => 'هدیهٔ اولین خرید',
             'bonus_renew' => 'هدیهٔ تمدید',
-            'daily'       => 'ورود روزانه',
-            'redeem'      => 'دریافت جایزه',
-            'admin'       => 'تنظیم توسط مدیر',
+            'daily' => 'ورود روزانه',
+            'redeem' => 'دریافت جایزه',
+            'admin' => 'تنظیم توسط مدیر',
         ][$type] ?? $type;
     }
 
     public static function topUsers(int $limit = 15): array
     {
         $now = self::now();
+
         return DB::table('loyalty_points as p')
             ->leftJoin('users as u', 'u.chat_id', '=', 'p.chat_id')
             ->where('p.amount', '>', 0)
             ->where('p.remaining', '>', 0)
             ->where(function ($q) use ($now) {
                 $q->whereNull('p.expires_at')
-                  ->orWhere('p.expires_at', '>', $now);
+                    ->orWhere('p.expires_at', '>', $now);
             })
             ->select('p.chat_id', DB::raw('COALESCE(SUM(p.remaining),0) AS bal'), 'u.name', 'u.telegram_id')
             ->groupBy('p.chat_id', 'u.name', 'u.telegram_id')
@@ -479,7 +490,7 @@ class LoyaltyAdminService
         $added = 0;
         $letters = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
         $digits = '23456789';
-        $all = $letters . $digits;
+        $all = $letters.$digits;
 
         for ($i = 0; $i < $count; $i++) {
             $chars = [
@@ -493,12 +504,12 @@ class LoyaltyAdminService
                 $k = random_int(0, $j);
                 [$chars[$j], $chars[$k]] = [$chars[$k], $chars[$j]];
             }
-            $code = 'LOY-' . implode('', $chars);
+            $code = 'LOY-'.implode('', $chars);
 
             try {
                 LoyaltyCode::create([
-                    'reward_id'  => $rewardId,
-                    'code'       => $code,
+                    'reward_id' => $rewardId,
+                    'code' => $code,
                     'created_at' => self::now(),
                 ]);
                 $added++;
@@ -528,7 +539,7 @@ class LoyaltyAdminService
         if ($search !== '') {
             $query->where(function ($q) use ($search) {
                 $q->where('loyalty_redemptions.code', strtoupper($search))
-                  ->orWhere('loyalty_redemptions.chat_id', $search);
+                    ->orWhere('loyalty_redemptions.chat_id', $search);
             });
         }
 
@@ -547,13 +558,13 @@ class LoyaltyAdminService
 
     public static function markManualDelivered(int $redemptionId, ?int $adminId = null): bool
     {
-        return DB::transaction(function () use ($redemptionId, $adminId) {
+        return DB::transaction(function () use ($redemptionId) {
             $row = LoyaltyRedemption::where('id', $redemptionId)
                 ->where('kind', 'manual')
                 ->whereNull('used_at')
                 ->first();
 
-            if (!$row) {
+            if (! $row) {
                 return false;
             }
 

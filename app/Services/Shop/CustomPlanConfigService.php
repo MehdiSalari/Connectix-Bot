@@ -6,6 +6,7 @@ namespace App\Services\Shop;
 
 use App\Models\CustomPlanSetting;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 /**
  * The custom volume/duration plan ("حجم و زمان دلخواه") pricing settings.
@@ -76,7 +77,7 @@ class CustomPlanConfigService
      *
      * @param  array<string, mixed>  $values
      *
-     * @throws \Illuminate\Validation\ValidationException
+     * @throws ValidationException
      */
     public function save(array $values): void
     {
@@ -101,7 +102,7 @@ class CustomPlanConfigService
         }
 
         if ($errors !== []) {
-            throw \Illuminate\Validation\ValidationException::withMessages($errors);
+            throw ValidationException::withMessages($errors);
         }
 
         CustomPlanSetting::query()->updateOrCreate(

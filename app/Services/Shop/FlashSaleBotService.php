@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Services\Shop;
 
 use App\Models\AdminActivity;
-use App\Services\Shop\FlashSaleAdminService;
 use App\Services\Telegram\TelegramService;
 use Illuminate\Support\Facades\Log;
 
@@ -42,14 +41,14 @@ class FlashSaleBotService
             [$final] = FlashSaleAdminService::priceWithSale((int) $originalPrice, $sale);
 
             return FlashSaleAdminService::remainingText($sale['ends_at']) !== ''
-                ? "\n🔥 <b>حراج ویژه</b>: قیمت اصلی <s>" . number_format((float) $originalPrice) . "</s> ➜ <b>" . number_format((float) $final) . "</b> تومان"
-                    . "\n⏳ زمان باقی‌مانده تا پایان حراج: <b>" . FlashSaleAdminService::remainingText($sale['ends_at']) . "</b>"
-                : "\n🔥 <b>حراج ویژه</b>: قیمت اصلی <s>" . number_format((float) $originalPrice) . "</s> ➜ <b>" . number_format((float) $final) . "</b> تومان";
+                ? "\n🔥 <b>حراج ویژه</b>: قیمت اصلی <s>".number_format((float) $originalPrice).'</s> ➜ <b>'.number_format((float) $final).'</b> تومان'
+                    ."\n⏳ زمان باقی‌مانده تا پایان حراج: <b>".FlashSaleAdminService::remainingText($sale['ends_at']).'</b>'
+                : "\n🔥 <b>حراج ویژه</b>: قیمت اصلی <s>".number_format((float) $originalPrice).'</s> ➜ <b>'.number_format((float) $final).'</b> تومان';
         }
 
         $rem = FlashSaleAdminService::remainingText($sale['ends_at']);
 
-        return "\n🔥 حراج ویژه فعال است! تا پایان حراج: " . $rem;
+        return "\n🔥 حراج ویژه فعال است! تا پایان حراج: ".$rem;
     }
 
     /** The live sale for a plan, or null when none is active right now. */
@@ -89,7 +88,7 @@ class FlashSaleBotService
                 $sent++;
             } catch (\Throwable $e) {
                 $failed++;
-                Log::warning('FlashSaleBotService::notifyAdmins failed for admin ' . $adminId, [
+                Log::warning('FlashSaleBotService::notifyAdmins failed for admin '.$adminId, [
                     'chat_id' => $chatId,
                     'plan_id' => $planId,
                     'error' => $e->getMessage(),
@@ -115,16 +114,16 @@ class FlashSaleBotService
     {
         try {
             AdminActivity::query()->create([
-                'action'      => 'flash_sale_bot_notify',
+                'action' => 'flash_sale_bot_notify',
                 'subject_type' => 'flash_sale',
-                'subject_id'   => $planId,
-                'meta'         => json_encode([
+                'subject_id' => $planId,
+                'meta' => json_encode([
                     'chat_id' => $chatId,
-                    'sent'    => $sent,
-                    'failed'  => $failed,
+                    'sent' => $sent,
+                    'failed' => $failed,
                     'preview' => mb_substr($text, 0, 200),
                 ], JSON_UNESCAPED_UNICODE),
-                'created_at'   => now(),
+                'created_at' => now(),
             ]);
         } catch (\Throwable $e) {
             // Activity logging is best-effort; never break the send over it.

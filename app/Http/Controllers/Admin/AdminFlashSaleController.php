@@ -7,7 +7,6 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Services\Plan\PlanService;
 use App\Services\Shop\FlashSaleAdminService;
-use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
 
@@ -47,7 +46,7 @@ class AdminFlashSaleController extends Controller
                     $planId = trim((string) ($validated['plan_id'] ?? ''));
                     $plan = $planId === '' ? null : $this->plans->findById($planId);
 
-                    if (!$startsAt || !$endsAt) {
+                    if (! $startsAt || ! $endsAt) {
                         $actionMsg = ['type' => 'error', 'text' => 'زمان شروع و پایان معتبر نیست.'];
                     } elseif ($plan === null) {
                         $actionMsg = ['type' => 'error', 'text' => 'پلن انتخابشده در کاتالوگ پیدا نشد؛ لیست را تازه کنید.'];
@@ -55,17 +54,17 @@ class AdminFlashSaleController extends Controller
                         $actionMsg = ['type' => 'error', 'text' => 'زمان پایان باید بعد از زمان شروع باشد.'];
                     } else {
                         $this->flashSaleService->create([
-                            'plan_id'        => (string) ($plan['id'] ?? $planId),
-                            'plan_title'     => (string) ($plan['title'] ?? ''),
-                            'discount_type'  => $validated['discount_type'] ?? 'percent',
+                            'plan_id' => (string) ($plan['id'] ?? $planId),
+                            'plan_title' => (string) ($plan['title'] ?? ''),
+                            'discount_type' => $validated['discount_type'] ?? 'percent',
                             'discount_value' => (int) ($validated['discount_value'] ?? 0),
-                            'starts_at'      => $startsAt,
-                            'ends_at'        => $endsAt,
+                            'starts_at' => $startsAt,
+                            'ends_at' => $endsAt,
                         ]);
                         $actionMsg = ['type' => 'success', 'text' => 'حراج ثبت شد.'];
                     }
                 } elseif ($action === 'toggle') {
-                    $this->flashSaleService->setActive((int) ($validated['id'] ?? 0), !empty($validated['to']));
+                    $this->flashSaleService->setActive((int) ($validated['id'] ?? 0), ! empty($validated['to']));
                     $actionMsg = ['type' => 'success', 'text' => 'وضعیت حراج تغییر کرد.'];
                 } elseif ($action === 'delete') {
                     $this->flashSaleService->delete((int) ($validated['id'] ?? 0));
@@ -74,7 +73,7 @@ class AdminFlashSaleController extends Controller
             } catch (\InvalidArgumentException $e) {
                 $actionMsg = ['type' => 'error', 'text' => $e->getMessage()];
             } catch (\Throwable $e) {
-                $actionMsg = ['type' => 'error', 'text' => 'خطا در پردازش: ' . $e->getMessage()];
+                $actionMsg = ['type' => 'error', 'text' => 'خطا در پردازش: '.$e->getMessage()];
             }
         }
 

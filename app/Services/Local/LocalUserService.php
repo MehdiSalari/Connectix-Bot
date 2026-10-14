@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace App\Services\Local;
 
-use App\Enums\WalletOperation;
-use App\Enums\WalletTransactionStatus;
 use App\Enums\WalletTransactionType;
 use App\Models\Client;
 use App\Models\LocalPlan;

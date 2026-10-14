@@ -6,6 +6,7 @@ namespace Tests\Feature;
 
 use App\Models\BroadcastLog;
 use App\Models\Client;
+use App\Models\NotificationSetting;
 use App\Services\Notifications\NotificationBotService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
@@ -38,13 +39,13 @@ class NotificationBotTest extends TestCase
             'https://api.telegram.org/*' => Http::response(['ok' => true, 'result' => true], 200),
         ]);
 
-        \App\Models\NotificationSetting::query()->updateOrCreate(
+        NotificationSetting::query()->updateOrCreate(
             ['id' => 1],
             [
-                'is_active'                => true,
-                'expiry_days_before'       => '3,1',
+                'is_active' => true,
+                'expiry_days_before' => '3,1',
                 'usage_percent_thresholds' => '80,90',
-                'updated_at'               => now(),
+                'updated_at' => now(),
             ]
         );
     }
@@ -56,10 +57,10 @@ class NotificationBotTest extends TestCase
         $target = Carbon::now('Asia/Tehran')->addDays($daysFromNow);
 
         Client::query()->create([
-            'id'         => $chatId,
-            'chat_id'    => $chatId,
-            'username'   => 'Client ' . $chatId,
-            'expire_date' => $target->format('Y-m-d') . ' 23:59',
+            'id' => $chatId,
+            'chat_id' => $chatId,
+            'username' => 'Client '.$chatId,
+            'expire_date' => $target->format('Y-m-d').' 23:59',
         ]);
     }
 
@@ -92,11 +93,11 @@ class NotificationBotTest extends TestCase
     public function test_send_reminder_creates_broadcast_log_and_sends_message(): void
     {
         $client = [
-            'id'         => 'chat-1',
-            'chat_id'    => 'chat-1',
-            'username'   => 'Client One',
+            'id' => 'chat-1',
+            'chat_id' => 'chat-1',
+            'username' => 'Client One',
             'expire_date' => '2030-01-01 23:59',
-            'days_left'  => 1,
+            'days_left' => 1,
         ];
 
         $result = NotificationBotService::sendReminder('chat-1', $client);
@@ -112,11 +113,11 @@ class NotificationBotTest extends TestCase
     public function test_send_now_delegates_to_send_reminder(): void
     {
         $client = [
-            'id'         => 'chat-1',
-            'chat_id'    => 'chat-1',
-            'username'   => 'Client One',
+            'id' => 'chat-1',
+            'chat_id' => 'chat-1',
+            'username' => 'Client One',
             'expire_date' => '2030-01-01 23:59',
-            'days_left'  => 3,
+            'days_left' => 3,
         ];
 
         $result = NotificationBotService::sendNow('chat-1', $client);

@@ -9,6 +9,7 @@ use App\Models\LocalPlan;
 use App\Models\Panel;
 use App\Services\Local\LocalUserService;
 use App\Services\Panels\PanelNodeService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -95,7 +96,7 @@ class AdminLocalServiceController extends Controller
     /**
      * The user-picker search box.
      */
-    public function searchUsers(Request $request): \Illuminate\Http\JsonResponse
+    public function searchUsers(Request $request): JsonResponse
     {
         $q = trim((string) $request->query('q', ''));
 

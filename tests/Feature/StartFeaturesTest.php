@@ -4,11 +4,9 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
-use App\Models\BotButton;
 use App\Models\PanelSetting;
 use App\Models\User;
 use App\Models\Wallet;
-use App\Models\WalletTransaction;
 use App\Models\WelcomeCreditLog;
 use App\Services\Features\StartEmojiAdminService;
 use App\Services\Features\WelcomeGiftService;
@@ -38,6 +36,7 @@ class StartFeaturesTest extends TestCase
             'chat_id' => $chatId,
             'balance' => '0',
         ]);
+
         return $user;
     }
 
@@ -49,7 +48,7 @@ class StartFeaturesTest extends TestCase
             'starts_at' => '',
             'ends_at' => '',
             'notify' => '1',
-            'message' => "🎁 {amount}",
+            'message' => '🎁 {amount}',
         ];
         foreach ($overrides as $k => $v) {
             $d[$k] = $v;

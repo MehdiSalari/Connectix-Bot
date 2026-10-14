@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Services\Shop;
 
 use App\Models\FlashSale;
+use App\Support\PersianCalendar;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\DB;
 
 /**
  * Admin-facing service for the timed flash-sale (حراج زمان‌دار) feature.
@@ -29,7 +29,7 @@ class FlashSaleAdminService
     public static function all(): array
     {
         return FlashSale::query()
-            ->orderByRaw("CASE WHEN is_active = 1 AND starts_at <= ? AND ends_at > ? THEN 0 ELSE 1 END", [self::nowTehran(), self::nowTehran()])
+            ->orderByRaw('CASE WHEN is_active = 1 AND starts_at <= ? AND ends_at > ? THEN 0 ELSE 1 END', [self::nowTehran(), self::nowTehran()])
             ->orderBy('id', 'desc')
             ->get()
             ->toArray();
@@ -38,7 +38,7 @@ class FlashSaleAdminService
     /**
      * Create a new flash sale.
      *
-     * @param array{plan_id:string, plan_title:string, discount_type:'percent'|'fixed', discount_value:int, starts_at:string, ends_at:string} $data
+     * @param  array{plan_id:string, plan_title:string, discount_type:'percent'|'fixed', discount_value:int, starts_at:string, ends_at:string}  $data
      */
     public static function create(array $data): FlashSale
     {
@@ -59,13 +59,13 @@ class FlashSaleAdminService
         }
 
         return FlashSale::create([
-            'plan_id'        => $data['plan_id'],
-            'plan_title'     => $data['plan_title'],
-            'discount_type'  => $data['discount_type'],
+            'plan_id' => $data['plan_id'],
+            'plan_title' => $data['plan_title'],
+            'discount_type' => $data['discount_type'],
             'discount_value' => $data['discount_value'],
-            'starts_at'      => $data['starts_at'],
-            'ends_at'        => $data['ends_at'],
-            'is_active'      => true,
+            'starts_at' => $data['starts_at'],
+            'ends_at' => $data['ends_at'],
+            'is_active' => true,
         ]);
     }
 
@@ -73,11 +73,12 @@ class FlashSaleAdminService
     public static function setActive(int $id, bool $active): bool
     {
         $sale = FlashSale::find($id);
-        if (!$sale) {
+        if (! $sale) {
             return false;
         }
 
         $sale->is_active = $active;
+
         return $sale->save();
     }
 
@@ -85,7 +86,7 @@ class FlashSaleAdminService
     public static function delete(int $id): bool
     {
         $sale = FlashSale::find($id);
-        if (!$sale) {
+        if (! $sale) {
             return false;
         }
 
@@ -98,7 +99,7 @@ class FlashSaleAdminService
      */
     public static function priceWithSale(int $planPrice, ?array $sale): array
     {
-        if (!$sale) {
+        if (! $sale) {
             return [$planPrice, 0];
         }
 
@@ -133,7 +134,7 @@ class FlashSaleAdminService
             }
             $parts[] = "{$minutes} دقیقه";
 
-            return implode(' و ', $parts) . ' باقی‌مانده';
+            return implode(' و ', $parts).' باقی‌مانده';
         } catch (\Throwable $e) {
             return '';
         }
@@ -143,7 +144,7 @@ class FlashSaleAdminService
      * Active sales keyed by plan_id (newest sale wins per plan).
      * For the shop/bot layer to consume.
      *
-     * @param  array<int,string>|null $planIds If null, return all active.
+     * @param  array<int,string>|null  $planIds  If null, return all active.
      * @return array<string,array>
      */
     public static function activeMap(?array $planIds = null): array
@@ -177,6 +178,7 @@ class FlashSaleAdminService
         }
         $v = str_replace('T', ' ', $v);
         $ts = strtotime($v);
+
         return $ts === false ? null : date('Y-m-d H:i:s', $ts);
     }
 
@@ -197,7 +199,7 @@ class FlashSaleAdminService
         }
 
         try {
-            $j = \App\Support\PersianCalendar::toJalali((int) $m[1], (int) $m[2], (int) $m[3]);
+            $j = PersianCalendar::toJalali((int) $m[1], (int) $m[2], (int) $m[3]);
         } catch (\Throwable $e) {
             return $value;
         }
@@ -208,10 +210,10 @@ class FlashSaleAdminService
     /** Ready-to-send announcement text for the broadcast page. */
     public static function announcementText(array $sale): string
     {
-        $title = $sale['plan_title'] ?: ('پلن ' . $sale['plan_id']);
+        $title = $sale['plan_title'] ?: ('پلن '.$sale['plan_id']);
         $off = ($sale['discount_type'] === 'percent')
-            ? ((int) $sale['discount_value'] . '٪')
-            : (number_format((int) $sale['discount_value']) . ' تومان');
+            ? ((int) $sale['discount_value'].'٪')
+            : (number_format((int) $sale['discount_value']).' تومان');
 
         // Gregorian end time shown in the panel's Jalali calendar.
         $endJ = self::jalaliDate($sale['ends_at'], '/');

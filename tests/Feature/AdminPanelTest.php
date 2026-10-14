@@ -19,6 +19,7 @@ use App\Models\WalletTransaction;
 use App\Services\Panel\PanelSettingsService;
 use App\Services\Plan\PlanService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
@@ -1124,8 +1125,7 @@ class AdminPanelTest extends TestCase
 
             $this->assertFileDoesNotExist($absolute.'/windows.txt');
         } finally {
-            \Illuminate\Support\Facades\File::deleteDirectory($absolute);
+            File::deleteDirectory($absolute);
         }
     }
 }
-

@@ -234,7 +234,7 @@ class AdminButtonsTest extends TestCase
                 'current_label' => $key,
                 'screen' => 'os_screen',
                 'is_active' => true,
-                'link_url' => 'https://example.com/' . $key,
+                'link_url' => 'https://example.com/'.$key,
                 'action_type' => 'open_url',
             ]);
         }

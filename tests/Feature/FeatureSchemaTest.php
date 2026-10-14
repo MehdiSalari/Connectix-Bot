@@ -11,14 +11,15 @@ use App\Models\BroadcastRecipient;
 use App\Models\Client;
 use App\Models\CouponRestriction;
 use App\Models\GatewayOrder;
-use App\Models\LoyaltyPoint;
 use App\Models\LocalPlan;
+use App\Models\LoyaltyPoint;
 use App\Models\Panel;
 use App\Models\Payment;
 use App\Models\Reseller;
 use App\Models\ResellerCommission;
 use App\Models\Ticket;
 use App\Models\TicketMessage;
+use App\Models\User;
 use App\Models\WinbackSent;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -158,7 +159,7 @@ class FeatureSchemaTest extends TestCase
             );
         }
 
-        $user = \App\Models\User::query()->create(['chat_id' => '7001']);
+        $user = User::query()->create(['chat_id' => '7001']);
 
         // Laravel's in-memory instance after create() only carries the
         // attributes that were passed; the column defaults live in the DDL

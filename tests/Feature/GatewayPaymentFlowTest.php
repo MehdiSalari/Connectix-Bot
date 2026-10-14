@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
+use App\Http\Controllers\Pay\GatewayCallbackController;
 use App\Models\GatewayOrder;
-use App\Models\Payment;
 use App\Models\PaymentGateway;
 use App\Models\User;
 use App\Models\Wallet;
@@ -13,6 +13,7 @@ use App\Models\WalletTransaction;
 use App\Services\Gateways\OnlineGatewayService;
 use App\Services\Wallet\WalletService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
@@ -41,14 +42,15 @@ class GatewayPaymentFlowTest extends TestCase
     private function makeUser(int $balance = 0): User
     {
         $user = User::query()->create([
-            'chat_id' => (string)self::CHAT,
-            'telegram_id' => (string)self::CHAT,
+            'chat_id' => (string) self::CHAT,
+            'telegram_id' => (string) self::CHAT,
             'name' => 'Ali',
             'test' => false,
         ]);
         if ($balance > 0) {
-            $this->app->make(WalletService::class)->create((string)self::CHAT, $balance);
+            $this->app->make(WalletService::class)->create((string) self::CHAT, $balance);
         }
+
         return $user;
     }
 
@@ -125,7 +127,7 @@ class GatewayPaymentFlowTest extends TestCase
                 'data' => ['code' => 100, 'authority' => 'test-authority-123', 'pay_url' => 'https://id.zarinpal.com/pg/StartPay/test-authority-123'],
             ], 200),
         ]);
-        $result = $service->createOrder((string)self::CHAT, 'zarinpal', 'buy', ['price' => '25000', 'action' => 'buy', 'acc' => 'new'], 25000);
+        $result = $service->createOrder((string) self::CHAT, 'zarinpal', 'buy', ['price' => '25000', 'action' => 'buy', 'acc' => 'new'], 25000);
         $this->assertTrue($result['ok']);
         $this->assertNotNull($result['order']);
         $this->assertStringContainsString('test-authority-123', $result['order']->pay_url);
@@ -143,7 +145,7 @@ class GatewayPaymentFlowTest extends TestCase
                 'code' => -1, 'token' => 'nextpay-trans-456',
             ], 200),
         ]);
-        $result = $service->createOrder((string)self::CHAT, 'nextpay', 'wallet', ['amount' => 50000], 50000);
+        $result = $service->createOrder((string) self::CHAT, 'nextpay', 'wallet', ['amount' => 50000], 50000);
         $this->assertTrue($result['ok']);
         $this->assertNotNull($result['order']);
         $this->assertStringContainsString('nextpay-trans-456', $result['order']->pay_url);
@@ -160,7 +162,7 @@ class GatewayPaymentFlowTest extends TestCase
                 'id' => 'np-invoice-789', 'invoice_url' => 'https://nowpayments.io/pay/np-invoice-789',
             ], 201),
         ]);
-        $result = $service->createOrder((string)self::CHAT, 'nowpayments', 'wallet', ['amount' => 200000], 200000);
+        $result = $service->createOrder((string) self::CHAT, 'nowpayments', 'wallet', ['amount' => 200000], 200000);
         $this->assertTrue($result['ok']);
         $this->assertNotNull($result['order']);
         $this->assertStringContainsString('np-invoice-789', $result['order']->pay_url);
@@ -173,20 +175,19 @@ class GatewayPaymentFlowTest extends TestCase
         $this->seedZarinpal();
         $this->makeUser();
         $service = $this->app->make(OnlineGatewayService::class);
-        $result = $service->createOrder((string)self::CHAT, 'zarinpal', 'buy', ['price' => '5000'], 5000);
+        $result = $service->createOrder((string) self::CHAT, 'zarinpal', 'buy', ['price' => '5000'], 5000);
         $this->assertFalse($result['ok']);
         $this->assertStringContainsString('حداقل مبلغ', $result['text']);
     }
-
 
     public function test_verify_and_finalize_zarinpal_paid_credits_wallet(): void
     {
         $this->seedZarinpal();
         $this->makeUser();
-        $this->app->make(WalletService::class)->create((string)self::CHAT, 0);
+        $this->app->make(WalletService::class)->create((string) self::CHAT, 0);
         $order = GatewayOrder::query()->create([
             'token' => 'a1b2c3d4e5f60718293a4b5c6d7e8f90',
-            'chat_id' => (string)self::CHAT,
+            'chat_id' => (string) self::CHAT,
             'kind' => 'wallet',
             'wallet_tx_id' => 1,
             'gateway' => 'zarinpal',
@@ -199,10 +200,10 @@ class GatewayPaymentFlowTest extends TestCase
             'updated_at' => now(),
         ]);
         WalletTransaction::query()->create([
-            'wallet_id' => Wallet::query()->where('chat_id', (string)self::CHAT)->first()->id,
+            'wallet_id' => Wallet::query()->where('chat_id', (string) self::CHAT)->first()->id,
             'amount' => '25000',
             'operation' => 'INCREASE',
-            'chat_id' => (string)self::CHAT,
+            'chat_id' => (string) self::CHAT,
             'status' => 'PENDING',
             'type' => 'CARD_TO_CARD',
             'created_at' => now(),
@@ -225,7 +226,7 @@ class GatewayPaymentFlowTest extends TestCase
         $this->makeUser();
         $order = GatewayOrder::query()->create([
             'token' => 'a1b2c3d4e5f60718293a4b5c6d7e8f90',
-            'chat_id' => (string)self::CHAT,
+            'chat_id' => (string) self::CHAT,
             'kind' => 'buy',
             'gateway' => 'zarinpal',
             'amount_toman' => 25000,
@@ -246,14 +247,13 @@ class GatewayPaymentFlowTest extends TestCase
         $this->assertSame('FAILED', $result['status']);
     }
 
-
     public function test_payments_row_created_with_method_gateway_for_kind_buy(): void
     {
         $this->seedZarinpal();
         $this->makeUser();
         $order = GatewayOrder::query()->create([
             'token' => 'a1b2c3d4e5f60718293a4b5c6d7e8f90',
-            'chat_id' => (string)self::CHAT,
+            'chat_id' => (string) self::CHAT,
             'kind' => 'buy',
             'gateway' => 'zarinpal',
             'amount_toman' => 25000,
@@ -282,10 +282,10 @@ class GatewayPaymentFlowTest extends TestCase
     {
         $this->seedZarinpal();
         $this->makeUser();
-        $this->app->make(WalletService::class)->create((string)self::CHAT, 0);
+        $this->app->make(WalletService::class)->create((string) self::CHAT, 0);
         $order = GatewayOrder::query()->create([
             'token' => 'a1b2c3d4e5f60718293a4b5c6d7e8f90',
-            'chat_id' => (string)self::CHAT,
+            'chat_id' => (string) self::CHAT,
             'kind' => 'wallet',
             'wallet_tx_id' => 1,
             'gateway' => 'zarinpal',
@@ -298,10 +298,10 @@ class GatewayPaymentFlowTest extends TestCase
             'updated_at' => now(),
         ]);
         WalletTransaction::query()->create([
-            'wallet_id' => Wallet::query()->where('chat_id', (string)self::CHAT)->first()->id,
+            'wallet_id' => Wallet::query()->where('chat_id', (string) self::CHAT)->first()->id,
             'amount' => '25000',
             'operation' => 'INCREASE',
-            'chat_id' => (string)self::CHAT,
+            'chat_id' => (string) self::CHAT,
             'status' => 'PENDING',
             'type' => 'CARD_TO_CARD',
             'created_at' => now(),
@@ -311,8 +311,8 @@ class GatewayPaymentFlowTest extends TestCase
                 'data' => ['code' => 100, 'ref_id' => 'zp-ref-123'],
             ], 200),
         ]);
-        $controller = $this->app->make(\App\Http\Controllers\Pay\GatewayCallbackController::class);
-        $request = new \Illuminate\Http\Request();
+        $controller = $this->app->make(GatewayCallbackController::class);
+        $request = new Request;
         $request->query->set('gw', 'zarinpal');
         $request->query->set('t', 'a1b2c3d4e5f60718293a4b5c6d7e8f90');
         $request->query->set('Authority', 'test-authority');

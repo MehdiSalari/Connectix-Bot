@@ -52,6 +52,7 @@ class GatewayCallbackController
     private function extractToken(string $token): string
     {
         $clean = preg_replace('/[^a-f0-9].*$/', '', strtolower($token));
+
         return substr($clean, 0, 64);
     }
 
@@ -79,18 +80,18 @@ class GatewayCallbackController
 
     public function __invoke(Request $request, OnlineGatewayService $service): Response
     {
-        $gateway = $this->extractGateway((string)$request->query('gw', ''));
-        $token = $this->extractToken((string)$request->query('t', ''));
-        $rawQuery = (string)$request->server('QUERY_STRING', '');
+        $gateway = $this->extractGateway((string) $request->query('gw', ''));
+        $token = $this->extractToken((string) $request->query('t', ''));
+        $rawQuery = (string) $request->server('QUERY_STRING', '');
 
         foreach (['trans_id', 'Authority', 'Status'] as $k) {
-            if ($request->query($k) === null && preg_match('/[?&]' . preg_quote($k, '/') . '=([^&]+)/', $rawQuery, $mm)) {
+            if ($request->query($k) === null && preg_match('/[?&]'.preg_quote($k, '/').'=([^&]+)/', $rawQuery, $mm)) {
                 $request->merge([$k => urldecode($mm[1])]);
             }
         }
 
         $order = GatewayOrder::query()->where('token', $token)->first();
-        if (!$order || $order->gateway !== $gateway) {
+        if (! $order || $order->gateway !== $gateway) {
             if ($request->isMethod('post')) {
                 return response('not found', 404)->header('Content-Type', 'text/plain; charset=utf-8');
             }
@@ -99,16 +100,17 @@ class GatewayCallbackController
         }
 
         if ($gateway === 'nowpayments' && $request->isMethod('post')) {
-            $body = (array)$request->json()->all();
-            $res = $service->handleNowPaymentsIpn((int)$order->id, $token, $body);
-            return response($res['text'] ?? 'ok', (int)$res['http'] ?? 200)->header('Content-Type', 'text/plain; charset=utf-8');
+            $body = (array) $request->json()->all();
+            $res = $service->handleNowPaymentsIpn((int) $order->id, $token, $body);
+
+            return response($res['text'] ?? 'ok', (int) $res['http'] ?? 200)->header('Content-Type', 'text/plain; charset=utf-8');
         }
 
         if ($gateway === 'nowpayments') {
             if ($request->query('cancel')) {
                 return $this->renderPage('fail', 'پرداخت لغو شد', 'اگر هنوز پرداخت نکرده‌اید، از ربات دوباره سفارش بدهید.');
             }
-            $cur = GatewayOrder::query()->find((int)$order->id);
+            $cur = GatewayOrder::query()->find((int) $order->id);
             if ($cur && $cur->status === 'PAID') {
                 return $this->renderPage('ok', 'پرداخت تایید شد', 'سفارش شما تکمیل شد و پیام آن در ربات ارسال شده است.');
             }
@@ -117,22 +119,23 @@ class GatewayCallbackController
         }
 
         if ($gateway === 'zarinpal') {
-            if (!hash_equals((string)$order->authority, (string)$request->query('Authority', ''))) {
+            if (! hash_equals((string) $order->authority, (string) $request->query('Authority', ''))) {
                 return $this->renderPage('fail', 'پرداخت نامعتبر', 'اطلاعات بازگشتی از درگاه با سفارش شما مطابقت ندارد.');
             }
-            if (strtoupper((string)$request->query('Status', '')) !== 'OK') {
-                $service->markFailed((int)$order->id, 'CANCELED');
+            if (strtoupper((string) $request->query('Status', '')) !== 'OK') {
+                $service->markFailed((int) $order->id, 'CANCELED');
+
                 return $this->renderPage('fail', 'پرداخت انجام نشد', 'پرداخت لغو شد یا ناموفق بود. مبلغی از حساب شما کسر نشده است (در صورت کسر، تا ۳۰ دقیقه بازگردانده می‌شود).');
             }
         } elseif ($gateway === 'nextpay') {
-            if (!hash_equals((string)$order->authority, (string)$request->query('trans_id', ''))) {
+            if (! hash_equals((string) $order->authority, (string) $request->query('trans_id', ''))) {
                 return $this->renderPage('fail', 'پرداخت نامعتبر', 'اطلاعات بازگشتی از درگاه با سفارش شما مطابقت ندارد.');
             }
         } else {
             return $this->renderPage('fail', 'درگاه نامعتبر', 'این درگاه پشتیبانی نمی‌شود.');
         }
 
-        $result = $service->verifyAndFinalize((int)$order->id);
+        $result = $service->verifyAndFinalize((int) $order->id);
         $st = self::STATUSES[$result['status']] ?? self::STATUSES['FAILED'];
 
         return $this->renderPage($st['kind'], $st['title'], $result['message'] ?: $st['msg']);

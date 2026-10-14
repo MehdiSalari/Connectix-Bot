@@ -35,13 +35,17 @@ class CryptoPaymentFlowTest extends TestCase
     use RefreshDatabase;
 
     private const CHAT = '555';
+
     private const ADMIN = '999';
 
     /** Tron wallet: base58check of 41 + 11*20. */
     private const TRX_ADDRESS = 'TBXSw8fM4jpQkGc6zZjsVABFpVN7UvXPdV';
+
     private const TRX_ADDRESS_HEX = '411111111111111111111111111111111111111111';
+
     /** A different wallet, for the wrong-destination test. */
     private const TRX_WRONG_ADDRESS_HEX = '412222222222222222222222222222222222222222';
+
     /** TON wallet: friendly EQ form of 11*32. */
     private const TON_ADDRESS = 'EQAREREREREREREREREREREREREREREREREREREREREREeYT';
 

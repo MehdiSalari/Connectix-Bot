@@ -17,6 +17,7 @@ use App\Telegram\TelegramUpdate;
 class GatewayHandler implements UpdateHandler
 {
     private const CALLBACK_PREFIX = 'gw_';
+
     private const FORBIDDEN = '⛔ دسترسی غیرمجاز.';
 
     public function __construct(
@@ -51,12 +52,15 @@ class GatewayHandler implements UpdateHandler
         switch ($action) {
             case 'go':
                 $this->createOrder($update, $user, $parts[1] ?? '', $parts[2] ?? 'buy');
+
                 return;
             case 'chk':
-                $this->checkOrder($update, $user, (int)($parts[1] ?? 0));
+                $this->checkOrder($update, $user, (int) ($parts[1] ?? 0));
+
                 return;
             case 'cancel':
-                $this->cancelOrder($update, $user, (int)($parts[1] ?? 0));
+                $this->cancelOrder($update, $user, (int) ($parts[1] ?? 0));
+
                 return;
         }
     }
@@ -64,14 +68,15 @@ class GatewayHandler implements UpdateHandler
     private function createOrder(TelegramUpdate $update, User $user, string $driver, string $mode): void
     {
         $result = $this->gateways->createOrder(
-            chatId: (string)$user->chat_id,
+            chatId: (string) $user->chat_id,
             driver: $driver,
             mode: $mode,
             state: $this->state->get($user) ?? [],
         );
 
-        if (!$result['ok']) {
+        if (! $result['ok']) {
             $this->render($update, $user, $result['text'], $result['kb'] ?? []);
+
             return;
         }
 
@@ -86,11 +91,12 @@ class GatewayHandler implements UpdateHandler
         $guard = AdminGuard::fromSettings($this->settings);
 
         $allowed = $order !== null
-            && ((string)$order->chat_id === (string)$user->chat_id
+            && ((string) $order->chat_id === (string) $user->chat_id
                 || $guard->isAdmin($update->fromUserId() ?? $user->chat_id));
 
-        if (!$allowed) {
+        if (! $allowed) {
             $this->render($update, $user, '⛔ این سفارش متعلق به شما نیست.', []);
+
             return;
         }
 
@@ -104,7 +110,7 @@ class GatewayHandler implements UpdateHandler
         $kb = [];
         if ($result['status'] === 'PENDING' && $order) {
             $kb = [
-                [['text' => '💳 | رفتن به صفحه پرداخت', 'url' => (string)$order->pay_url]],
+                [['text' => '💳 | رفتن به صفحه پرداخت', 'url' => (string) $order->pay_url]],
                 [['text' => '🔄 | بررسی دوباره', 'callback_data' => 'gw_chk:'.$orderId]],
                 [['text' => '❌ | انصراف', 'callback_data' => 'gw_cancel:'.$orderId]],
             ];
@@ -119,14 +125,16 @@ class GatewayHandler implements UpdateHandler
     {
         $order = GatewayOrder::query()->find($orderId);
 
-        if (!$order || (string)$order->chat_id !== (string)$user->chat_id) {
+        if (! $order || (string) $order->chat_id !== (string) $user->chat_id) {
             $this->render($update, $user, '⛔ این سفارش متعلق به شما نیست.', []);
+
             return;
         }
 
         if ($order->status === 'PENDING') {
             $this->gateways->markFailed($orderId, 'CANCELED');
             $this->render($update, $user, '❌ سفارش لغو شد.', [['text' => '🏡 | خانه', 'callback_data' => 'main_menu']]);
+
             return;
         }
 
@@ -135,7 +143,7 @@ class GatewayHandler implements UpdateHandler
 
     private function render(TelegramUpdate $update, User $user, string $text, array $rows): void
     {
-        $chatId = (string)$user->chat_id;
+        $chatId = (string) $user->chat_id;
         $keyboard = json_encode(['inline_keyboard' => $rows], JSON_UNESCAPED_UNICODE);
         $messageId = $update->callbackMessageId();
 
@@ -144,6 +152,7 @@ class GatewayHandler implements UpdateHandler
                 'parse_mode' => 'HTML',
                 'reply_markup' => $keyboard,
             ]);
+
             return;
         }
 

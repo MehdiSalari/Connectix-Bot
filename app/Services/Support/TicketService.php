@@ -7,9 +7,12 @@ namespace App\Services\Support;
 use App\Models\Ticket;
 use App\Models\TicketMessage;
 use App\Models\User;
+use App\Services\Panel\PanelSettingsService;
+use App\Services\Telegram\AdminGuard;
 use App\Services\Telegram\TelegramService;
 use App\Services\User\UserStateService;
 use App\Support\JalaliDate;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
@@ -194,7 +197,7 @@ class TicketService
 
         try {
             $this->openCountMemo = (int) Ticket::query()->where('status', 'OPEN')->count();
-        } catch (\Throwable) {
+        } catch (Throwable) {
             $this->openCountMemo = 0;
         }
 
@@ -233,9 +236,9 @@ class TicketService
      * Every ticket with its newest message attached, for list pages.
      *
      * @param  string  $status  one of the STATUSES or 'ALL'
-     * @return \Illuminate\Support\Collection<int, array{ticket: Ticket, last: TicketMessage|null}>
+     * @return Collection<int, array{ticket: Ticket, last: TicketMessage|null}>
      */
-    public function history(string $status = 'ALL'): \Illuminate\Support\Collection
+    public function history(string $status = 'ALL'): Collection
     {
         $query = Ticket::query()->orderByDesc('updated_at')->orderByDesc('id');
 
@@ -917,8 +920,8 @@ class TicketService
     public function isAdmin(User $user): bool
     {
         try {
-            return \App\Services\Telegram\AdminGuard::fromSettings(
-                app(\App\Services\Panel\PanelSettingsService::class)
+            return AdminGuard::fromSettings(
+                app(PanelSettingsService::class)
             )->isAdmin($user->chat_id);
         } catch (Throwable) {
             return false;
@@ -931,7 +934,7 @@ class TicketService
      */
     private function notifyAdminsUserReply(Ticket $ticket, string $message, string $senderName): void
     {
-        $text = "📩 <b>پاسخ جدید کاربر در تیکت ".self::e($ticket->ticket_number)."</b>\n\n"
+        $text = '📩 <b>پاسخ جدید کاربر در تیکت '.self::e($ticket->ticket_number)."</b>\n\n"
             .'👤 کاربر: <b>'.self::e($senderName)."</b>\n"
             .'📌 موضوع: '.self::e($ticket->subject)."\n"
             .'💬 پیام کاربر:'.self::e($message);
@@ -955,7 +958,7 @@ class TicketService
      */
     private function notifyOwnerAdminReply(Ticket $ticket, string $message): void
     {
-        $text = "🔔 <b>پاسخ جدید به تیکت ".self::e($ticket->ticket_number)."</b>\n\n"
+        $text = '🔔 <b>پاسخ جدید به تیکت '.self::e($ticket->ticket_number)."</b>\n\n"
             .'📌 موضوع: '.self::e($ticket->subject)."\n"
             .'👨💼 پاسخ پشتیبان:'.self::e($message)."\n\n"
             .'برای پاسخ مجدد روی دکمه زیر کلیک کنید 👇';
@@ -978,7 +981,7 @@ class TicketService
         }
 
         try {
-            return app(\App\Services\Panel\PanelSettingsService::class)->adminIds();
+            return app(PanelSettingsService::class)->adminIds();
         } catch (Throwable) {
             return [];
         }

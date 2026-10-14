@@ -6,7 +6,6 @@ namespace Tests\Feature;
 
 use App\Models\LoyaltyCode;
 use App\Models\LoyaltyPoint;
-use App\Models\LoyaltyRedemption;
 use App\Models\LoyaltyReward;
 use App\Models\Payment;
 use App\Models\User;

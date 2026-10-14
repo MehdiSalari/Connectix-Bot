@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Tests\Feature;
 
 use App\Models\FlashSale;
-use App\Models\PanelSetting;
 use App\Services\Shop\FlashSaleBotService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Factory;
@@ -41,13 +40,13 @@ class FlashSaleBotTest extends TestCase
     private function makeSale(string $planId, string $type, int $value, string $startsAt, string $endsAt): FlashSale
     {
         return FlashSale::query()->create([
-            'plan_id'        => $planId,
-            'plan_title'     => 'Test Plan',
-            'discount_type'  => $type,
+            'plan_id' => $planId,
+            'plan_title' => 'Test Plan',
+            'discount_type' => $type,
             'discount_value' => $value,
-            'starts_at'      => $startsAt,
-            'ends_at'        => $endsAt,
-            'is_active'      => true,
+            'starts_at' => $startsAt,
+            'ends_at' => $endsAt,
+            'is_active' => true,
         ]);
     }
 

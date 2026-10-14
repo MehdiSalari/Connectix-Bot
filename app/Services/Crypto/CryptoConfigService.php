@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Crypto;
 
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 /**
  * The TRX/TON crypto payment settings, stored in `panel_settings`.
@@ -104,7 +105,7 @@ class CryptoConfigService
      *
      * @param  array<string, mixed>  $values
      *
-     * @throws \Illuminate\Validation\ValidationException
+     * @throws ValidationException
      */
     public function save(array $values): void
     {
@@ -126,14 +127,14 @@ class CryptoConfigService
                 ]);
 
                 if ($networks[$name]['enabled'] && $networks[$name]['address'] === '') {
-                    throw \Illuminate\Validation\ValidationException::withMessages([
+                    throw ValidationException::withMessages([
                         "{$name}_address" => "برای فعال کردن {$meta['symbol']} آدرس کیف پول را وارد کنید.",
                     ]);
                 }
 
                 if ($networks[$name]['address'] !== ''
                     && ! $this->isValidAddress($name, $networks[$name]['address'])) {
-                    throw \Illuminate\Validation\ValidationException::withMessages([
+                    throw ValidationException::withMessages([
                         "{$name}_address" => "آدرس کیف پول {$meta['symbol']} نامعتبر است (یک‌بار دیگر از کیف پول کپی کنید).",
                     ]);
                 }
@@ -175,7 +176,7 @@ class CryptoConfigService
             $configured = array_filter($networks, fn (array $net): bool => $net['enabled'] && $net['address'] !== '');
 
             if ($configured === []) {
-                throw \Illuminate\Validation\ValidationException::withMessages([
+                throw ValidationException::withMessages([
                     'crypto_enabled' => 'برای فعال کردن پرداخت کریپتو، حداقل یک شبکه (TRX یا TON) را با آدرس کیف پول فعال کنید.',
                 ]);
             }

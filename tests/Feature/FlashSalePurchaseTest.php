@@ -4,10 +4,9 @@ declare(strict_types=1);
 
 namespace Tests\Feature;
 
-use App\Models\PanelSetting;
+use App\Models\FlashSale;
 use App\Services\Shop\FlashSaleAdminService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Carbon;
 use Tests\TestCase;
 
 class FlashSalePurchaseTest extends TestCase
@@ -18,7 +17,7 @@ class FlashSalePurchaseTest extends TestCase
     {
         $now = now('Asia/Tehran');
         // Create active flash sale via model directly for test
-        \App\Models\FlashSale::query()->create([
+        FlashSale::query()->create([
             'plan_id' => '123',
             'plan_title' => 'Test Plan',
             'discount_type' => 'percent',

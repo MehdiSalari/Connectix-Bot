@@ -26,18 +26,18 @@ class LoyaltyBotService
         $stmt = $pdo->prepare('SELECT * FROM payments WHERE id = ?');
         $stmt->execute([$paymentIdNum]);
         $p = $stmt->fetch(\PDO::FETCH_ASSOC);
-        if (!$p) {
+        if (! $p) {
             return;
         }
         $isPaid = (string) ($p['is_paid'] ?? '');
-        if (!in_array($isPaid, ['1', '2'], true)) {
+        if (! in_array($isPaid, ['1', '2'], true)) {
             return;
         }
         $method = (string) ($p['method'] ?? '');
         if ($method === 'loyalty') {
             return;
         }
-        if (!LoyaltyAdminService::enabled()) {
+        if (! LoyaltyAdminService::enabled()) {
             return;
         }
         $chatId = (string) ($p['chat_id'] ?? '');
@@ -58,8 +58,8 @@ class LoyaltyBotService
                 'amount' => $earned,
                 'remaining' => $earned,
                 'type' => 'payment',
-                'ref' => 'pay:' . $paymentIdNum,
-                'note' => 'سفارش ' . ($p['order_number'] ?? $paymentIdNum),
+                'ref' => 'pay:'.$paymentIdNum,
+                'note' => 'سفارش '.($p['order_number'] ?? $paymentIdNum),
                 'expires_at' => null,
                 'created_at' => self::now(),
             ]);
@@ -67,7 +67,7 @@ class LoyaltyBotService
             return;
         }
         try {
-            tg('sendMessage', ['chat_id' => $chatId, 'text' => '🎉 ' . $earned . ' امتیاز به حساب شما اضافه شد.']);
+            tg('sendMessage', ['chat_id' => $chatId, 'text' => '🎉 '.$earned.' امتیاز به حساب شما اضافه شد.']);
         } catch (\Throwable $e) {
         }
     }
@@ -82,7 +82,7 @@ class LoyaltyBotService
         $chat = (string) $chatId;
         $balance = self::getBalance($chat);
         $code = LoyaltyCode::query()->find($codeId);
-        if (!$code) {
+        if (! $code) {
             return ['ok' => false, 'error' => 'کد یافت نشد.'];
         }
         if ($code->assigned_to !== null && (string) $code->assigned_to !== $chat) {
@@ -102,7 +102,7 @@ class LoyaltyBotService
                 if ($cost > 0) {
                     $spend = new \ReflectionMethod(LoyaltyAdminService::class, 'spend');
                     $spend->setAccessible(true);
-                    $spend->invoke(null, $chat, $cost, 'redeem', 'redeem:' . $code->id, $reward ? $reward->title : 'redeem');
+                    $spend->invoke(null, $chat, $cost, 'redeem', 'redeem:'.$code->id, $reward ? $reward->title : 'redeem');
                 }
                 LoyaltyRedemption::create([
                     'chat_id' => $chat,
@@ -130,6 +130,7 @@ class LoyaltyBotService
             tg('sendMessage', ['chat_id' => $chat, 'text' => '✅ کد با موفقیت اعمال شد.']);
         } catch (\Throwable $e) {
         }
+
         return ['ok' => true];
     }
 }

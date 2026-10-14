@@ -4,10 +4,8 @@ declare(strict_types=1);
 
 namespace App\Services\Gateways;
 
-use App\Enums\PaymentMethod;
-use App\Enums\WalletTransactionStatus;
-use App\Enums\WalletTransactionType;
 use App\Models\GatewayOrder;
+use App\Models\Payment;
 use App\Models\PaymentGateway;
 use App\Services\Panel\PanelSettingsService;
 use App\Services\Payment\PaymentService;
@@ -17,7 +15,6 @@ use App\Services\Wallet\WalletService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class OnlineGatewayService
@@ -77,12 +74,12 @@ class OnlineGatewayService
             $drivers = self::activeDrivers();
             foreach ($drivers as $driver) {
                 $meta = self::meta()[$driver['gateway_name']] ?? null;
-                if (!$meta) {
+                if (! $meta) {
                     continue;
                 }
                 if ($driver['gateway_name'] === 'nowpayments') {
-                    $cfg = json_decode((string)($driver['config_json'] ?? ''), true);
-                    $rate = (float)($cfg['usd_rate_toman'] ?? 0);
+                    $cfg = json_decode((string) ($driver['config_json'] ?? ''), true);
+                    $rate = (float) ($cfg['usd_rate_toman'] ?? 0);
                     if ($rate <= 0) {
                         continue;
                     }
@@ -108,7 +105,7 @@ class OnlineGatewayService
             ->where('is_active', true)
             ->first();
 
-        if (!$gateway) {
+        if (! $gateway) {
             return ['ok' => false, 'text' => 'این درگاه فعال نیست.', 'kb' => [], 'order' => null];
         }
 
@@ -158,6 +155,7 @@ class OnlineGatewayService
                     'created_at' => Carbon::now('Asia/Tehran'),
                     'updated_at' => Carbon::now('Asia/Tehran'),
                 ]);
+
                 return ['ok' => true, 'text' => '', 'kb' => [], 'order' => $order];
             } elseif ($driver === 'nextpay') {
                 $res = Http::post('https://api.nextpay.ir/np/gateway/token', [
@@ -169,10 +167,10 @@ class OnlineGatewayService
                 ]);
                 $data = $res->json();
                 $code = $data['code'] ?? null;
-                if ($code === -1 && !empty($data['token'])) {
+                if ($code === -1 && ! empty($data['token'])) {
                     $authority = $data['token'];
                     $payUrl = 'https://nextpay.ir/np/gateway/'.$authority;
-                } elseif ($code === -1 && !empty($data['trans_id'])) {
+                } elseif ($code === -1 && ! empty($data['trans_id'])) {
                     $authority = $data['trans_id'];
                     $payUrl = 'https://nextpay.ir/np/gateway/payment/'.$authority;
                 } else {
@@ -191,6 +189,7 @@ class OnlineGatewayService
                     'created_at' => Carbon::now('Asia/Tehran'),
                     'updated_at' => Carbon::now('Asia/Tehran'),
                 ]);
+
                 return ['ok' => true, 'text' => '', 'kb' => [], 'order' => $order];
             } elseif ($driver === 'nowpayments') {
                 $rate = (float) ($config['usd_rate_toman'] ?? 0);
@@ -224,17 +223,20 @@ class OnlineGatewayService
                     'created_at' => Carbon::now('Asia/Tehran'),
                     'updated_at' => Carbon::now('Asia/Tehran'),
                 ]);
+
                 return ['ok' => true, 'text' => '', 'kb' => [], 'order' => $order];
             }
+
             return ['ok' => false, 'text' => 'این درگاه فعال نیست.', 'kb' => [], 'order' => null];
         } catch (\Throwable $e) {
             return ['ok' => false, 'text' => 'این درگاه فعال نیست.', 'kb' => [], 'order' => null];
         }
     }
+
     public function verifyAndFinalize(int $orderId): array
     {
         $order = GatewayOrder::query()->find($orderId);
-        if (!$order) {
+        if (! $order) {
             return ['status' => 'FAILED', 'message' => 'سفارش پیدا نشد'];
         }
 
@@ -247,7 +249,7 @@ class OnlineGatewayService
         }
 
         $gateway = PaymentGateway::query()->where('gateway_name', $order->gateway)->first();
-        if (!$gateway) {
+        if (! $gateway) {
             return ['status' => 'FAILED', 'message' => 'درگاه یافت نشد'];
         }
 
@@ -267,6 +269,7 @@ class OnlineGatewayService
                 if ($code === 100 || $code === 101) {
                     return $this->finalizePaidOrder($order);
                 }
+
                 return ['status' => 'FAILED', 'message' => 'پرداخت تایید نشد'];
             } elseif ($order->gateway === 'nextpay') {
                 $res = Http::post('https://api.nextpay.ir/np/gateway/verify', [
@@ -279,6 +282,7 @@ class OnlineGatewayService
                 if ($code === 0) {
                     return $this->finalizePaidOrder($order);
                 }
+
                 return ['status' => 'FAILED', 'message' => 'پرداخت تایید نشد'];
             } elseif ($order->gateway === 'nowpayments') {
                 $authority = $order->authority;
@@ -294,8 +298,10 @@ class OnlineGatewayService
                 if (in_array($status, ['expired', 'failed', 'refunded'])) {
                     return ['status' => 'FAILED', 'message' => 'پرداخت ناموفق بود'];
                 }
+
                 return ['status' => 'PENDING', 'message' => 'در انتظار تایید'];
             }
+
             return ['status' => 'FAILED', 'message' => 'درگاه پشتیبانی نمی‌شود'];
         } catch (\Throwable $e) {
             return ['status' => 'FAILED', 'message' => 'خطا در تایید پرداخت'];
@@ -318,7 +324,7 @@ class OnlineGatewayService
                 }
             } elseif ($order->kind === 'buy') {
                 try {
-                    $payment = new \App\Models\Payment([
+                    $payment = new Payment([
                         'chat_id' => $order->chat_id,
                         'client_id' => 'new',
                         'plan_id' => 'plan',
@@ -356,18 +362,21 @@ class OnlineGatewayService
     public function handleNowPaymentsIpn(int $orderId, string $token, array $body): array
     {
         $order = GatewayOrder::query()->find($orderId);
-        if (!$order || $order->token !== $token) {
+        if (! $order || $order->token !== $token) {
             return ['http' => 404, 'text' => 'not found'];
         }
         $paymentStatus = strtolower($body['payment_status'] ?? ($body['status'] ?? ''));
         if (in_array($paymentStatus, ['paid', 'completed', 'finished'])) {
             $this->verifyAndFinalize($orderId);
+
             return ['http' => 200, 'text' => 'ok'];
         }
         if (in_array($paymentStatus, ['failed', 'cancelled', 'expired'])) {
             $this->markFailed($orderId, 'FAILED');
+
             return ['http' => 200, 'text' => 'ok'];
         }
+
         return ['http' => 200, 'text' => 'ok'];
     }
 
